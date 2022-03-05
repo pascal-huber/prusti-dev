@@ -3,7 +3,7 @@ use crate::common::display;
 
 #[derive_helpers]
 #[derive_visitors]
-#[derive(derive_more::From, derive_more::IsVariant)]
+#[derive(derive_more::From, derive_more::IsVariant, derive_more::Unwrap)]
 pub enum TypeDecl {
     Bool,
     Int(Int),

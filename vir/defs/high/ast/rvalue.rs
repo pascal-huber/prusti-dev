@@ -10,6 +10,7 @@ pub(crate) use super::super::{
 pub enum Rvalue {
     UnaryOp(UnaryOp),
     BinaryOp(BinaryOp),
+    Discriminant(Discriminant),
 }
 
 #[display(fmt = "{}({})", kind, argument)]
@@ -23,6 +24,11 @@ pub struct BinaryOp {
     pub kind: BinaryOpKind,
     pub left: Operand,
     pub right: Operand,
+}
+
+#[display(fmt = "discriminant({})", place)]
+pub struct Discriminant {
+    pub place: Expression,
 }
 
 #[display(fmt = "{}({})", kind, expression)]

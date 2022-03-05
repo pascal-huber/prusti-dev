@@ -6,6 +6,7 @@ impl WithIdentifier for Rvalue {
         match self {
             Self::UnaryOp(value) => value.get_identifier(),
             Self::BinaryOp(value) => value.get_identifier(),
+            Self::Discriminant(value) => value.get_identifier(),
         }
     }
 }
@@ -24,6 +25,12 @@ impl WithIdentifier for BinaryOp {
             self.left.get_identifier(),
             self.right.get_identifier()
         )
+    }
+}
+
+impl WithIdentifier for Discriminant {
+    fn get_identifier(&self) -> String {
+        format!("discriminant${}", self.place.get_type().get_identifier())
     }
 }
 

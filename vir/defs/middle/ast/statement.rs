@@ -17,6 +17,7 @@ pub enum Statement {
     UnfoldOwned(UnfoldOwned),
     JoinBlock(JoinBlock),
     SplitBlock(SplitBlock),
+    ConvertOwnedIntoMemoryBlock(ConvertOwnedIntoMemoryBlock),
     MovePlace(MovePlace),
     CopyPlace(CopyPlace),
     WritePlace(WritePlace),
@@ -77,6 +78,14 @@ pub struct JoinBlock {
 #[display(fmt = "split {}", place)]
 /// Split `MemoryBlock(place)`.
 pub struct SplitBlock {
+    pub place: Expression,
+    pub condition: Option<Vec<BasicBlockId>>,
+    pub position: Position,
+}
+
+/// Convert `Owned(place)` into `MemoryBlock(place)`.
+#[display(fmt = "convert-owned-memory-block {}", place)]
+pub struct ConvertOwnedIntoMemoryBlock {
     pub place: Expression,
     pub condition: Option<Vec<BasicBlockId>>,
     pub position: Position,
