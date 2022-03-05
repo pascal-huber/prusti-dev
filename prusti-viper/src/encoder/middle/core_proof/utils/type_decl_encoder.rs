@@ -25,10 +25,9 @@ pub(in super::super) trait TypeDeclWalker {
             {
                 self.before_primitive(ty, parameters, lowerer)
             }
-            vir_mid::Type::Tuple(_) | vir_mid::Type::Struct(_) => {
+            vir_mid::Type::Tuple(_) | vir_mid::Type::Struct(_) | vir_mid::Type::Enum(_) => {
                 self.before_composite(ty, parameters, lowerer)
             }
-            // vir_mid::Type::Enum(Enum) => {},
             // vir_mid::Type::Array(Array) => {},
             // vir_mid::Type::Reference(Reference) => {},
             // vir_mid::Type::Never => {},
@@ -97,6 +96,26 @@ pub(in super::super) trait TypeDeclWalker {
         }
         Ok(())
     }
+    fn walk_enum(&mut self, ty: &vir_mid::Type, decl: &vir_mid::type_decl::Enum, parameters: &Self::Parameters
+        ,
+        lowerer: &mut Lowerer,
+    ) -> SpannedEncodingResult<()> {
+        for variant in &decl.variants {
+            let variant_ty = ty.clone().variant(variant.name.clone().into());
+            self.walk_variant(&variant_ty, variant, parameters, lowerer)?;
+        }
+        Ok(())
+    }
+    fn walk_variant(
+        &mut self,
+        ty: &vir_mid::Type,
+        variant: &vir_mid::type_decl::Struct,
+        parameters: &Self::Parameters,
+        lowerer: &mut Lowerer,
+    ) -> SpannedEncodingResult<()> {
+        self.walk_fields(ty, variant.iter_fields(), parameters, lowerer)?;
+        Ok(())
+    }
     fn need_walk_type(
         &mut self,
         _ty: &vir_mid::Type,
@@ -142,7 +161,9 @@ pub(in super::super) trait TypeDeclWalker {
             vir_mid::TypeDecl::Struct(struct_decl) => {
                 self.walk_fields(ty, struct_decl.iter_fields(), &parameters, lowerer)?;
             }
-            // vir_mid::TypeDecl::Enum(Enum) => {},
+            vir_mid::TypeDecl::Enum(decl) => {
+                self.walk_enum(ty, decl, &parameters, lowerer)?;
+            },
             // vir_mid::TypeDecl::Array(Array) => {},
             // vir_mid::TypeDecl::Reference(Reference) => {},
             // vir_mid::TypeDecl::Never => {},
@@ -170,10 +191,9 @@ pub(in super::super) trait TypeDeclWalker {
             {
                 self.after_primitive(ty, parameters, lowerer)
             }
-            vir_mid::Type::Tuple(_) | vir_mid::Type::Struct(_) => {
+            vir_mid::Type::Tuple(_) | vir_mid::Type::Struct(_)| vir_mid::Type::Enum(_) => {
                 self.after_composite(ty, parameters, lowerer)
             }
-            // vir_mid::Type::Enum(Enum) => {},
             // vir_mid::Type::Array(Array) => {},
             // vir_mid::Type::Reference(Reference) => {},
             // vir_mid::Type::Never => {},

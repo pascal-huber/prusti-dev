@@ -36,6 +36,7 @@ pub(in super::super) trait Private {
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
+    #[allow(unused_parens)] // Our macros require to put parenthesis around, but currently there is no way of putting this inside the macro.
     fn encode_owned_non_aliased(
         &mut self,
         ty: &vir_mid::Type,
@@ -83,7 +84,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 validity,
                 struct_decl.iter_fields(),
             )?,
-            // vir_mid::TypeDecl::Enum(Enum) => {},
+            vir_mid::TypeDecl::Enum(decl) => {
+                let mut variant_predicates = Vec::new();
+                for variant in &decl.variants {
+                    let variant_ty = ty.clone().variant(variant.name.clone().into());
+                    self.encode_owned_non_aliased(&variant_ty)?;
+                    let acc = expr! {
+                        acc(OwnedNonAliased<(&variant_ty)>(
+                            place, root_address, snapshot
+                        ))
+                    };
+                    variant_predicates.push(acc);
+                }
+                predicate! {
+                    OwnedNonAliased<ty>(place: Place, root_address: Address, snapshot: {snapshot_type})
+                    {(
+                        ([validity]) &&
+                        ([variant_predicates.into_iter().conjoin()])
+                    )}
+                }
+            },
             // vir_mid::TypeDecl::Array(Array) => {},
             // vir_mid::TypeDecl::Reference(Reference) => {},
             // vir_mid::TypeDecl::Never => {},

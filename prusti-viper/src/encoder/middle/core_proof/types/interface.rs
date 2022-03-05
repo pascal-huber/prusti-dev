@@ -53,24 +53,36 @@ impl LoweredVariants {
             is_representational,
         });
     }
-    fn add_enum_variant_no_inv(
-        &mut self,
-        variant: impl ToString,
-        parameters: Vec<vir_low::VariableDecl>,
-    ) {
-        self.variants.push(LoweredVariant {
-            constructor: AdtConstructor::variant(variant.to_string(), parameters),
-            validity: None,
-            is_representational: false,
-        });
-    }
     fn add_struct_with_inv(
         &mut self,
         parameters: Vec<vir_low::VariableDecl>,
         invariant: vir_low::Expression,
     ) {
         self.variants.push(LoweredVariant {
-            constructor: AdtConstructor::base(parameters),
+            constructor: AdtConstructor::struct_main(parameters),
+            validity: Some(invariant),
+            is_representational: false,
+        });
+    }
+    fn add_struct_alternative_no_inv(
+        &mut self,
+        variant: impl ToString,
+        parameters: Vec<vir_low::VariableDecl>,
+    ) {
+        self.variants.push(LoweredVariant {
+            constructor: AdtConstructor::struct_alternative(variant.to_string(), parameters),
+            validity: None,
+            is_representational: false,
+        });
+    }
+    fn add_enum_variant_with_inv(
+        &mut self,
+        variant: impl ToString,
+        variant_type: vir_low::Type,
+        invariant: vir_low::Expression,
+    ) {
+        self.variants.push(LoweredVariant {
+            constructor: AdtConstructor::enum_variant(variant.to_string(), variant_type),
             validity: Some(invariant),
             is_representational: false,
         });
@@ -161,14 +173,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             vir_mid::TypeDecl::Bool => {
                 constructors.add_constant_with_inv(vir_low::Type::Bool, true.into(), true);
                 let bool_ty = (vir_mid::Type::Bool).create_snapshot(self)?;
-                constructors.add_enum_variant_no_inv(
+                constructors.add_struct_alternative_no_inv(
                     &self
                         .encode_unary_op_variant(vir_low::UnaryOpKind::Not, &vir_mid::Type::Bool)?,
                     vars! { argument: {bool_ty.clone()} },
                 );
                 for op in BOOLEAN_OPERATORS {
                     // FIXME: Make these on demand.
-                    constructors.add_enum_variant_no_inv(
+                    constructors.add_struct_alternative_no_inv(
                         self.encode_binary_op_variant(*op, &vir_mid::Type::Bool)?,
                         vars! { left: {bool_ty.clone()}, right: {bool_ty.clone()} },
                     );
@@ -178,7 +190,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     let snapshot_type = int_ty.create_snapshot(self)?;
                     for op in COMPARISON_OPERATORS {
                         // FIXME: Make these on demand.
-                        constructors.add_enum_variant_no_inv(
+                        constructors.add_struct_alternative_no_inv(
                             self.encode_binary_op_variant(*op, &int_ty)?,
                             vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
                         );
@@ -197,13 +209,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 let validity = conjuncts.into_iter().conjoin();
                 constructors.add_constant_with_inv(vir_low::Type::Int, validity, true);
                 let snapshot_type = ty.create_snapshot(self)?;
-                constructors.add_enum_variant_no_inv(
+                constructors.add_struct_alternative_no_inv(
                     &self.encode_unary_op_variant(vir_low::UnaryOpKind::Minus, ty)?,
                     vars! { argument: {snapshot_type.clone()} },
                 );
                 for op in ARITHMETIC_OPERATORS {
                     // FIXME: Make these on demand.
-                    constructors.add_enum_variant_no_inv(
+                    constructors.add_struct_alternative_no_inv(
                         &self.encode_binary_op_variant(*op, ty)?,
                         vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
                     );
@@ -228,6 +240,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     ));
                 }
                 constructors.add_struct_with_inv(parameters, true.into());
+            }
+            vir_mid::TypeDecl::Enum(decl) => {
+                for variant in &decl.variants {
+                    let variant_type = ty.clone().variant(variant.name.clone().into());
+                    let variant_type_snapshot = variant_type.create_snapshot(self)?;
+                    constructors.add_enum_variant_with_inv(&variant.name, variant_type_snapshot, true.into());
+                    self.ensure_type_definition(&variant_type)?;
+                }
             }
             _ => unimplemented!("type: {:?}", type_decl),
         };
@@ -307,7 +327,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     ];
                     for parameter in variant.constructor.get_parameters() {
                         if parameter.ty.is_domain() {
-                            let field = self.adt_destructor_base_call(
+                            let field = self.adt_destructor_struct_call(
                                 &domain_name,
                                 &parameter.name,
                                 parameter.ty.clone(),
@@ -360,23 +380,33 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         let valid_call = self.encode_snapshot_validity_expression(snapshot.clone().into(), ty)?;
                         let mut arguments = Vec::new();
                         for parameter in variant.constructor.get_parameters() {
-                            let function_name = self.adt_destructor_variant_name(&domain_name, variant.constructor.get_variant(), &parameter.name)?;
+                            // let function_name = variant.constructor.parameter_destructor_name(&domain_name, &parameter.name);
                             arguments.push(
-                                vir_low::Expression::domain_function_call(
+                                variant.constructor.destructor_call(
                                     &domain_name,
-                                    function_name,
-                                    vec![snapshot.clone().into()],
+                                    &parameter.name,
                                     parameter.ty.clone(),
+                                    snapshot.clone().into()
                                 )
+                                // vir_low::Expression::domain_function_call(
+                                //     &domain_name,
+                                //     function_name,
+                                //     vec![],
+                                //     parameter.ty.clone(),
+                                // )
                             );
                         };
-                        let constructor_name = self.adt_constructor_variant_name(&domain_name, variant.constructor.get_variant())?;
-                        let constructor_call = vir_low::Expression::domain_function_call(
+                        // let constructor_name = variant.constructor.constructor_name(&domain_name);
+                        let constructor_call = variant.constructor.constructor_call(
                             &domain_name,
-                            constructor_name,
                             arguments,
-                            snapshot_type.clone(),
                         );
+                        // vir_low::Expression::domain_function_call(
+                        //     &domain_name,
+                        //     constructor_name,
+                        //     arguments,
+                        //     snapshot_type.clone(),
+                        // );
                     }
                     [{[valid_call.clone()]}
                     ]
@@ -417,7 +447,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             self.adt_constructor_constant_call(&domain_name, vec![simplification_result])?;
         let op_constructor_call = vir_low::Expression::domain_function_call(
             &domain_name,
-            self.adt_constructor_variant_name(&domain_name, variant)?,
+            self.adt_constructor_struct_alternative_name(&domain_name, variant)?,
             constructor_calls,
             snapshot_type,
         );

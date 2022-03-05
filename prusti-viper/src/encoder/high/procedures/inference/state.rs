@@ -32,31 +32,29 @@ pub(in super::super) struct FoldUnfoldState {
     conditional: BTreeMap<Vec<vir_mid::BasicBlockId>, PredicateState>,
 }
 
+impl std::fmt::Display for PredicateState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        writeln!(f, "owned_non_aliased ({}):", self.owned_non_aliased.len())?;
+        for place in &self.owned_non_aliased {
+            writeln!(f, "  {}", place)?;
+        }
+        writeln!(f, "memory_block_stack ({}):", self.memory_block_stack.len())?;
+        for place in &self.memory_block_stack {
+            writeln!(f, "  {}", place)?;
+        }
+        Ok(())
+    }
+}
+
 impl PredicateState {
     fn is_empty(&self) -> bool {
         self.owned_non_aliased.is_empty() && self.memory_block_stack.is_empty()
     }
 
-    fn debug_write(&self, writer: &mut dyn Write) -> std::fmt::Result {
-        writeln!(writer)?;
-        writeln!(
-            writer,
-            "owned_non_aliased ({}):",
-            self.owned_non_aliased.len()
-        )?;
-        for place in &self.owned_non_aliased {
-            writeln!(writer, "  {}", place)?;
-        }
-        writeln!(
-            writer,
-            "memory_block_stack ({}):",
-            self.memory_block_stack.len()
-        )?;
-        for place in &self.memory_block_stack {
-            writeln!(writer, "  {}", place)?;
-        }
-        Ok(())
-    }
+    // fn debug_write(&self, writer: &mut dyn Write) -> std::fmt::Result {
+
+    // }
 
     fn places_mut(&mut self, kind: PermissionKind) -> &mut BTreeSet<vir_high::Expression> {
         match kind {
@@ -105,12 +103,13 @@ impl PredicateState {
         self.places(kind).contains(place)
     }
 
+    /// Returns a witness if it exists.
     pub(super) fn contains_with_prefix(
         &self,
         kind: PermissionKind,
         prefix: &vir_high::Expression,
-    ) -> bool {
-        self.places(kind).iter().any(|p| p.has_prefix(prefix))
+    ) -> Option<&vir_high::Expression> {
+        self.places(kind).iter().find(|p| p.has_prefix(prefix))
     }
 
     pub(super) fn contains_prefix_of(
@@ -152,6 +151,23 @@ impl PredicateState {
     }
 }
 
+impl std::fmt::Display for FoldUnfoldState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "incoming labels: ")?;
+        for label in &self.incoming_labels {
+            write!(f, "{}, ", label)?;
+        }
+        writeln!(f, "\nunconditional:")?;
+        writeln!(f, "{}", self.unconditional)?;
+        for (condition, state) in &self.conditional {
+            write!(f, "conditional (")?;
+            self.debug_write_condition(condition, f)?;
+            writeln!(f, "):\n{}", state)?;
+        }
+        Ok(())
+    }
+}
+
 impl FoldUnfoldState {
     pub(in super::super) fn new() -> Self {
         Self {
@@ -162,30 +178,18 @@ impl FoldUnfoldState {
     }
 
     pub(in super::super) fn debug_print(&self) {
-        debug!("state:\n{}", self.debug_string());
+        debug!("state:\n{}", self);
     }
 
-    pub(in super::super) fn debug_string(&self) -> String {
-        let mut buffer = String::new();
-        self.debug_write(&mut buffer).unwrap();
-        buffer
-    }
+    // pub(in super::super) fn debug_string(&self) -> String {
+    //     let mut buffer = String::new();
+    //     self.debug_write(&mut buffer).unwrap();
+    //     buffer
+    // }
 
-    pub(in super::super) fn debug_write(&self, writer: &mut dyn Write) -> std::fmt::Result {
-        write!(writer, "incoming labels: ")?;
-        for label in &self.incoming_labels {
-            write!(writer, "{}, ", label)?;
-        }
-        writeln!(writer, "\nunconditional:")?;
-        self.unconditional.debug_write(writer)?;
-        for (condition, state) in &self.conditional {
-            write!(writer, "conditional (")?;
-            self.debug_write_condition(condition, writer)?;
-            writeln!(writer, "):")?;
-            state.debug_write(writer)?;
-        }
-        Ok(())
-    }
+    // pub(in super::super) fn debug_write(&self, writer: &mut dyn Write) -> std::fmt::Result {
+
+    // }
 
     fn debug_write_condition(
         &self,

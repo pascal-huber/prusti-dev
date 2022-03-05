@@ -6,6 +6,7 @@ impl<'p, 'v, 'tcx> super::super::ensurer::Context for Visitor<'p, 'v, 'tcx> {
     fn expand_place(
         &mut self,
         place: &vir_high::Expression,
+        guiding_place: &vir_high::Expression,
     ) -> SpannedEncodingResult<Vec<(ExpandedPermissionKind, vir_high::Expression)>> {
         let ty = place.get_type();
         let type_decl = self.encoder.encode_type_def(ty)?;
@@ -41,7 +42,13 @@ impl<'p, 'v, 'tcx> super::super::ensurer::Context for Visitor<'p, 'v, 'tcx> {
             vir_high::TypeDecl::Struct(struct_decl) => {
                 expand_fields(place, struct_decl.iter_fields())
             }
-            vir_high::TypeDecl::Enum(_) => unimplemented!("ty: {}", ty),
+            vir_high::TypeDecl::Enum(decl) => {
+                let variant_name = place.get_variant_name(guiding_place);
+                let variant = decl.variant(variant_name.as_ref()).unwrap();
+                let ty = place.get_type().clone().variant(variant_name.clone());
+                let variant_place = place.clone().variant_no_pos(variant_name.clone(), ty);
+                expand_fields(&variant_place, variant.iter_fields())
+            }
             vir_high::TypeDecl::Array(_) => unimplemented!("ty: {}", ty),
             vir_high::TypeDecl::Reference(_) => unimplemented!("ty: {}", ty),
             vir_high::TypeDecl::Never => unimplemented!("ty: {}", ty),

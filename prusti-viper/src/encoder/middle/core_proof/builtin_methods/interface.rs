@@ -32,6 +32,7 @@ pub(in super::super) struct BuiltinMethodsState {
     encoded_write_address_methods: FxHashSet<vir_mid::Type>,
     encoded_memory_block_split_methods: FxHashSet<vir_mid::Type>,
     encoded_memory_block_join_methods: FxHashSet<vir_mid::Type>,
+    encoded_into_memory_block_methods: FxHashSet<vir_mid::Type>,
     encoded_assign_methods: FxHashSet<String>,
 }
 
@@ -135,6 +136,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             vir_mid::Rvalue::BinaryOp(value) => {
                 self.encode_operand_arguments(arguments, &value.left)?;
                 self.encode_operand_arguments(arguments, &value.right)?;
+            }
+            vir_mid::Rvalue::Discriminant(value) => {
+                arguments.push(self.lower_expression_into_snapshot(&value.place)?);
             }
         }
         Ok(())
@@ -255,6 +259,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             vir_mid::Rvalue::BinaryOp(_value) => {
                 unimplemented!();
             }
+            vir_mid::Rvalue::Discriminant(value) => {
+                // unimplemented!("lookup discriminant snapshot for: {}", value);
+                let place = value.place.create_snapshot(self)?;
+                self.encode_discriminant_call(
+                                        place,
+                                        value.place.get_type(),
+                                        position
+                )?
+            }
         };
         posts.push(exprp! { position => result_value == [assigned_value.clone()]});
         pre_write_statements.push(vir_low::Statement::assign(
@@ -311,6 +324,7 @@ pub(in super::super) trait BuiltinMethodsInterface {
     fn encode_memory_block_split_method(&mut self, ty: &vir_mid::Type)
         -> SpannedEncodingResult<()>;
     fn encode_memory_block_join_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
+    fn encode_into_memory_block_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
     fn encode_assign_method_call(
         &mut self,
         statements: &mut Vec<vir_low::Statement>,
@@ -601,6 +615,55 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.builtin_methods_state
                 .encoded_memory_block_join_methods
                 .insert(ty.clone());
+        }
+        Ok(())
+    }
+    fn encode_into_memory_block_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        if !self
+            .builtin_methods_state
+            .encoded_into_memory_block_methods
+            .contains(ty)
+        {
+            self.builtin_methods_state
+                .encoded_into_memory_block_methods
+                .insert(ty.clone());
+            use vir_low::macros::*;
+            let size_of = self.encode_type_size_expression(ty)?;
+            let compute_address = ty!(Address);
+            let to_bytes = ty! { Bytes };
+            let mut statements = Vec::new();
+            let mut method = method! {
+                into_memory_block<ty>(
+                    place: Place,
+                    address: Address,
+                    value: {ty.create_snapshot(self)?}
+                ) returns ()
+                    raw_code {
+                        let compute_address_source = expr! { ComputeAddress::compute_address(place, address) };
+                        let bytes = self.encode_memory_block_bytes_expression(compute_address_source, size_of.clone())?;
+                        // self.encode_fully_unfold_owned_non_aliased(
+                        //     &mut statements,
+                        //     ty,
+                        //     source_place.clone().into(),
+                        //     &Into::<vir_low::Expression>::into(source_address.clone()),
+                        //     source_value.clone().into(),
+                        //     position,
+                        // )?;
+                        // self.encode_fully_join_memory_block(
+                        //     &mut statements,
+                        //     ty,
+                        //     expr! { ComputeAddress::compute_address(source_place, source_address) },
+                        //     position,
+                        // )?;
+                        // statements.push(stmtp! { position => call write_place<ty>(target_place, target_address, source_value)});
+                    }
+                    requires (acc(OwnedNonAliased<ty>(place, address, value)));
+                    ensures (acc(MemoryBlock((ComputeAddress::compute_address(place, address)), [size_of])));
+                    ensures (([bytes]) == (Snap<ty>::to_bytes(value)));
+            };
+            method.body = Some(statements);
+            self.declare_method(method)?;
+
         }
         Ok(())
     }

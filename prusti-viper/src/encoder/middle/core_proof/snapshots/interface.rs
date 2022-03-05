@@ -130,6 +130,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         place: &vir_mid::Expression,
         position: vir_low::Position,
     ) -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)> {
+        eprintln!("place: {}", place);
         use vir_low::macros::*;
         if let Some(parent) = place.get_parent_ref() {
             let (old_snapshot, new_snapshot) = self.snapshot_copy_except(
@@ -140,6 +141,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 position,
             )?;
             let parent_type = parent.get_type();
+            eprintln!("place2: {} parent_type: {}", place, parent_type);
             let type_decl = self.encoder.get_type_decl_mid(parent_type)?;
             match &type_decl {
                 vir_mid::TypeDecl::Bool
@@ -185,7 +187,23 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         )?,
                     ))
                 }
-                vir_mid::TypeDecl::Enum(_) => unimplemented!("ty: {}", type_decl),
+                vir_mid::TypeDecl::Enum(_) => {
+                    let place_variant = place.clone().unwrap_variant(); // FIXME: Implement a macro that takes a reference to avoid clonning.
+                    Ok((
+                        self.encode_enum_variant_snapshot(
+                            parent_type,
+                            &place_variant.variant_index,
+                            old_snapshot,
+                            Default::default()
+                        )?,
+                        self.encode_enum_variant_snapshot(
+                            parent_type,
+                            &place_variant.variant_index,
+                            new_snapshot,
+                            Default::default()
+                        )?,
+                    ))
+                },
                 vir_mid::TypeDecl::Array(_) => unimplemented!("ty: {}", type_decl),
                 vir_mid::TypeDecl::Reference(_) => unimplemented!("ty: {}", type_decl),
                 vir_mid::TypeDecl::Never => unimplemented!("ty: {}", type_decl),
@@ -240,6 +258,13 @@ pub(in super::super) trait SnapshotsInterface {
         base_snapshot: vir_low::Expression,
         position: vir_mid::Position,
     ) -> SpannedEncodingResult<vir_low::Expression>;
+    fn encode_enum_variant_snapshot(
+        &mut self,
+        base_type: &vir_mid::Type,
+        variant: &vir_mid::ty::VariantIndex,
+        base_snapshot: vir_low::Expression,
+        position: vir_mid::Position,
+    ) -> SpannedEncodingResult<vir_low::Expression>;
     fn encode_constant_snapshot(
         &mut self,
         ty: &vir_mid::Type,
@@ -271,6 +296,12 @@ pub(in super::super) trait SnapshotsInterface {
         ty: &vir_mid::Type,
         left: vir_low::Expression,
         right: vir_low::Expression,
+        position: vir_mid::Position,
+    ) -> SpannedEncodingResult<vir_low::Expression>;
+    fn encode_discriminant_call(
+        &mut self,
+        place: vir_low::Expression,
+        ty: &vir_mid::Type,
         position: vir_mid::Position,
     ) -> SpannedEncodingResult<vir_low::Expression>;
     #[allow(clippy::ptr_arg)] // Clippy false positive.
@@ -392,7 +423,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         let domain_name = self.encode_snapshot_domain_name(base_type)?;
         let return_type = field.ty.create_snapshot(self)?;
         Ok(self
-            .adt_destructor_base_call(&domain_name, &field.name, return_type, base_snapshot)?
+            .adt_destructor_struct_call(&domain_name, &field.name, return_type, base_snapshot)?
+            .set_default_position(position))
+    }
+    fn encode_enum_variant_snapshot(
+        &mut self,
+        base_type: &vir_mid::Type,
+        variant: &vir_mid::ty::VariantIndex,
+        base_snapshot: vir_low::Expression,
+        position: vir_mid::Position,
+    ) -> SpannedEncodingResult<vir_low::Expression> {
+        let domain_name = self.encode_snapshot_domain_name(base_type)?;
+        let return_type = base_type.create_snapshot(self)?;
+        Ok(self
+            .adt_destructor_enum_variant_call(&domain_name, &variant.index, return_type, base_snapshot)?
             .set_default_position(position))
     }
     fn encode_constant_snapshot(
@@ -420,7 +464,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         position: vir_mid::Position,
     ) -> SpannedEncodingResult<vir_low::Expression> {
         let domain_name = self.encode_snapshot_domain_name(ty)?;
-        let function_name = self.adt_constructor_base_name(&domain_name)?;
+        let function_name = self.adt_constructor_struct_name(&domain_name)?;
         let return_type = ty.create_snapshot(self)?;
         self.create_domain_func_app(domain_name, function_name, arguments, return_type, position)
     }
@@ -456,7 +500,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         let domain_name = self.encode_snapshot_domain_name(ty)?;
         let op = op.to_low(self)?;
         let variant = self.encode_unary_op_variant(op, ty)?;
-        let function_name = self.adt_constructor_variant_name(&domain_name, &variant)?;
+        let function_name = self.adt_constructor_struct_alternative_name(&domain_name, &variant)?;
         let return_type = ty.create_snapshot(self)?;
         self.create_domain_func_app(
             domain_name,
@@ -478,12 +522,29 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         let domain_name = self.encode_snapshot_domain_name(ty)?;
         let op = op.to_low(self)?;
         let variant = self.encode_binary_op_variant(op, ty)?;
-        let function_name = self.adt_constructor_variant_name(&domain_name, &variant)?;
+        let function_name = self.adt_constructor_struct_alternative_name(&domain_name, &variant)?;
         let return_type = ty.create_snapshot(self)?;
         self.create_domain_func_app(
             domain_name,
             function_name,
             vec![left, right],
+            return_type,
+            position,
+        )
+    }
+    fn encode_discriminant_call(
+        &mut self,
+        place: vir_low::Expression,
+        ty: &vir_mid::Type,
+        position: vir_mid::Position,
+    ) -> SpannedEncodingResult<vir_low::Expression> {
+        let domain_name = self.encode_snapshot_domain_name(ty)?;
+        let function_name = format!("discriminant${}", ty.get_identifier());
+        let return_type = ty.create_snapshot(self)?;
+        self.create_domain_func_app(
+            domain_name,
+            function_name,
+            vec![place],
             return_type,
             position,
         )

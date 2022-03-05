@@ -17,7 +17,7 @@ impl IntoSnapshot for vir_mid::Expression {
         match self {
             Self::Local(expression) => expression.create_snapshot(lowerer),
             Self::Constructor(expression) => expression.create_snapshot(lowerer),
-            // Self::Variant(expression) => expression.create_snapshot(lowerer),
+            Self::Variant(expression) => expression.create_snapshot(lowerer),
             Self::Field(expression) => expression.create_snapshot(lowerer),
             // Self::Deref(expression) => expression.create_snapshot(lowerer),
             // Self::AddrOf(expression) => expression.create_snapshot(lowerer),
@@ -59,6 +59,22 @@ impl IntoSnapshot for vir_mid::Constructor {
             arguments.push(argument.create_snapshot(lowerer)?);
         }
         lowerer.encode_snapshot_constructor_base_call(&self.ty, arguments, self.position)
+    }
+}
+
+impl IntoSnapshot for vir_mid::Variant {
+    type Target = vir_low::Expression;
+    fn create_snapshot<'p, 'v: 'p, 'tcx: 'v>(
+        &self,
+        lowerer: &mut Lowerer<'p, 'v, 'tcx>,
+    ) -> SpannedEncodingResult<Self::Target> {
+        let base_snapshot = self.base.create_snapshot(lowerer)?;
+        lowerer.encode_enum_variant_snapshot(
+            self.base.get_type(),
+            &self.variant_index,
+            base_snapshot,
+            self.position,
+        )
     }
 }
 

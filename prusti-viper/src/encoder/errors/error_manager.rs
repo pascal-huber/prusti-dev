@@ -67,7 +67,6 @@ pub enum ErrorCtxt {
     /// A Viper `assert false` that encodes an `abort` Rust terminator
     AbortTerminator,
     /// A Viper `assert false` that encodes an `unreachable` Rust terminator
-    #[allow(dead_code)]
     UnreachableTerminator,
     /// An error that should never happen
     Unexpected,

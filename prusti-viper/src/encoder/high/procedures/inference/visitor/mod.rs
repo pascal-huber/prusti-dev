@@ -2,7 +2,7 @@ use super::{ensurer::ensure_required_permissions, state::FoldUnfoldState};
 use crate::encoder::{
     errors::SpannedEncodingResult,
     high::procedures::inference::{
-        action::{Action, ActionState},
+        action::{Action, ConversionState, FoldingActionState},
         permission::PermissionKind,
         semantics::collect_permission_changes,
     },
@@ -168,7 +168,7 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
         let actions = ensure_required_permissions(self, state, consumed_permissions.clone())?;
         for action in actions {
             let statement = match action {
-                Action::Unfold(ActionState {
+                Action::Unfold(FoldingActionState {
                     kind: PermissionKind::Owned,
                     place,
                     condition,
@@ -177,7 +177,7 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
                     condition,
                     statement.position(),
                 ),
-                Action::Fold(ActionState {
+                Action::Fold(FoldingActionState {
                     kind: PermissionKind::Owned,
                     place,
                     condition,
@@ -186,7 +186,7 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
                     condition,
                     statement.position(),
                 ),
-                Action::Unfold(ActionState {
+                Action::Unfold(FoldingActionState {
                     kind: PermissionKind::MemoryBlock,
                     place,
                     condition,
@@ -195,7 +195,7 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
                     condition,
                     statement.position(),
                 ),
-                Action::Fold(ActionState {
+                Action::Fold(FoldingActionState {
                     kind: PermissionKind::MemoryBlock,
                     place,
                     condition,
@@ -204,6 +204,13 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
                     condition,
                     statement.position(),
                 ),
+                Action::OwnedIntoMemoryBlock(ConversionState { place, condition }) => {
+                    vir_mid::Statement::convert_owned_into_memory_block(
+                        place.to_middle_expression(self.encoder)?,
+                        condition,
+                        statement.position(),
+                    )
+                }
             };
             self.current_statements.push(statement);
         }

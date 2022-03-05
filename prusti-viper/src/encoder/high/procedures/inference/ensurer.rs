@@ -17,9 +17,12 @@ pub(in super::super) enum ExpandedPermissionKind {
 }
 
 pub(in super::super) trait Context {
+    /// The guiding place is used to determine which variant of the enum should
+    /// be used.
     fn expand_place(
         &mut self,
         place: &vir_high::Expression,
+        guiding_place: &vir_high::Expression,
     ) -> SpannedEncodingResult<Vec<(ExpandedPermissionKind, vir_high::Expression)>>;
 }
 
@@ -85,25 +88,23 @@ fn ensure_required_permission(
     Ok(())
 }
 
-#[allow(clippy::if_same_then_else)] // Clippy is ignoring comments.
 fn can_place_be_ensured_in(
     place: &vir_high::Expression,
     permission_kind: PermissionKind,
     predicate_state: &PredicateState,
 ) -> SpannedEncodingResult<bool> {
-    let can = if predicate_state.contains(permission_kind, place) {
-        // The requirement is already satisfied.
-        true
-    } else if predicate_state.contains_prefix_of(permission_kind, place) {
-        // The requirement can be satisifed by unfolding.
-        true
-    } else if predicate_state.contains_with_prefix(permission_kind, place) {
-        // The requirement can be satisifed by folding.
-        true
-    } else {
-        permission_kind == PermissionKind::MemoryBlock
-            && can_place_be_ensured_in(place, PermissionKind::Owned, predicate_state)?
-    };
+    // The requirement is already satisfied.
+    let already_satisfied = predicate_state.contains(permission_kind, place);
+    // The requirement can be satisifed by unfolding.
+    let by_unfolding = predicate_state.contains_prefix_of(permission_kind, place);
+    // The requirement can be satisifed by folding.
+    let by_folding = predicate_state
+        .contains_with_prefix(permission_kind, place)
+        .is_some();
+    // The requirement can be satisfied by converting into Memory Block.
+    let by_into_memory_block = permission_kind == PermissionKind::MemoryBlock
+        && can_place_be_ensured_in(place, PermissionKind::Owned, predicate_state)?;
+    let can = already_satisfied || by_unfolding || by_folding || by_into_memory_block;
     Ok(can)
 }
 
@@ -119,7 +120,7 @@ fn ensure_permission_in_state(
     } else if let Some(prefix) = predicate_state.find_prefix(permission_kind, &place) {
         // The requirement can be satisifed by unfolding.
         predicate_state.remove(permission_kind, &prefix)?;
-        let expanded_place = context.expand_place(&prefix)?;
+        let expanded_place = context.expand_place(&prefix, &place)?;
         actions.push(Action::unfold(permission_kind, prefix));
         for (kind, new_place) in expanded_place {
             assert_eq!(
@@ -130,9 +131,9 @@ fn ensure_permission_in_state(
             predicate_state.insert(permission_kind, new_place)?;
         }
         ensure_permission_in_state(context, predicate_state, place, permission_kind, actions)?;
-    } else if predicate_state.contains_with_prefix(permission_kind, &place) {
+    } else if let Some(witness) = predicate_state.contains_with_prefix(permission_kind, &place) {
         // The requirement can be satisifed by folding.
-        for (kind, new_place) in context.expand_place(&place)? {
+        for (kind, new_place) in context.expand_place(&place, witness)? {
             assert_eq!(kind, ExpandedPermissionKind::Same);
             ensure_permission_in_state(
                 context,
@@ -151,37 +152,39 @@ fn ensure_permission_in_state(
         // We have Owned and we need MemoryBlock. Fully unfold.
         for place in predicate_state.collect_owned_with_prefix(&place)? {
             predicate_state.remove(PermissionKind::Owned, &place)?;
-            ensure_fully_unfolded(context, predicate_state, place, actions)?;
+            predicate_state.insert(PermissionKind::MemoryBlock, place.clone())?;
+            actions.push(Action::owned_into_memory_block(place));
+            // ensure_fully_unfolded(context, predicate_state, place, actions)?;
         }
         ensure_permission_in_state(context, predicate_state, place, permission_kind, actions)?;
     } else {
-        // There requirement cannot be satisfied.
+        // The requirement cannot be satisfied.
         unreachable!("{} {:?}", place, permission_kind);
     };
     Ok(())
 }
 
-/// Important: the `place` has to be already removed from `context`. This is
-/// done to avoid unnecessary copying.
-fn ensure_fully_unfolded(
-    context: &mut impl Context,
-    predicate_state: &mut PredicateState,
-    place: vir_high::Expression,
-    actions: &mut Vec<Action>,
-) -> SpannedEncodingResult<()> {
-    let place_expansion = context.expand_place(&place)?;
-    actions.push(Action::unfold(PermissionKind::Owned, place));
-    for (kind, new_place) in place_expansion {
-        match kind {
-            ExpandedPermissionKind::Same => {
-                // Still need to unfold.
-                ensure_fully_unfolded(context, predicate_state, new_place, actions)?;
-            }
-            ExpandedPermissionKind::MemoryBlock => {
-                // Reached the bottom.
-                predicate_state.insert(PermissionKind::MemoryBlock, new_place)?;
-            }
-        }
-    }
-    Ok(())
-}
+// /// Important: the `place` has to be already removed from `context`. This is
+// /// done to avoid unnecessary copying.
+// fn ensure_fully_unfolded(
+//     context: &mut impl Context,
+//     predicate_state: &mut PredicateState,
+//     place: vir_high::Expression,
+//     actions: &mut Vec<Action>,
+// ) -> SpannedEncodingResult<()> {
+//     let place_expansion = context.expand_place(&place)?;
+//     actions.push(Action::unfold(PermissionKind::Owned, place));
+//     for (kind, new_place) in place_expansion {
+//         match kind {
+//             ExpandedPermissionKind::Same => {
+//                 // Still need to unfold.
+//                 ensure_fully_unfolded(context, predicate_state, new_place, actions)?;
+//             }
+//             ExpandedPermissionKind::MemoryBlock => {
+//                 // Reached the bottom.
+//                 predicate_state.insert(PermissionKind::MemoryBlock, new_place)?;
+//             }
+//         }
+//     }
+//     Ok(())
+// }

@@ -195,6 +195,9 @@ impl CollectPermissionChanges for vir_high::Rvalue {
         match self {
             Self::UnaryOp(rvalue) => rvalue.collect(consumed_permissions, produced_permissions),
             Self::BinaryOp(rvalue) => rvalue.collect(consumed_permissions, produced_permissions),
+            Self::Discriminant(rvalue) => {
+                rvalue.collect(consumed_permissions, produced_permissions)
+            }
         }
     }
 }
@@ -220,6 +223,18 @@ impl CollectPermissionChanges for vir_high::ast::rvalue::BinaryOp {
             .collect(consumed_permissions, produced_permissions)?;
         self.right
             .collect(consumed_permissions, produced_permissions)?;
+        Ok(())
+    }
+}
+
+impl CollectPermissionChanges for vir_high::ast::rvalue::Discriminant {
+    fn collect(
+        &self,
+        consumed_permissions: &mut Vec<Permission>,
+        produced_permissions: &mut Vec<Permission>,
+    ) -> SpannedEncodingResult<()> {
+        consumed_permissions.push(Permission::Owned(self.place.clone()));
+        produced_permissions.push(Permission::Owned(self.place.clone()));
         Ok(())
     }
 }

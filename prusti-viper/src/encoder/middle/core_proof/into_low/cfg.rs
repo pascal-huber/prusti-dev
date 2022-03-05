@@ -188,6 +188,26 @@ impl IntoLow for vir_mid::Statement {
                 };
                 Ok(vec![low_statement])
             }
+            Self::ConvertOwnedIntoMemoryBlock(statement) => {
+                let ty = statement.place.get_type();
+                lowerer.encode_into_memory_block_method(ty)?;
+                let place = lowerer.encode_expression_as_place(&statement.place)?;
+                let address = lowerer.extract_root_address(&statement.place)?;
+                let snapshot = lowerer.lower_expression_into_snapshot(&statement.place)?;
+                let low_statement = if let Some(condition) = statement.condition {
+                    let low_condition = lowerer.lower_block_marker_condition(condition)?;
+                    stmtp! {
+                        statement.position =>
+                        call<low_condition> into_memory_block<ty>([place], [address], [snapshot])
+                    }
+                } else {
+                    stmtp! {
+                        statement.position =>
+                        call into_memory_block<ty>([place], [address], [snapshot])
+                    }
+                };
+                Ok(vec![low_statement])
+            }
             Self::MovePlace(statement) => {
                 // TODO: Remove code duplication with Self::CopyPlace
                 let target_ty = statement.target.get_type();
