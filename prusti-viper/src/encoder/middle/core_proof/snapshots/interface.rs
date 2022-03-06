@@ -304,6 +304,7 @@ pub(in super::super) trait SnapshotsInterface {
         right: vir_low::Expression,
         position: vir_mid::Position,
     ) -> SpannedEncodingResult<vir_low::Expression>;
+    fn encode_discriminant_name(&mut self, domain_name: &str) -> SpannedEncodingResult<String>;
     fn encode_discriminant_call(
         &mut self,
         place: vir_low::Expression,
@@ -565,6 +566,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
             position,
         )
     }
+    fn encode_discriminant_name(&mut self, domain_name: &str) -> SpannedEncodingResult<String> {
+        let ty = if let Some(decoded_type) = self.try_decoding_snapshot_type(domain_name)? {
+            decoded_type
+        }else {
+                    unreachable!("Failed to decode the snapshot: {}", domain_name);
+                };
+                Ok(format!("discriminant${}", ty.get_identifier()))
+    }
     fn encode_discriminant_call(
         &mut self,
         place: vir_low::Expression,
@@ -572,13 +581,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         position: vir_mid::Position,
     ) -> SpannedEncodingResult<vir_low::Expression> {
         let domain_name = self.encode_snapshot_domain_name(ty)?;
-        let function_name = format!("discriminant${}", ty.get_identifier());
-        let return_type = ty.create_snapshot(self)?;
+        let function_name = self.encode_discriminant_name(&domain_name)?;
         self.create_domain_func_app(
             domain_name,
             function_name,
             vec![place],
-            return_type,
+            vir_low::Type::Int,
             position,
         )
     }

@@ -151,6 +151,13 @@ trait Private {
         variant_name: &str,
         parameters: Vec<vir_low::VariableDecl>,
     ) -> SpannedEncodingResult<()>;
+    fn register_enum_variant_constructor(
+        &mut self,
+        domain_name: &str,
+        variant_name: &str,
+        variant_domain_name: &str,
+        discriminant: vir_low::Expression,
+    ) -> SpannedEncodingResult<()>;
     fn encode_validity_axioms_primitive(
         &mut self,
         domain_name: &str,
@@ -207,6 +214,14 @@ fn valid_call(
     ))
 }
 
+fn valid_call2(
+    domain_name: &str,
+    variable: &vir_low::VariableDecl,
+) -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)> {
+    let call = valid_call(domain_name, variable)?;
+    Ok((call.clone(), call))
+}
+
 impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
     // TODO: Move to SnapshotADTs
     fn register_constant_constructor(
@@ -218,7 +233,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         self.adt_register_main_constructor(
             domain_name,
             vars! { value: {parameter_type}},
-            Some(valid_call),
+            Some(valid_call2),
         )
     }
     fn register_struct_constructor(
@@ -226,7 +241,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         domain_name: &str,
         parameters: Vec<vir_low::VariableDecl>,
     ) -> SpannedEncodingResult<()> {
-        self.adt_register_main_constructor(domain_name, parameters, Some(valid_call))
+        self.adt_register_main_constructor(domain_name, parameters, Some(valid_call2))
     }
     fn register_alternative_constructor(
         &mut self,
@@ -238,7 +253,35 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             domain_name,
             variant_name,
             parameters,
-            Some(valid_call),
+            Some(valid_call2),
+        )
+    }
+    fn register_enum_variant_constructor(
+        &mut self,
+        domain_name: &str,
+        variant_name: &str,
+        variant_domain_name: &str,
+        discriminant: vir_low::Expression,
+    ) -> SpannedEncodingResult<()> {
+        use vir_low::macros::*;
+        let parameter_type = vir_low::Type::domain(variant_domain_name.to_string());
+        let discriminant_name = self.encode_discriminant_name(domain_name)?;
+        let valid_call_with_discriminant = move |domain_name: &str, variable: &vir_low::VariableDecl| {
+            let validity_call = valid_call(domain_name, variable)?;
+            let discriminant_call = vir_low::Expression::domain_function_call(
+                domain_name,
+                discriminant_name,
+                vec![variable.clone().into()],
+                vir_low::Type::Int
+            );
+            let guard = expr! { [validity_call.clone()] && ([discriminant_call] == [discriminant]) };
+            Ok((validity_call, guard))
+        };
+        self.adt_register_variant_constructor(
+            domain_name,
+            variant_name,
+            vars! { value: {parameter_type}},
+            Some(valid_call_with_discriminant),
         )
     }
     fn encode_validity_axioms_primitive(
@@ -473,16 +516,23 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 // constructors.add_struct_with_inv(parameters, true.into());
             }
             vir_mid::TypeDecl::Enum(decl) => {
-                // for variant in &decl.variants {
-                //     let variant_type = ty.clone().variant(variant.name.clone().into());
-                //     let variant_type_snapshot = variant_type.create_snapshot(self)?;
-                //     constructors.add_enum_variant_with_inv(
-                //         &variant.name,
-                //         variant_type_snapshot,
-                //         true.into(),
-                //     );
-                //     self.ensure_type_definition(&variant_type)?;
-                // }
+                let mut variant_domains = Vec::new();
+                for (variant, discriminant) in decl.variants.iter().zip(&decl.discriminant_values) {
+                    let variant_type = ty.clone().variant(variant.name.clone().into());
+                    let variant_domain = self.encode_snapshot_domain_name(&variant_type)?;
+                    // let variant_type_snapshot = variant_type.create_snapshot(self)?;
+                    // constructors.add_enum_variant_with_inv(
+                    //     &variant.name,
+                    //     variant_type_snapshot,
+                    //     true.into(),
+                    // );
+                    let discriminant = discriminant.clone().to_low(self)?;
+                    self.register_enum_variant_constructor(&domain_name, &variant.name, &variant_domain, discriminant)?;
+                    self.ensure_type_definition(&variant_type)?;
+                    variant_domains.push(variant_domain);
+                }
+                // self.encode_validity_axioms_enum(&domain_name, variant_domains, true.into())?;
+                // self.register_discriminant_variants() TODO
             }
             _ => unimplemented!("type: {:?}", type_decl),
         };

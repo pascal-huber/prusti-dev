@@ -25,47 +25,47 @@ pub(in super::super) struct AdtConstructor {
 }
 
 impl AdtConstructor {
-    pub(in super::super) fn constant(parameter_type: vir_crate::low::Type) -> AdtConstructor {
-        Self {
-            kind: AdtConstructorKind::Constant,
-            parameters: vec![vir_low::VariableDecl::new("constant", parameter_type)],
-        }
-    }
-
-    pub(in super::super) fn struct_main(parameters: Vec<vir_low::VariableDecl>) -> AdtConstructor {
-        Self {
-            kind: AdtConstructorKind::Struct,
-            parameters,
-        }
-    }
-
-    pub(in super::super) fn struct_alternative(
-        name: String,
-        parameters: Vec<vir_low::VariableDecl>,
-    ) -> AdtConstructor {
-        Self {
-            kind: AdtConstructorKind::AlternativeStruct { name },
-            parameters,
-        }
-    }
-
-    pub(in super::super) fn enum_variant(
-        name: String,
-        variant_type: vir_crate::low::Type,
-    ) -> AdtConstructor {
-        Self {
-            kind: AdtConstructorKind::EnumVariant { name },
-            parameters: vec![vir_low::VariableDecl::new("variant", variant_type)],
-        }
-    }
-
-    // pub(in super::super) fn get_variant(&self) -> &str {
-    //     &self.variant
+    // pub(in super::super) fn constant(parameter_type: vir_crate::low::Type) -> AdtConstructor {
+    //     Self {
+    //         kind: AdtConstructorKind::Constant,
+    //         parameters: vec![vir_low::VariableDecl::new("constant", parameter_type)],
+    //     }
     // }
 
-    pub(in super::super) fn get_parameters(&self) -> &[vir_low::VariableDecl] {
-        &self.parameters
-    }
+    // pub(in super::super) fn struct_main(parameters: Vec<vir_low::VariableDecl>) -> AdtConstructor {
+    //     Self {
+    //         kind: AdtConstructorKind::Struct,
+    //         parameters,
+    //     }
+    // }
+
+    // pub(in super::super) fn struct_alternative(
+    //     name: String,
+    //     parameters: Vec<vir_low::VariableDecl>,
+    // ) -> AdtConstructor {
+    //     Self {
+    //         kind: AdtConstructorKind::AlternativeStruct { name },
+    //         parameters,
+    //     }
+    // }
+
+    // pub(in super::super) fn enum_variant(
+    //     name: String,
+    //     variant_type: vir_crate::low::Type,
+    // ) -> AdtConstructor {
+    //     Self {
+    //         kind: AdtConstructorKind::EnumVariant { name },
+    //         parameters: vec![vir_low::VariableDecl::new("variant", variant_type)],
+    //     }
+    // }
+
+    // // pub(in super::super) fn get_variant(&self) -> &str {
+    // //     &self.variant
+    // // }
+
+    // pub(in super::super) fn get_parameters(&self) -> &[vir_low::VariableDecl] {
+    //     &self.parameters
+    // }
 
     pub(in super::super) fn parameter_destructor_name(
         &self,
