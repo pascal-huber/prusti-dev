@@ -53,7 +53,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         }
         let compute_address = ty!(Address);
         let to_bytes = ty! { Bytes };
-        let validity = self.encode_snapshot_validity_expression(snapshot.clone().into(), ty)?;
+        let validity =
+            self.encode_snapshot_validity_expression_for_type(snapshot.clone().into(), ty)?;
         let size_of = self.encode_type_size_expression(ty)?;
         let compute_address = expr! { ComputeAddress::compute_address(place, root_address) };
         let bytes =
@@ -103,7 +104,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         ([variant_predicates.into_iter().conjoin()])
                     )}
                 }
-            },
+            }
             // vir_mid::TypeDecl::Array(Array) => {},
             // vir_mid::TypeDecl::Reference(Reference) => {},
             // vir_mid::TypeDecl::Never => {},

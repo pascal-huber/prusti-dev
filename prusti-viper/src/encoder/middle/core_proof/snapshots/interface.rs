@@ -194,16 +194,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                             parent_type,
                             &place_variant.variant_index,
                             old_snapshot,
-                            Default::default()
+                            Default::default(),
                         )?,
                         self.encode_enum_variant_snapshot(
                             parent_type,
                             &place_variant.variant_index,
                             new_snapshot,
-                            Default::default()
+                            Default::default(),
                         )?,
                     ))
-                },
+                }
                 vir_mid::TypeDecl::Array(_) => unimplemented!("ty: {}", type_decl),
                 vir_mid::TypeDecl::Reference(_) => unimplemented!("ty: {}", type_decl),
                 vir_mid::TypeDecl::Never => unimplemented!("ty: {}", type_decl),
@@ -241,10 +241,16 @@ pub(in super::super) trait SnapshotsInterface {
         &mut self,
         ty: &vir_mid::Type,
     ) -> SpannedEncodingResult<()>;
-    fn encode_snapshot_validity_expression(
+    fn encode_snapshot_validity_expression_for_type(
         &mut self,
         argument: vir_low::Expression,
         ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<vir_low::Expression>;
+    // FIXME: Move this to the snapshot encoder.
+    fn encode_snapshot_validity_expression(
+        &mut self,
+        domain_name: &str,
+        argument: vir_low::Expression,
     ) -> SpannedEncodingResult<vir_low::Expression>;
     fn declare_snapshot_constructors<'a>(
         &mut self,
@@ -369,7 +375,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
             let domain_type = self.encode_snapshot_domain_type(ty)?;
             let return_type = self.bytes_type()?;
             self.declare_domain_function(
-                std::borrow::Cow::Owned(domain_name),
+                &domain_name,
                 std::borrow::Cow::Owned(format!("to_bytes${}", ty.get_identifier())),
                 std::borrow::Cow::Owned(vec![vir_low::VariableDecl::new("snapshot", domain_type)]),
                 std::borrow::Cow::Owned(return_type),
@@ -377,17 +383,37 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         }
         Ok(())
     }
-    // TODO: Rename this to type validity and move to
-    // prusti-viper/src/encoder/middle/core_proof/types/interface.rs
-    fn encode_snapshot_validity_expression(
+    // // TODO: Rename this to type validity and move to
+    // // prusti-viper/src/encoder/middle/core_proof/types/interface.rs
+    fn encode_snapshot_validity_expression_for_type(
         &mut self,
         argument: vir_low::Expression,
         ty: &vir_mid::Type,
     ) -> SpannedEncodingResult<vir_low::Expression> {
         let domain_name = self.encode_snapshot_domain_name(ty)?;
+        self.encode_snapshot_validity_expression(&domain_name, argument)
+        // self.create_domain_func_app(
+        //     domain_name,
+        //     format!("valid${}", ty.get_identifier()),
+        //     vec![argument],
+        //     vir_low::Type::Bool,
+        //     Default::default(),
+        // )
+    }
+    fn encode_snapshot_validity_expression(
+        &mut self,
+        domain_name: &str,
+        argument: vir_low::Expression,
+    ) -> SpannedEncodingResult<vir_low::Expression> {
+        // Ok(vir_low::Expression::domain_function_call(
+        //     domain_name,
+        //     format!("valid${}", domain_name),
+        //     vec![argument],
+        //     vir_low::Type::Bool,
+        // ))
         self.create_domain_func_app(
             domain_name,
-            format!("valid${}", ty.get_identifier()),
+            format!("valid${}", domain_name),
             vec![argument],
             vir_low::Type::Bool,
             Default::default(),
@@ -423,7 +449,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         let domain_name = self.encode_snapshot_domain_name(base_type)?;
         let return_type = field.ty.create_snapshot(self)?;
         Ok(self
-            .adt_destructor_struct_call(&domain_name, &field.name, return_type, base_snapshot)?
+            .snapshot_destructor_struct_call(&domain_name, &field.name, return_type, base_snapshot)?
             .set_default_position(position))
     }
     fn encode_enum_variant_snapshot(
@@ -436,7 +462,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         let domain_name = self.encode_snapshot_domain_name(base_type)?;
         let return_type = base_type.create_snapshot(self)?;
         Ok(self
-            .adt_destructor_enum_variant_call(&domain_name, &variant.index, return_type, base_snapshot)?
+            .snapshot_destructor_enum_variant_call(
+                &domain_name,
+                &variant.index,
+                return_type,
+                base_snapshot,
+            )?
             .set_default_position(position))
     }
     fn encode_constant_snapshot(
@@ -454,7 +485,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         };
         vir_low::operations::ty::Typed::set_type(&mut argument, low_type);
         Ok(self
-            .adt_constructor_constant_call(&domain_name, vec![argument])?
+            .snapshot_constructor_constant_call(&domain_name, vec![argument])?
             .set_default_position(position))
     }
     fn encode_snapshot_constructor_base_call(
@@ -464,7 +495,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         position: vir_mid::Position,
     ) -> SpannedEncodingResult<vir_low::Expression> {
         let domain_name = self.encode_snapshot_domain_name(ty)?;
-        let function_name = self.adt_constructor_struct_name(&domain_name)?;
+        let function_name = self.snapshot_constructor_struct_name(&domain_name)?;
         let return_type = ty.create_snapshot(self)?;
         self.create_domain_func_app(domain_name, function_name, arguments, return_type, position)
     }
@@ -475,7 +506,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         position: vir_mid::Position,
     ) -> SpannedEncodingResult<vir_low::Expression> {
         let domain_name = self.encode_snapshot_domain_name(ty)?;
-        let function_name = self.adt_destructor_constant_name(&domain_name)?;
+        let function_name = self.snapshot_destructor_constant_name(&domain_name)?;
         let return_type = match &ty {
             vir_mid::Type::Bool => vir_low::Type::Bool,
             vir_mid::Type::Int(_) => vir_low::Type::Int,
@@ -500,7 +531,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         let domain_name = self.encode_snapshot_domain_name(ty)?;
         let op = op.to_low(self)?;
         let variant = self.encode_unary_op_variant(op, ty)?;
-        let function_name = self.adt_constructor_struct_alternative_name(&domain_name, &variant)?;
+        let function_name =
+            self.snapshot_constructor_struct_alternative_name(&domain_name, &variant)?;
         let return_type = ty.create_snapshot(self)?;
         self.create_domain_func_app(
             domain_name,
@@ -522,7 +554,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         let domain_name = self.encode_snapshot_domain_name(ty)?;
         let op = op.to_low(self)?;
         let variant = self.encode_binary_op_variant(op, ty)?;
-        let function_name = self.adt_constructor_struct_alternative_name(&domain_name, &variant)?;
+        let function_name =
+            self.snapshot_constructor_struct_alternative_name(&domain_name, &variant)?;
         let return_type = ty.create_snapshot(self)?;
         self.create_domain_func_app(
             domain_name,

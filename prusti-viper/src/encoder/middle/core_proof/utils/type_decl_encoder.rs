@@ -96,8 +96,11 @@ pub(in super::super) trait TypeDeclWalker {
         }
         Ok(())
     }
-    fn walk_enum(&mut self, ty: &vir_mid::Type, decl: &vir_mid::type_decl::Enum, parameters: &Self::Parameters
-        ,
+    fn walk_enum(
+        &mut self,
+        ty: &vir_mid::Type,
+        decl: &vir_mid::type_decl::Enum,
+        parameters: &Self::Parameters,
         lowerer: &mut Lowerer,
     ) -> SpannedEncodingResult<()> {
         for variant in &decl.variants {
@@ -163,7 +166,7 @@ pub(in super::super) trait TypeDeclWalker {
             }
             vir_mid::TypeDecl::Enum(decl) => {
                 self.walk_enum(ty, decl, &parameters, lowerer)?;
-            },
+            }
             // vir_mid::TypeDecl::Array(Array) => {},
             // vir_mid::TypeDecl::Reference(Reference) => {},
             // vir_mid::TypeDecl::Never => {},
@@ -191,7 +194,7 @@ pub(in super::super) trait TypeDeclWalker {
             {
                 self.after_primitive(ty, parameters, lowerer)
             }
-            vir_mid::Type::Tuple(_) | vir_mid::Type::Struct(_)| vir_mid::Type::Enum(_) => {
+            vir_mid::Type::Tuple(_) | vir_mid::Type::Struct(_) | vir_mid::Type::Enum(_) => {
                 self.after_composite(ty, parameters, lowerer)
             }
             // vir_mid::Type::Array(Array) => {},

@@ -348,7 +348,8 @@ impl IntoLow for vir_mid::Predicate {
                 let address = lowerer.extract_root_address(&predicate.place)?;
                 let snapshot = lowerer.lower_expression_into_snapshot(&predicate.place)?;
                 let ty = predicate.place.get_type();
-                let valid = lowerer.encode_snapshot_validity_expression(snapshot.clone(), ty)?;
+                let valid =
+                    lowerer.encode_snapshot_validity_expression_for_type(snapshot.clone(), ty)?;
                 exprp! {
                     predicate.position =>
                     (acc(OwnedNonAliased<ty>([place], [address], [snapshot]))) &&

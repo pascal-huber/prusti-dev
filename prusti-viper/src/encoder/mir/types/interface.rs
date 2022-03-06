@@ -227,8 +227,19 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
             .borrow()
             .contains_key(ty)
         {
-            let encoded_type = if let vir_high::Type::Enum(vir_high::ty::Enum { variant: Some(variant), name, arguments}) = ty {
-                let encoded_enum = self.encode_type_def(&vir_high::Type::enum_(name.clone(), arguments.clone(), None))?.unwrap_enum();
+            let encoded_type = if let vir_high::Type::Enum(vir_high::ty::Enum {
+                variant: Some(variant),
+                name,
+                arguments,
+            }) = ty
+            {
+                let encoded_enum = self
+                    .encode_type_def(&vir_high::Type::enum_(
+                        name.clone(),
+                        arguments.clone(),
+                        None,
+                    ))?
+                    .unwrap_enum();
                 vir_high::TypeDecl::Struct(encoded_enum.into_variant(&variant.index).unwrap())
             } else {
                 let original_ty = self.decode_type_high(ty);

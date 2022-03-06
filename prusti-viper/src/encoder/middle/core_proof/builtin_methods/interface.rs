@@ -262,11 +262,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             vir_mid::Rvalue::Discriminant(value) => {
                 // unimplemented!("lookup discriminant snapshot for: {}", value);
                 let place = value.place.create_snapshot(self)?;
-                self.encode_discriminant_call(
-                                        place,
-                                        value.place.get_type(),
-                                        position
-                )?
+                self.encode_discriminant_call(place, value.place.get_type(), position)?
             }
         };
         posts.push(exprp! { position => result_value == [assigned_value.clone()]});
@@ -299,7 +295,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             }
             vir_mid::OperandKind::Constant => {
                 parameters.push(value.clone());
-                pres.push(self.encode_snapshot_validity_expression(value.clone().into(), ty)?);
+                pres.push(
+                    self.encode_snapshot_validity_expression_for_type(value.clone().into(), ty)?,
+                );
             }
         }
         Ok(value)
@@ -516,7 +514,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     value: {ty.create_snapshot(self)?}
                 ) returns ()
                     raw_code {
-                        let validity = self.encode_snapshot_validity_expression(value.clone().into(), ty)?;
+                        let validity = self.encode_snapshot_validity_expression_for_type(value.clone().into(), ty)?;
                         let compute_address = expr! { ComputeAddress::compute_address(place, address) };
                         self.encode_fully_split_memory_block(
                             &mut statements,
@@ -663,7 +661,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             };
             method.body = Some(statements);
             self.declare_method(method)?;
-
         }
         Ok(())
     }

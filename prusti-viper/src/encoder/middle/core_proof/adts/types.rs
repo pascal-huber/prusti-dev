@@ -14,13 +14,9 @@ pub(in super::super) enum AdtConstructorKind {
     /// A constructor that constructs the type from given parameters.
     Struct,
     /// An alternative constructor for the struct type.
-    AlternativeStruct {
-        name: String,
-    },
+    AlternativeStruct { name: String },
     /// A constructor that creates a specific variant of a enum.
-    EnumVariant {
-        name: String,
-    },
+    EnumVariant { name: String },
 }
 
 pub(in super::super) struct AdtConstructor {
@@ -43,9 +39,12 @@ impl AdtConstructor {
         }
     }
 
-    pub(in super::super) fn struct_alternative(name: String, parameters: Vec<vir_low::VariableDecl>) -> AdtConstructor {
+    pub(in super::super) fn struct_alternative(
+        name: String,
+        parameters: Vec<vir_low::VariableDecl>,
+    ) -> AdtConstructor {
         Self {
-            kind: AdtConstructorKind::AlternativeStruct{ name },
+            kind: AdtConstructorKind::AlternativeStruct { name },
             parameters,
         }
     }
@@ -55,7 +54,7 @@ impl AdtConstructor {
         variant_type: vir_crate::low::Type,
     ) -> AdtConstructor {
         Self {
-            kind: AdtConstructorKind::EnumVariant{ name },
+            kind: AdtConstructorKind::EnumVariant { name },
             parameters: vec![vir_low::VariableDecl::new("variant", variant_type)],
         }
     }
@@ -68,7 +67,11 @@ impl AdtConstructor {
         &self.parameters
     }
 
-    pub(in super::super) fn parameter_destructor_name(&self, domain_name: &str, field_name: &str) -> String {
+    pub(in super::super) fn parameter_destructor_name(
+        &self,
+        domain_name: &str,
+        field_name: &str,
+    ) -> String {
         parameter_destructor_name(domain_name, &self.kind, field_name)
     }
 
@@ -111,7 +114,8 @@ impl AdtConstructor {
     pub(in super::super) fn destructor_call(
         &self,
         domain_name: &str,
-        field_name: &str, field_type: vir_low::Type,
+        field_name: &str,
+        field_type: vir_low::Type,
         argument: vir_low::Expression,
     ) -> vir_low::Expression {
         destructor_call(domain_name, &self.kind, field_name, field_type, argument)
@@ -222,16 +226,24 @@ pub(super) fn constructor_name(domain_name: &str, kind: &AdtConstructorKind) -> 
     match kind {
         AdtConstructorKind::Constant => format!("constructor${}", domain_name),
         AdtConstructorKind::Struct => format!("constructor${}", domain_name),
-        AdtConstructorKind::AlternativeStruct { name } => format!("constructor${}${}", domain_name, name),
+        AdtConstructorKind::AlternativeStruct { name } => {
+            format!("constructor${}${}", domain_name, name)
+        }
         AdtConstructorKind::EnumVariant { name } => format!("constructor${}${}", domain_name, name),
     }
 }
 
-pub(super) fn parameter_destructor_name(domain_name: &str, kind: &AdtConstructorKind, parameter_name: &str) -> String {
+pub(super) fn parameter_destructor_name(
+    domain_name: &str,
+    kind: &AdtConstructorKind,
+    parameter_name: &str,
+) -> String {
     match kind {
         AdtConstructorKind::Constant => constant_destructor_name(domain_name),
         AdtConstructorKind::Struct => format!("field${}${}", domain_name, parameter_name),
-        AdtConstructorKind::AlternativeStruct { name } => alternative_struct_destructor_name(domain_name, name, parameter_name),
+        AdtConstructorKind::AlternativeStruct { name } => {
+            alternative_struct_destructor_name(domain_name, name, parameter_name)
+        }
         AdtConstructorKind::EnumVariant { name } => enum_variant_destructor_name(domain_name, name),
     }
 }
@@ -240,7 +252,11 @@ pub(super) fn constant_destructor_name(domain_name: &str) -> String {
     format!("destructor${}", domain_name)
 }
 
-pub(super) fn alternative_struct_destructor_name(domain_name: &str, variant: &str, parameter_name: &str) -> String {
+pub(super) fn alternative_struct_destructor_name(
+    domain_name: &str,
+    variant: &str,
+    parameter_name: &str,
+) -> String {
     format!("field${}${}${}", domain_name, variant, parameter_name)
 }
 

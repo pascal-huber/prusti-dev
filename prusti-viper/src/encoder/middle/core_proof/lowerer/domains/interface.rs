@@ -55,7 +55,7 @@ pub(in super::super::super) trait DomainsLowererInterface {
     ) -> SpannedEncodingResult<()>;
     fn declare_domain_function(
         &mut self,
-        domain_name: std::borrow::Cow<'_, String>,
+        domain_name: &str,
         function_name: std::borrow::Cow<'_, String>,
         parameters: std::borrow::Cow<'_, Vec<vir_low::VariableDecl>>,
         return_type: std::borrow::Cow<'_, vir_low::Type>,
@@ -124,7 +124,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> DomainsLowererInterface for Lowerer<'p, 'v, 'tcx> {
     }
     fn declare_domain_function(
         &mut self,
-        domain_name: std::borrow::Cow<'_, String>,
+        domain_name: &str,
         function_name: std::borrow::Cow<'_, String>,
         parameters: std::borrow::Cow<'_, Vec<vir_low::VariableDecl>>,
         return_type: std::borrow::Cow<'_, vir_low::Type>,
@@ -135,7 +135,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> DomainsLowererInterface for Lowerer<'p, 'v, 'tcx> {
                 parameters: parameters.into_owned(),
                 return_type: return_type.into_owned(),
             };
-            self.insert_domain_function(&domain_name, domain_function)?;
+            self.insert_domain_function(domain_name, domain_function)?;
         }
         Ok(())
     }
@@ -152,7 +152,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> DomainsLowererInterface for Lowerer<'p, 'v, 'tcx> {
         let function_name = function_name.to_string();
         let parameters = self.create_parameters(&arguments);
         self.declare_domain_function(
-            std::borrow::Cow::Borrowed(&domain_name),
+            &domain_name,
             std::borrow::Cow::Borrowed(&function_name),
             std::borrow::Cow::Borrowed(&parameters),
             std::borrow::Cow::Borrowed(&return_type),
