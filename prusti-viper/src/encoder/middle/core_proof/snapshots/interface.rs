@@ -569,10 +569,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
     fn encode_discriminant_name(&mut self, domain_name: &str) -> SpannedEncodingResult<String> {
         let ty = if let Some(decoded_type) = self.try_decoding_snapshot_type(domain_name)? {
             decoded_type
-        }else {
-                    unreachable!("Failed to decode the snapshot: {}", domain_name);
-                };
-                Ok(format!("discriminant${}", ty.get_identifier()))
+        } else {
+            unreachable!("Failed to decode the snapshot: {}", domain_name);
+        };
+        Ok(format!("discriminant${}", ty.get_identifier()))
     }
     fn encode_discriminant_call(
         &mut self,

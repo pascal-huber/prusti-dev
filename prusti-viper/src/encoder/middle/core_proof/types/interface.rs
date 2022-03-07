@@ -170,6 +170,21 @@ trait Private {
         parameters: Vec<vir_low::VariableDecl>,
         invariant: vir_low::Expression,
     ) -> SpannedEncodingResult<()>;
+    fn encode_validity_axioms_enum(
+        &mut self,
+        domain_name: &str,
+        variants: Vec<(String, String)>,
+        invariant: vir_low::Expression,
+        discriminant_bounds: vir_low::Expression,
+    ) -> SpannedEncodingResult<()>;
+    fn encode_validity_axioms_enum_variant(
+        &mut self,
+        domain_name: &str,
+        variant_name: String,
+        variant_domain: String,
+        invariant: vir_low::Expression,
+        discriminant_bounds: vir_low::Expression,
+    ) -> SpannedEncodingResult<()>;
     fn ensure_type_definition_for_decl(
         &mut self,
         ty: &vir_mid::Type,
@@ -266,17 +281,19 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         use vir_low::macros::*;
         let parameter_type = vir_low::Type::domain(variant_domain_name.to_string());
         let discriminant_name = self.encode_discriminant_name(domain_name)?;
-        let valid_call_with_discriminant = move |domain_name: &str, variable: &vir_low::VariableDecl| {
-            let validity_call = valid_call(domain_name, variable)?;
-            let discriminant_call = vir_low::Expression::domain_function_call(
-                domain_name,
-                discriminant_name,
-                vec![variable.clone().into()],
-                vir_low::Type::Int
-            );
-            let guard = expr! { [validity_call.clone()] && ([discriminant_call] == [discriminant]) };
-            Ok((validity_call, guard))
-        };
+        let valid_call_with_discriminant =
+            move |domain_name: &str, variable: &vir_low::VariableDecl| {
+                let validity_call = valid_call(domain_name, variable)?;
+                let discriminant_call = vir_low::Expression::domain_function_call(
+                    domain_name,
+                    discriminant_name,
+                    vec![variable.clone().into()],
+                    vir_low::Type::Int,
+                );
+                let guard =
+                    expr! { [validity_call.clone()] && ([discriminant_call] == [discriminant]) };
+                Ok((validity_call, guard))
+            };
         self.adt_register_variant_constructor(
             domain_name,
             variant_name,
@@ -302,15 +319,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<()> {
         use vir_low::macros::*;
         let mut valid_parameters = Vec::new();
-        let variant_name = ""; // FIXME
         for parameter in &parameters {
             if let vir_low::Type::Domain(parameter_domain) = &parameter.ty {
                 valid_parameters.push(valid_call(&parameter_domain.name, parameter)?);
             }
         }
-        let constructor_call = self.adt_constructor_variant_call(
+        let constructor_call = self.adt_constructor_main_call(
             domain_name,
-            variant_name,
             parameters
                 .iter()
                 .map(|parameter| parameter.clone().into())
@@ -387,6 +402,65 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             body: axiom_bottom_up_body,
         };
         self.declare_axiom(domain_name, axiom_bottom_up)?;
+        Ok(())
+    }
+    fn encode_validity_axioms_enum(
+        &mut self,
+        domain_name: &str,
+        variants: Vec<(String, String)>,
+        invariant: vir_low::Expression,
+        discriminant_bounds: vir_low::Expression,
+    ) -> SpannedEncodingResult<()> {
+        for (variant_name, variant_domain) in variants {
+            self.encode_validity_axioms_enum_variant(
+                domain_name,
+                variant_name,
+                variant_domain,
+                invariant.clone(),
+                discriminant_bounds.clone(),
+            )?;
+        }
+        Ok(())
+    }
+    fn encode_validity_axioms_enum_variant(
+        &mut self,
+        domain_name: &str,
+        variant_name: String,
+        variant_domain: String,
+        invariant: vir_low::Expression,
+        discriminant_bounds: vir_low::Expression,
+    ) -> SpannedEncodingResult<()> {
+        use vir_low::macros::*;
+        {
+            let variant_type = vir_low::Type::domain(variant_domain.clone());
+            var_decls! { variant: {variant_type} };
+            let constructor_call = self.adt_constructor_variant_call(
+                domain_name,
+                &variant_name,
+                vec![variant.clone().into()],
+            )?;
+            let valid_constructor =
+                self.encode_snapshot_validity_expression(domain_name, constructor_call)?;
+            let valid_variant =
+                self.encode_snapshot_validity_expression(&variant_domain, variant.clone().into())?;
+            let axiom_bottom_up_body = {
+                let trigger = vec![valid_variant.clone(), valid_constructor.clone()];
+                vir_low::Expression::forall(
+                    vec![variant.clone()],
+                    vec![vir_low::Trigger::new(trigger)],
+                    expr! {
+                        [ valid_constructor ] == ([ valid_variant ] && [ invariant ])
+                    },
+                )
+            };
+            // The axiom that allows proving that the data structure is
+            // valid if we know that its fields are valid.
+            let axiom_bottom_up = vir_low::DomainAxiomDecl {
+                name: format!("{}${}$validity_axiom_bottom_up", domain_name, variant_name),
+                body: axiom_bottom_up_body,
+            };
+            self.declare_axiom(domain_name, axiom_bottom_up)?;
+        }
         Ok(())
     }
     fn ensure_type_definition_for_decl(
@@ -516,7 +590,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 // constructors.add_struct_with_inv(parameters, true.into());
             }
             vir_mid::TypeDecl::Enum(decl) => {
-                let mut variant_domains = Vec::new();
+                let mut variants = Vec::new();
                 for (variant, discriminant) in decl.variants.iter().zip(&decl.discriminant_values) {
                     let variant_type = ty.clone().variant(variant.name.clone().into());
                     let variant_domain = self.encode_snapshot_domain_name(&variant_type)?;
@@ -527,11 +601,22 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     //     true.into(),
                     // );
                     let discriminant = discriminant.clone().to_low(self)?;
-                    self.register_enum_variant_constructor(&domain_name, &variant.name, &variant_domain, discriminant)?;
+                    self.register_enum_variant_constructor(
+                        &domain_name,
+                        &variant.name,
+                        &variant_domain,
+                        discriminant,
+                    )?;
                     self.ensure_type_definition(&variant_type)?;
-                    variant_domains.push(variant_domain);
+                    variants.push((variant.name.clone(), variant_domain));
                 }
-                // self.encode_validity_axioms_enum(&domain_name, variant_domains, true.into())?;
+                let discriminant_bounds = decl.discriminant_bounds.clone().to_low(self)?;
+                self.encode_validity_axioms_enum(
+                    &domain_name,
+                    variants,
+                    true.into(),
+                    discriminant_bounds,
+                )?;
                 // self.register_discriminant_variants() TODO
             }
             _ => unimplemented!("type: {:?}", type_decl),
