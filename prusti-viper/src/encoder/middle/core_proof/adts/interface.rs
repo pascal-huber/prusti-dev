@@ -102,7 +102,8 @@ pub(in super::super) trait AdtsInterface {
         F: for<'a> FnOnce(
             &'a str,
             &'a vir_low::VariableDecl,
-        ) -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)>;
+        )
+            -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)>;
     /// Register the variant constructor and derive injectivity axioms for it.
     /// If `top_down_injectivity_guard` is not `None`, when deriving the
     /// top-down injectivity axiom, it is called with the quantified variable
@@ -120,7 +121,8 @@ pub(in super::super) trait AdtsInterface {
         F: for<'a> FnOnce(
             &'a str,
             &'a vir_low::VariableDecl,
-        ) -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)>;
+        )
+            -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)>;
 
     fn snapshot_constructor_constant_call(
         &mut self,
@@ -219,7 +221,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
         F: for<'a> FnOnce(
             &'a str,
             &'a vir_low::VariableDecl,
-        ) -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)>,
+        )
+            -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)>,
     {
         assert!(self
             .adts_state
@@ -243,7 +246,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
         F: for<'a> FnOnce(
             &'a str,
             &'a vir_low::VariableDecl,
-        ) -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)>,
+        )
+            -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)>,
     {
         assert!(self.adts_state.variant_constructors.insert((
             vir_low::ty::Domain::new(domain_name),
@@ -329,7 +333,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
         // Top-down injectivity axiom.
         {
             var_decls! { value: {ty} };
-            let (trigger_guard, guard) = if let Some(guard_constructor) = top_down_injectivity_guard {
+            let (trigger_guard, guard) = if let Some(guard_constructor) = top_down_injectivity_guard
+            {
                 let (trigger, guard) = guard_constructor(domain_name, &value)?;
                 (Some(trigger), Some(guard))
             } else {
@@ -454,13 +459,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
         variant_type: vir_low::Type,
         argument: vir_low::Expression,
     ) -> SpannedEncodingResult<vir_low::Expression> {
-        self.adt_destructor_variant_call(
-            domain_name,
-            variant_name,
-            "value",
-            variant_type,
-            argument
-        )
+        self.adt_destructor_variant_call(domain_name, variant_name, "value", variant_type, argument)
         // Ok(enum_variant_destructor_call(
         //     domain_name,
         //     variant,
