@@ -454,7 +454,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
         variant_type: vir_low::Type,
         argument: vir_low::Expression,
     ) -> SpannedEncodingResult<vir_low::Expression> {
-        unimplemented!();
+        self.adt_destructor_variant_call(
+            domain_name,
+            variant_name,
+            "value",
+            variant_type,
+            argument
+        )
         // Ok(enum_variant_destructor_call(
         //     domain_name,
         //     variant,

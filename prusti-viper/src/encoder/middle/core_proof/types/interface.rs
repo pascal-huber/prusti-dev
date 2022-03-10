@@ -298,6 +298,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         self.adt_register_variant_constructor(
             domain_name,
             variant_name,
+            // FIXME: refactor the code so that this function is at the same
+            // place as snapshot_destructor_enum_variant_call because both of
+            // them hardcode the same constant `value`.
             vars! { value: {parameter_type}},
             Some(valid_call_with_discriminant),
         )
@@ -425,10 +428,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 self.encode_discriminant_call(snapshot.clone().into(), ty, Default::default())?;
             for (variant_name, variant_domain, discriminant) in &variants {
                 let variant_type = vir_low::Type::domain(variant_domain.clone());
-                let variant = self.adt_destructor_variant_call(
+                let variant = self.snapshot_destructor_enum_variant_call(
                     &domain_name,
                     variant_name,
-                    "value",
                     variant_type,
                     snapshot.clone().into(),
                 )?;
