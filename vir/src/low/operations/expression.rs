@@ -101,4 +101,21 @@ impl Expression {
         };
         replacer.fold_expression(self)
     }
+    #[must_use]
+    pub fn replace_discriminant(self, new_discriminant: &Expression) -> Self {
+        struct DiscriminantReplacer<'a> {
+            new_discriminant: &'a Expression,
+        }
+        impl<'a> ExpressionFolder for DiscriminantReplacer<'a> {
+            fn fold_expression(&mut self, expression: Expression) -> Expression {
+                if expression.is_discriminant() {
+                    self.new_discriminant.clone()
+                } else {
+                    default_fold_expression(self, expression)
+                }
+            }
+        }
+        let mut replacer = DiscriminantReplacer { new_discriminant };
+        replacer.fold_expression(self)
+    }
 }
