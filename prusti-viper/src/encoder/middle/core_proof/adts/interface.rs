@@ -351,10 +351,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
                     value.clone().into(),
                 )?;
                 if let Some(guard) = &trigger_guard {
-                    triggers.push(vir_low::Trigger::new(vec![
+                    let mut terms = vec![
                         guard.clone(),
-                        destructor_call.clone(),
-                    ]));
+                    ];
+                    if parameters.len() != 1 {
+                        terms.push(destructor_call.clone());
+                    }
+                    triggers.push(vir_low::Trigger::new(terms));
                 } else {
                     unimplemented!("figure out what triggers to choose to avoid matching loop!");
                 }

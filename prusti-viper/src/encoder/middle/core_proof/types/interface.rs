@@ -551,6 +551,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     &variant_name,
                     vars! { argument: {snapshot_type.clone()} },
                 )?;
+                var_decls! { constant: Bool };
+                self.declare_simplification_axiom(ty, &variant_name, vec![constant.clone()], ty, expr! { !constant })?;
 
                 // constructors.add_constant_with_inv(vir_low::Type::Bool, true.into(), true);
                 // let snapshot_type = (vir_mid::Type::Bool).create_snapshot(self)?;
@@ -567,27 +569,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         &variant_name,
                         vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
                     )?;
+                    var_decls! { left: Bool, right: Bool };
+                    let result =
+                        vir_low::Expression::binary_op_no_pos(*op, expr! {left}, expr! {right});
+                    self.declare_simplification_axiom(ty, &variant_name, vec![left, right], ty, result)?;
                     // constructors.add_struct_alternative_no_inv(
                     //     self.encode_binary_op_variant(*op, &vir_mid::Type::Bool)?,
                     //     vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
                     // );
-                }
-                for size in INTEGER_SIZES {
-                    let int_ty = vir_mid::Type::Int(*size);
-                    let snapshot_type = int_ty.create_snapshot(self)?;
-                    for op in COMPARISON_OPERATORS {
-                        // FIXME: Make these on demand.
-                        let variant_name = self.encode_binary_op_variant(*op, &int_ty)?;
-                        self.register_alternative_constructor(
-                            &domain_name,
-                            &variant_name,
-                            vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
-                        )?;
-                        // constructors.add_struct_alternative_no_inv(
-                        //     self.encode_binary_op_variant(*op, &int_ty)?,
-                        //     vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
-                        // );
-                    }
                 }
 
                 self.encode_validity_axioms_primitive(
@@ -606,6 +595,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     &variant_name,
                     vars! { argument: {snapshot_type.clone()} },
                 )?;
+                var_decls! { constant: Int };
+                self.declare_simplification_axiom(ty, &variant_name, vec![constant.clone()], ty, expr! { -constant })?;
                 // constructors.add_struct_alternative_no_inv(
                 //     &self.encode_unary_op_variant(vir_low::UnaryOpKind::Minus, ty)?,
                 //     vars! { argument: {snapshot_type.clone()} },
@@ -618,10 +609,38 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         &variant_name,
                         vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
                     )?;
+                    var_decls! { left: Int, right: Int };
+                    let result =
+                        vir_low::Expression::binary_op_no_pos(*op, expr! {left}, expr! {right});
+                    self.declare_simplification_axiom(ty, &variant_name, vec![left, right], ty, result)?;
                     // constructors.add_struct_alternative_no_inv(
                     //     &self.encode_binary_op_variant(*op, ty)?,
                     //     vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
                     // );
+                }
+                let bool_domain_name = self.encode_snapshot_domain_name(&vir_mid::Type::Bool)?;
+                for op in COMPARISON_OPERATORS {
+                    // FIXME: Make these on demand.
+                    let variant_name = self.encode_binary_op_variant(*op, &ty)?;
+                    self.register_alternative_constructor(
+                        &bool_domain_name,
+                        &variant_name,
+                        vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
+                    )?;
+                    // constructors.add_struct_alternative_no_inv(
+                    //     self.encode_binary_op_variant(*op, &int_ty)?,
+                    //     vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
+                    // );
+                    var_decls! { left: Int, right: Int };
+                    let result =
+                        vir_low::Expression::binary_op_no_pos(*op, expr! {left}, expr! {right});
+                    self.declare_simplification_axiom(
+                        &vir_mid::Type::Bool,
+                        &variant_name,
+                        vec![left, right],
+                        ty,
+                        result,
+                    )?;
                 }
                 var_decls! { value: Int };
                 let mut conjuncts = Vec::new();
