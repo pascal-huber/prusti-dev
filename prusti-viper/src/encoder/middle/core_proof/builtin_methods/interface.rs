@@ -660,9 +660,31 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                 // Primitive type. Nothing to do.
                             }
                             vir_mid::TypeDecl::TypeVar(_) => unimplemented!("ty: {}", ty),
-                            vir_mid::TypeDecl::Tuple(_) => unimplemented!("ty: {}", ty),
-                            vir_mid::TypeDecl::Struct(struct_decl) => {
-                                for field in struct_decl.iter_fields() {
+                            vir_mid::TypeDecl::Tuple(decl) => {
+                                // TODO: Remove code duplication.
+                                for field in decl.iter_fields() {
+                                    let field_place = self.encode_field_place(
+                                        ty, &field, place.clone().into(), position
+                                    )?;
+                                    let field_value = self.encode_field_snapshot(
+                                        ty, &field, value.clone().into(), position
+                                    )?;
+                                    self.encode_into_memory_block_method(&field.ty)?;
+                                    let field_ty = &field.ty;
+                                    statements.push(stmtp! {
+                                        position =>
+                                        call into_memory_block<field_ty>([field_place], root_address, [field_value])
+                                    })
+                                }
+                                self.encode_memory_block_join_method(ty)?;
+                                statements.push(stmtp! {
+                                    position =>
+                                    call memory_block_join<ty>([address.clone()])
+                                });
+                            },
+                            vir_mid::TypeDecl::Struct(decl) => {
+                                // TODO: Remove code duplication.
+                                for field in decl.iter_fields() {
                                     let field_place = self.encode_field_place(
                                         ty, &field, place.clone().into(), position
                                     )?;
