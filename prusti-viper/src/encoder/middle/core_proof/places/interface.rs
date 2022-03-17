@@ -52,13 +52,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> PlacesInterface for Lowerer<'p, 'v, 'tcx> {
         base_place: vir_low::Expression,
         position: vir_mid::Position,
     ) -> SpannedEncodingResult<vir_low::ast::expression::Expression> {
-        self.encode_variant_access_function_app(
-            "Place",
-            base_place,
-            base_type,
-            variant,
-            position,
-        )
+        self.encode_variant_access_function_app("Place", base_place, base_type, variant, position)
     }
     /// Emits code that represents the place.
     fn encode_expression_as_place(

@@ -555,7 +555,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     vars! { argument: {snapshot_type.clone()} },
                 )?;
                 var_decls! { constant: Bool };
-                self.declare_simplification_axiom(ty, &variant_name, vec![constant.clone()], ty, expr! { !constant })?;
+                self.declare_simplification_axiom(
+                    ty,
+                    &variant_name,
+                    vec![constant.clone()],
+                    ty,
+                    expr! { !constant },
+                )?;
 
                 // constructors.add_constant_with_inv(vir_low::Type::Bool, true.into(), true);
                 // let snapshot_type = (vir_mid::Type::Bool).create_snapshot(self)?;
@@ -575,7 +581,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     var_decls! { left: Bool, right: Bool };
                     let result =
                         vir_low::Expression::binary_op_no_pos(*op, expr! {left}, expr! {right});
-                    self.declare_simplification_axiom(ty, &variant_name, vec![left, right], ty, result)?;
+                    self.declare_simplification_axiom(
+                        ty,
+                        &variant_name,
+                        vec![left, right],
+                        ty,
+                        result,
+                    )?;
                     // constructors.add_struct_alternative_no_inv(
                     //     self.encode_binary_op_variant(*op, &vir_mid::Type::Bool)?,
                     //     vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },
@@ -600,7 +612,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     vars! { argument: {snapshot_type.clone()} },
                 )?;
                 var_decls! { constant: Int };
-                self.declare_simplification_axiom(ty, &variant_name, vec![constant.clone()], ty, expr! { -constant })?;
+                self.declare_simplification_axiom(
+                    ty,
+                    &variant_name,
+                    vec![constant.clone()],
+                    ty,
+                    expr! { -constant },
+                )?;
                 // constructors.add_struct_alternative_no_inv(
                 //     &self.encode_unary_op_variant(vir_low::UnaryOpKind::Minus, ty)?,
                 //     vars! { argument: {snapshot_type.clone()} },
@@ -616,7 +634,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     var_decls! { left: Int, right: Int };
                     let result =
                         vir_low::Expression::binary_op_no_pos(*op, expr! {left}, expr! {right});
-                    self.declare_simplification_axiom(ty, &variant_name, vec![left, right], ty, result)?;
+                    self.declare_simplification_axiom(
+                        ty,
+                        &variant_name,
+                        vec![left, right],
+                        ty,
+                        result,
+                    )?;
                     // constructors.add_struct_alternative_no_inv(
                     //     &self.encode_binary_op_variant(*op, ty)?,
                     //     vars! { left: {snapshot_type.clone()}, right: {snapshot_type.clone()} },

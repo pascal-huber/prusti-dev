@@ -64,7 +64,7 @@ trait Private {
     fn encode_place_arguments(
         &mut self,
         arguments: &mut Vec<vir_low::Expression>,
-        expression: &vir_mid::Expression
+        expression: &vir_mid::Expression,
     ) -> SpannedEncodingResult<()>;
     fn encode_assign_method(
         &mut self,
@@ -175,7 +175,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
     fn encode_place_arguments(
         &mut self,
         arguments: &mut Vec<vir_low::Expression>,
-        expression: &vir_mid::Expression
+        expression: &vir_mid::Expression,
     ) -> SpannedEncodingResult<()> {
         arguments.push(self.encode_expression_as_place(expression)?);
         arguments.push(self.extract_root_address(expression)?);
@@ -282,11 +282,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             }
             vir_mid::Rvalue::Discriminant(value) => {
                 let ty = value.place.get_type();
-                let parameter_value = vir_low::VariableDecl::new("operand_value", ty.create_snapshot(self)?);
+                let parameter_value =
+                    vir_low::VariableDecl::new("operand_value", ty.create_snapshot(self)?);
                 parameters.push(parameter_value.clone());
-                pres.push(
-                    self.encode_snapshot_validity_expression_for_type(parameter_value.clone().into(), ty)?
-                );
+                pres.push(self.encode_snapshot_validity_expression_for_type(
+                    parameter_value.clone().into(),
+                    ty,
+                )?);
                 // unimplemented!("lookup discriminant snapshot for: {}", value);
                 let place = value.place.create_snapshot(self)?;
                 self.encode_discriminant_call(parameter_value.into(), ty, position)?
@@ -315,17 +317,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         let value = self.encode_assign_operand_snapshot(operand_counter, operand)?;
         let ty = operand.expression.get_type();
         match operand.kind {
-            vir_mid::OperandKind::Copy|
-            vir_mid::OperandKind::Move => {
+            vir_mid::OperandKind::Copy | vir_mid::OperandKind::Move => {
                 let place = self.encode_assign_operand_place(operand_counter)?;
-                let root_address =self.encode_assign_operand_address(operand_counter)?;
+                let root_address = self.encode_assign_operand_address(operand_counter)?;
                 pres.push(expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) });
                 let post_predicate = if operand.kind == vir_mid::OperandKind::Copy {
                     expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) }
                 } else {
-                    pre_write_statements.push(
-                        stmt! { call into_memory_block<ty>(place, root_address, value) }
-                    );
+                    pre_write_statements
+                        .push(stmt! { call into_memory_block<ty>(place, root_address, value) });
                     let compute_address = ty!(Address);
                     let size_of = self.encode_type_size_expression(ty)?;
                     expr! { acc(MemoryBlock((ComputeAddress::compute_address(place, root_address)), [size_of])) }
@@ -334,12 +334,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 parameters.push(place);
                 parameters.push(root_address);
             }
-            vir_mid::OperandKind::Constant => {
-            }
+            vir_mid::OperandKind::Constant => {}
         }
-        pres.push(
-            self.encode_snapshot_validity_expression_for_type(value.clone().into(), ty)?,
-        );
+        pres.push(self.encode_snapshot_validity_expression_for_type(value.clone().into(), ty)?);
         parameters.push(value.clone());
         Ok(value)
     }

@@ -357,9 +357,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
                     value.clone().into(),
                 )?;
                 if let Some(guard) = &trigger_guard {
-                    let mut terms = vec![
-                        guard.clone(),
-                    ];
+                    let mut terms = vec![guard.clone()];
                     if parameters.len() != 1 {
                         terms.push(destructor_call.clone());
                     }
