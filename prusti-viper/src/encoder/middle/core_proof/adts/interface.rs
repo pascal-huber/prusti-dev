@@ -96,6 +96,7 @@ pub(in super::super) trait AdtsInterface {
         &mut self,
         domain_name: &str,
         parameters: Vec<vir_low::VariableDecl>,
+        generate_top_down_injectivity_axiom: bool,
         top_down_injectivity_guard: Option<F>,
     ) -> SpannedEncodingResult<()>
     where
@@ -115,6 +116,7 @@ pub(in super::super) trait AdtsInterface {
         domain_name: &str,
         variant_name: &str,
         parameters: Vec<vir_low::VariableDecl>,
+        generate_top_down_injectivity_axiom: bool,
         top_down_injectivity_guard: Option<F>,
     ) -> SpannedEncodingResult<()>
     where
@@ -215,6 +217,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         domain_name: &str,
         parameters: Vec<vir_low::VariableDecl>,
+        generate_top_down_injectivity_axiom: bool,
         top_down_injectivity_guard: Option<F>,
     ) -> SpannedEncodingResult<()>
     where
@@ -232,6 +235,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
             domain_name,
             "",
             parameters,
+            generate_top_down_injectivity_axiom,
             top_down_injectivity_guard,
         )
     }
@@ -240,6 +244,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
         domain_name: &str,
         variant_name: &str,
         parameters: Vec<vir_low::VariableDecl>,
+        generate_top_down_injectivity_axiom: bool,
         top_down_injectivity_guard: Option<F>,
     ) -> SpannedEncodingResult<()>
     where
@@ -330,8 +335,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
             self.declare_axiom(&domain_name, axiom)?;
         }
 
-        // Top-down injectivity axiom.
-        {
+        // Top-down injectivity axiom. We do not generate top-down injectivity
+        // axioms for alternative constructors.
+        if generate_top_down_injectivity_axiom {
             var_decls! { value: {ty} };
             let (trigger_guard, guard) = if let Some(guard_constructor) = top_down_injectivity_guard
             {
@@ -376,6 +382,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> AdtsInterface for Lowerer<'p, 'v, 'tcx> {
                 body: vir_low::Expression::forall(vec![value.into()], triggers, forall_body),
             };
             self.declare_axiom(&domain_name, axiom)?;
+        } else {
+            assert!(top_down_injectivity_guard.is_none(), "top-down injectivity guard is Some while generate_top_down_injectivity_axiom is true");
         }
 
         Ok(())

@@ -251,6 +251,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         self.adt_register_main_constructor(
             domain_name,
             vars! { value: {parameter_type}},
+            true,
             Some(valid_call2),
         )
     }
@@ -259,7 +260,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         domain_name: &str,
         parameters: Vec<vir_low::VariableDecl>,
     ) -> SpannedEncodingResult<()> {
-        self.adt_register_main_constructor(domain_name, parameters, Some(valid_call2))
+        self.adt_register_main_constructor(domain_name, parameters, true, Some(valid_call2))
     }
     fn register_alternative_constructor(
         &mut self,
@@ -271,7 +272,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             domain_name,
             variant_name,
             parameters,
-            Some(valid_call2),
+            false,
+            None::<fn(&_, &_) -> SpannedEncodingResult<(vir_low::Expression, vir_low::Expression)>>,
         )
     }
     fn register_enum_variant_constructor(
@@ -304,6 +306,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             // place as snapshot_destructor_enum_variant_call because both of
             // them hardcode the same constant `value`.
             vars! { value: {parameter_type}},
+            true,
             Some(valid_call_with_discriminant),
         )
     }
@@ -586,6 +589,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 )?;
             }
             vir_mid::TypeDecl::Int(decl) => {
+                self.ensure_type_definition(&vir_mid::Type::Bool)?;
                 self.register_constant_constructor(&domain_name, vir_low::Type::Int)?;
                 // constructors.add_constant_with_inv(vir_low::Type::Int, validity, true);
                 let snapshot_type = ty.create_snapshot(self)?;

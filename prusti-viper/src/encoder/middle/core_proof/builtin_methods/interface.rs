@@ -20,7 +20,7 @@ use crate::encoder::{
 use rustc_hash::FxHashSet;
 use vir_crate::{
     common::{expression::ExpressionIterator, identifier::WithIdentifier},
-    low::{self as vir_low},
+    low::{self as vir_low, operations::ToLow},
     middle::{self as vir_mid, operations::ty::Typed},
 };
 
@@ -61,6 +61,11 @@ trait Private {
         arguments: &mut Vec<vir_low::Expression>,
         operand: &vir_mid::Operand,
     ) -> SpannedEncodingResult<()>;
+    fn encode_place_arguments(
+        &mut self,
+        arguments: &mut Vec<vir_low::Expression>,
+        expression: &vir_mid::Expression
+    ) -> SpannedEncodingResult<()>;
     fn encode_assign_method(
         &mut self,
         method_name: &str,
@@ -90,6 +95,14 @@ trait Private {
         operand_counter: u32,
         operand: &vir_mid::Operand,
         position: vir_low::Position,
+    ) -> SpannedEncodingResult<vir_low::VariableDecl>;
+    fn encode_assign_operand_place(
+        &mut self,
+        operand_counter: u32,
+    ) -> SpannedEncodingResult<vir_low::VariableDecl>;
+    fn encode_assign_operand_address(
+        &mut self,
+        operand_counter: u32,
     ) -> SpannedEncodingResult<vir_low::VariableDecl>;
     fn encode_assign_operand_snapshot(
         &mut self,
@@ -138,7 +151,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 self.encode_operand_arguments(arguments, &value.right)?;
             }
             vir_mid::Rvalue::Discriminant(value) => {
-                arguments.push(self.lower_expression_into_snapshot(&value.place)?);
+                self.encode_place_arguments(arguments, &value.place)?;
+                // arguments.push(self.lower_expression_into_snapshot(&value.place)?);
             }
         }
         Ok(())
@@ -149,16 +163,23 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         operand: &vir_mid::Operand,
     ) -> SpannedEncodingResult<()> {
         match operand.kind {
-            vir_mid::OperandKind::Copy => {
-                unimplemented!();
-            }
-            vir_mid::OperandKind::Move => {
-                unimplemented!();
+            vir_mid::OperandKind::Copy | vir_mid::OperandKind::Move => {
+                self.encode_place_arguments(arguments, &operand.expression)?;
             }
             vir_mid::OperandKind::Constant => {
-                arguments.push(self.lower_expression_into_snapshot(&operand.expression)?)
+                arguments.push(self.lower_expression_into_snapshot(&operand.expression)?);
             }
         }
+        Ok(())
+    }
+    fn encode_place_arguments(
+        &mut self,
+        arguments: &mut Vec<vir_low::Expression>,
+        expression: &vir_mid::Expression
+    ) -> SpannedEncodingResult<()> {
+        arguments.push(self.encode_expression_as_place(expression)?);
+        arguments.push(self.extract_root_address(expression)?);
+        arguments.push(self.lower_expression_into_snapshot(expression)?);
         Ok(())
     }
     fn encode_assign_method(
@@ -260,9 +281,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 unimplemented!();
             }
             vir_mid::Rvalue::Discriminant(value) => {
+                let ty = value.place.get_type();
+                let parameter_value = vir_low::VariableDecl::new("operand_value", ty.create_snapshot(self)?);
+                parameters.push(parameter_value.clone());
+                pres.push(
+                    self.encode_snapshot_validity_expression_for_type(parameter_value.clone().into(), ty)?
+                );
                 // unimplemented!("lookup discriminant snapshot for: {}", value);
                 let place = value.place.create_snapshot(self)?;
-                self.encode_discriminant_call(place, value.place.get_type(), position)?
+                self.encode_discriminant_call(parameter_value.into(), ty, position)?
             }
         };
         posts.push(exprp! { position => result_value == [assigned_value.clone()]});
@@ -277,30 +304,62 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         parameters: &mut Vec<vir_low::VariableDecl>,
         pres: &mut Vec<vir_low::Expression>,
-        _posts: &mut Vec<vir_low::Expression>,
-        _pre_write_statements: &mut Vec<vir_low::Statement>,
+        posts: &mut Vec<vir_low::Expression>,
+        pre_write_statements: &mut Vec<vir_low::Statement>,
         _post_write_statements: &mut Vec<vir_low::Statement>,
         operand_counter: u32,
         operand: &vir_mid::Operand,
         _position: vir_low::Position,
     ) -> SpannedEncodingResult<vir_low::VariableDecl> {
+        use vir_low::macros::*;
         let value = self.encode_assign_operand_snapshot(operand_counter, operand)?;
         let ty = operand.expression.get_type();
         match operand.kind {
-            vir_mid::OperandKind::Copy => {
-                unimplemented!();
-            }
+            vir_mid::OperandKind::Copy|
             vir_mid::OperandKind::Move => {
-                unimplemented!();
+                let place = self.encode_assign_operand_place(operand_counter)?;
+                let root_address =self.encode_assign_operand_address(operand_counter)?;
+                pres.push(expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) });
+                let post_predicate = if operand.kind == vir_mid::OperandKind::Copy {
+                    expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) }
+                } else {
+                    pre_write_statements.push(
+                        stmt! { call into_memory_block<ty>(place, root_address, value) }
+                    );
+                    let compute_address = ty!(Address);
+                    let size_of = self.encode_type_size_expression(ty)?;
+                    expr! { acc(MemoryBlock((ComputeAddress::compute_address(place, root_address)), [size_of])) }
+                };
+                posts.push(post_predicate);
+                parameters.push(place);
+                parameters.push(root_address);
             }
             vir_mid::OperandKind::Constant => {
-                parameters.push(value.clone());
-                pres.push(
-                    self.encode_snapshot_validity_expression_for_type(value.clone().into(), ty)?,
-                );
             }
         }
+        pres.push(
+            self.encode_snapshot_validity_expression_for_type(value.clone().into(), ty)?,
+        );
+        parameters.push(value.clone());
         Ok(value)
+    }
+    fn encode_assign_operand_place(
+        &mut self,
+        operand_counter: u32,
+    ) -> SpannedEncodingResult<vir_low::VariableDecl> {
+        Ok(vir_low::VariableDecl::new(
+            format!("operand{}_place", operand_counter),
+            self.place_type()?,
+        ))
+    }
+    fn encode_assign_operand_address(
+        &mut self,
+        operand_counter: u32,
+    ) -> SpannedEncodingResult<vir_low::VariableDecl> {
+        Ok(vir_low::VariableDecl::new(
+            format!("operand{}_root_address", operand_counter),
+            self.address_type()?,
+        ))
     }
     fn encode_assign_operand_snapshot(
         &mut self,
@@ -696,7 +755,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                     statements.push(stmtp! {
                                         position =>
                                         call into_memory_block<field_ty>([field_place], root_address, [field_value])
-                                    })
+                                    });
                                 }
                                 self.encode_memory_block_join_method(ty)?;
                                 statements.push(stmtp! {
@@ -705,7 +764,24 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                 });
                             }
                             vir_mid::TypeDecl::Enum(decl) => {
-                                unimplemented!();
+                                let discriminant_call =
+                                    self.encode_discriminant_call(value.clone().into(), ty, Default::default())?;
+                                for (discriminant, variant) in decl.discriminant_values.iter().zip(&decl.variants) {
+                                    let variant_index = variant.name.clone().into();
+                                    let variant_place = self.encode_enum_variant_place(
+                                        ty, &variant_index, place.clone().into(), position,
+                                    )?;
+                                    let variant_value = self.encode_enum_variant_snapshot(ty, &variant_index, value.clone().into(), Default::default())?;
+                                    let variant_ty = &ty.clone().variant(variant_index);
+                                    self.encode_into_memory_block_method(variant_ty)?;
+                                    let condition = expr! {
+                                        [discriminant_call.clone()] == [discriminant.clone().to_low(self)?]
+                                    };
+                                    statements.push(stmtp! {
+                                        position =>
+                                        call<condition> into_memory_block<variant_ty>([variant_place], root_address, [variant_value])
+                                    });
+                                }
                                 // let variant_name = place.get_variant_name(guiding_place);
                                 // let variant = decl.variant(variant_name.as_ref()).unwrap();
                                 // let ty = place.get_type().clone().variant(variant_name.clone());
