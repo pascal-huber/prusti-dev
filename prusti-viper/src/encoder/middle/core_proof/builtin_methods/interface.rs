@@ -629,16 +629,73 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let size_of = self.encode_type_size_expression(ty)?;
             let compute_address = ty!(Address);
             let to_bytes = ty! { Bytes };
+            let span = self.encoder.get_type_definition_span_mid(ty)?;
+            let position = self.register_error(
+                span,
+                ErrorCtxt::UnexpectedBuiltinMethod(BuiltinMethodKind::IntoMemoryBlock),
+            );
             let mut statements = Vec::new();
             let mut method = method! {
                 into_memory_block<ty>(
                     place: Place,
-                    address: Address,
+                    root_address: Address,
                     value: {ty.create_snapshot(self)?}
                 ) returns ()
                     raw_code {
-                        let compute_address_source = expr! { ComputeAddress::compute_address(place, address) };
-                        let bytes = self.encode_memory_block_bytes_expression(compute_address_source, size_of.clone())?;
+                        let address = expr! {
+                            ComputeAddress::compute_address(place, root_address)
+                        };
+                        let bytes = self.encode_memory_block_bytes_expression(
+                            address.clone(), size_of.clone()
+                        )?;
+                        let type_decl = self.encoder.get_type_decl_mid(ty)?;
+                        statements.push(stmtp! {
+                            position =>
+                            unfold OwnedNonAliased<ty>(place, root_address, value)
+                        });
+                        match type_decl {
+                            vir_mid::TypeDecl::Bool
+                            | vir_mid::TypeDecl::Int(_)
+                            | vir_mid::TypeDecl::Float(_) => {
+                                // Primitive type. Nothing to do.
+                            }
+                            vir_mid::TypeDecl::TypeVar(_) => unimplemented!("ty: {}", ty),
+                            vir_mid::TypeDecl::Tuple(_) => unimplemented!("ty: {}", ty),
+                            vir_mid::TypeDecl::Struct(struct_decl) => {
+                                for field in struct_decl.iter_fields() {
+                                    let field_place = self.encode_field_place(
+                                        ty, &field, place.clone().into(), position
+                                    )?;
+                                    let field_value = self.encode_field_snapshot(
+                                        ty, &field, value.clone().into(), position
+                                    )?;
+                                    self.encode_into_memory_block_method(&field.ty)?;
+                                    let field_ty = &field.ty;
+                                    statements.push(stmtp! {
+                                        position =>
+                                        call into_memory_block<field_ty>([field_place], root_address, [field_value])
+                                    })
+                                }
+                                self.encode_memory_block_join_method(ty)?;
+                                statements.push(stmtp! {
+                                    position =>
+                                    call memory_block_join<ty>([address.clone()])
+                                });
+                            }
+                            vir_mid::TypeDecl::Enum(decl) => {
+                                unimplemented!();
+                                // let variant_name = place.get_variant_name(guiding_place);
+                                // let variant = decl.variant(variant_name.as_ref()).unwrap();
+                                // let ty = place.get_type().clone().variant(variant_name.clone());
+                                // let variant_place = place.clone().variant_no_pos(variant_name.clone(), ty);
+                                // expand_fields(&variant_place, variant.iter_fields())
+                            }
+                            vir_mid::TypeDecl::Array(_) => unimplemented!("ty: {}", ty),
+                            vir_mid::TypeDecl::Reference(_) => unimplemented!("ty: {}", ty),
+                            vir_mid::TypeDecl::Never => unimplemented!("ty: {}", ty),
+                            vir_mid::TypeDecl::Closure(_) => unimplemented!("ty: {}", ty),
+                            vir_mid::TypeDecl::Unsupported(_) => unimplemented!("ty: {}", ty),
+                        };
                         // self.encode_fully_unfold_owned_non_aliased(
                         //     &mut statements,
                         //     ty,
@@ -655,8 +712,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         // )?;
                         // statements.push(stmtp! { position => call write_place<ty>(target_place, target_address, source_value)});
                     }
-                    requires (acc(OwnedNonAliased<ty>(place, address, value)));
-                    ensures (acc(MemoryBlock((ComputeAddress::compute_address(place, address)), [size_of])));
+                    requires (acc(OwnedNonAliased<ty>(place, root_address, value)));
+                    ensures (acc(MemoryBlock([address], [size_of])));
                     ensures (([bytes]) == (Snap<ty>::to_bytes(value)));
             };
             method.body = Some(statements);

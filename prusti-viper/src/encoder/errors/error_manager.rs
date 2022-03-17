@@ -37,6 +37,7 @@ pub enum PanicCause {
 pub enum BuiltinMethodKind {
     WritePlace,
     MovePlace,
+    IntoMemoryBlock,
 }
 
 /// In case of verification error, this enum will contain additional information
