@@ -71,6 +71,7 @@ pub struct Struct {
 #[display(fmt = "{}", name)]
 pub struct Enum {
     pub name: String,
+    pub discriminant_type: Type,
     pub discriminant_bounds: Expression,
     pub discriminant_values: Vec<Expression>,
     pub variants: Vec<Struct>,
