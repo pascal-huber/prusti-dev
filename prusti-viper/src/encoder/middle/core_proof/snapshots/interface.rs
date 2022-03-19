@@ -300,6 +300,7 @@ pub(in super::super) trait SnapshotsInterface {
         &mut self,
         op: vir_mid::BinaryOpKind,
         ty: &vir_mid::Type,
+        arg_type: &vir_mid::Type,
         left: vir_low::Expression,
         right: vir_low::Expression,
         position: vir_mid::Position,
@@ -547,6 +548,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         op: vir_mid::BinaryOpKind,
         ty: &vir_mid::Type,
+        arg_type: &vir_mid::Type,
         left: vir_low::Expression,
         right: vir_low::Expression,
         position: vir_mid::Position,
@@ -554,7 +556,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotsInterface for Lowerer<'p, 'v, 'tcx> {
         // FIXME: Encode evaluation and simplification axioms.
         let domain_name = self.encode_snapshot_domain_name(ty)?;
         let op = op.to_low(self)?;
-        let variant = self.encode_binary_op_variant(op, ty)?;
+        let variant = self.encode_binary_op_variant(op, arg_type)?;
         let function_name =
             self.snapshot_constructor_struct_alternative_name(&domain_name, &variant)?;
         let return_type = ty.create_snapshot(self)?;

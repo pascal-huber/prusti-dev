@@ -129,9 +129,12 @@ impl IntoSnapshot for vir_mid::BinaryOp {
     ) -> SpannedEncodingResult<Self::Target> {
         let left_snapshot = self.left.create_snapshot(lowerer)?;
         let right_snapshot = self.right.create_snapshot(lowerer)?;
+        let arg_type = self.left.get_type();
+        assert_eq!(arg_type, self.right.get_type());
         lowerer.encode_binary_op_call(
             self.op_kind,
             self.get_type(),
+            arg_type,
             left_snapshot,
             right_snapshot,
             self.position,
