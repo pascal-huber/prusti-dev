@@ -380,7 +380,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     }
                     vir_high::TypeDecl::Enum(decl) => {
                         eprintln!("variant_index: {:?}", variant_index);
-                        let variant_def = &adt_def.variants[*variant_index];
+                        let variant_def = &adt_def.variants()[*variant_index];
                         let variant_name = variant_def.ident(self.encoder.env().tcx()).to_string();
                         let variant = decl.into_variant(&variant_name).unwrap();
                         eprintln!("variant_name: {}", variant_name);

@@ -779,7 +779,7 @@ pub(super) fn encode_adt_def<'v, 'tcx>(
                 let encoded_variant = encode_variant(encoder, name, substs, variant)?;
                 variants.push(encoded_variant);
             }
-            let mir_discriminant_type = match adt_def.repr.discr_type() {
+            let mir_discriminant_type = match adt_def.repr().discr_type() {
                 rustc_attr::IntType::SignedInt(int) => {
                     let int = match int {
                         rustc_ast::ast::IntTy::Isize => rustc_middle::ty::IntTy::Isize,

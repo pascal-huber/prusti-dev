@@ -119,11 +119,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 let discriminant_type = &decl.discriminant_type;
                 let discriminant_field = vir_mid::FieldDecl::discriminant();
                 let discriminant_place = self.encode_field_place(ty, &discriminant_field, place.clone().into(), position)?;
-                let discriminant_snapshot = self.encode_field_snapshot(
-                    ty,
-                    &discriminant_field,
-                    snapshot.clone().into(),
-                    Default::default(),
+                // let discriminant_domain = self.encode_snapshot_domain_name(discriminant_type)?;
+                let discriminant_snapshot = self.encode_constant_snapshot(
+                    discriminant_type,
+                    discriminant_call,
+                    position
                 )?;
                 // .clone().to_low(self)?;
                 // let discriminant_type = &discriminant_type;
