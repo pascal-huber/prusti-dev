@@ -2,18 +2,23 @@ use crate::encoder::{
     errors::SpannedEncodingResult,
     high::types::HighTypeEncoderInterface,
     middle::core_proof::{
+        adts::AdtsInterface,
         compute_address::ComputeAddressInterface,
         lowerer::Lowerer,
         places::PlacesInterface,
         predicates_memory_block::PredicatesMemoryBlockInterface,
         snapshots::{IntoSnapshot, SnapshotsInterface},
         type_layouts::TypeLayoutsInterface,
-        types::TypesInterface, adts::AdtsInterface,
+        types::TypesInterface,
     },
 };
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
-use vir_crate::{common::expression::ExpressionIterator, low::{self as vir_low, operations::ToLow}, middle as vir_mid};
+use vir_crate::{
+    common::expression::ExpressionIterator,
+    low::{self as vir_low, operations::ToLow},
+    middle as vir_mid,
+};
 
 #[derive(Default)]
 pub(in super::super) struct PredicatesOwnedState {
@@ -89,15 +94,22 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 let position = Default::default();
                 let mut variant_predicates = Vec::new();
                 let discriminant_call =
-                self.encode_discriminant_call(snapshot.clone().into(), ty, position)?;
+                    self.encode_discriminant_call(snapshot.clone().into(), ty, position)?;
                 // let domain_name = self.encode_snapshot_domain_name(ty)?;
                 for (discriminant, variant) in decl.discriminant_values.iter().zip(&decl.variants) {
                     let variant_index = variant.name.clone().into();
                     let variant_place = self.encode_enum_variant_place(
-                        ty, &variant_index, place.clone().into(), position,
+                        ty,
+                        &variant_index,
+                        place.clone().into(),
+                        position,
                     )?;
                     let variant_snapshot = self.encode_enum_variant_snapshot(
-                        ty, &variant_index, snapshot.clone().into(), position)?;
+                        ty,
+                        &variant_index,
+                        snapshot.clone().into(),
+                        position,
+                    )?;
                     let variant_type = ty.clone().variant(variant_index);
                     predicates.extend(self.encode_owned_non_aliased(&variant_type)?);
                     // let variant_snapshot_type = variant_type.create_snapshot(self)?;
@@ -118,13 +130,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 }
                 let discriminant_type = &decl.discriminant_type;
                 let discriminant_field = vir_mid::FieldDecl::discriminant();
-                let discriminant_place = self.encode_field_place(ty, &discriminant_field, place.clone().into(), position)?;
-                // let discriminant_domain = self.encode_snapshot_domain_name(discriminant_type)?;
-                let discriminant_snapshot = self.encode_constant_snapshot(
-                    discriminant_type,
-                    discriminant_call,
-                    position
+                let discriminant_place = self.encode_field_place(
+                    ty,
+                    &discriminant_field,
+                    place.clone().into(),
+                    position,
                 )?;
+                let discriminant_snapshot =
+                    self.encode_constant_snapshot(discriminant_type, discriminant_call, position)?;
                 // .clone().to_low(self)?;
                 // let discriminant_type = &discriminant_type;
                 predicate! {

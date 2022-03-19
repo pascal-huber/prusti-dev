@@ -790,7 +790,7 @@ pub(super) fn encode_adt_def<'v, 'tcx>(
                         rustc_ast::ast::IntTy::I128 => rustc_middle::ty::IntTy::I128,
                     };
                     encoder.env().tcx().mk_ty(ty::TyKind::Int(int))
-                },
+                }
                 rustc_attr::IntType::UnsignedInt(uint) => {
                     let uint = match uint {
                         rustc_ast::ast::UintTy::Usize => rustc_middle::ty::UintTy::Usize,
@@ -800,10 +800,17 @@ pub(super) fn encode_adt_def<'v, 'tcx>(
                         rustc_ast::ast::UintTy::U64 => rustc_middle::ty::UintTy::U64,
                         rustc_ast::ast::UintTy::U128 => rustc_middle::ty::UintTy::U128,
                     };
-                    encoder.env().tcx().mk_ty(ty::TyKind::Uint(uint))},
+                    encoder.env().tcx().mk_ty(ty::TyKind::Uint(uint))
+                }
             };
             let discriminant_type = encoder.encode_type_high(mir_discriminant_type)?;
-            vir::TypeDecl::enum_(name, discriminant_type, discriminant_bounds, discriminant_values, variants)
+            vir::TypeDecl::enum_(
+                name,
+                discriminant_type,
+                discriminant_bounds,
+                discriminant_values,
+                variants,
+            )
         };
         Ok(type_decl)
     } else {

@@ -81,7 +81,8 @@ trait Private {
         pre_write_statements: &mut Vec<vir_low::Statement>,
         post_write_statements: &mut Vec<vir_low::Statement>,
         value: &vir_mid::Rvalue,
-        result: &vir_low::VariableDecl,
+        result_type: &vir_mid::Type,
+        result_value: &vir_low::VariableDecl,
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()>;
     #[allow(clippy::too_many_arguments)]
@@ -226,6 +227,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 &mut pre_write_statements,
                 &mut post_write_statements,
                 value,
+                ty,
                 &result_value,
                 position,
             )?;
@@ -254,6 +256,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         pre_write_statements: &mut Vec<vir_low::Statement>,
         post_write_statements: &mut Vec<vir_low::Statement>,
         value: &vir_mid::Rvalue,
+        result_type: &vir_mid::Type,
         result_value: &vir_low::VariableDecl,
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()> {
@@ -282,16 +285,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             }
             vir_mid::Rvalue::Discriminant(value) => {
                 let ty = value.place.get_type();
-                let parameter_value =
-                    vir_low::VariableDecl::new("operand_value", ty.create_snapshot(self)?);
-                parameters.push(parameter_value.clone());
+                var_decls! {
+                    operand_place: Place ,
+                    operand_address: Address ,
+                    operand_value: { ty.create_snapshot(self)? }
+                };
+                let predicate = expr! {
+                    acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
+                };
+                pres.push(predicate.clone());
+                posts.push(predicate);
+                parameters.push(operand_place.clone());
+                parameters.push(operand_address.clone());
+                parameters.push(operand_value.clone());
                 pres.push(self.encode_snapshot_validity_expression_for_type(
-                    parameter_value.clone().into(),
+                    operand_value.clone().into(),
                     ty,
                 )?);
-                // unimplemented!("lookup discriminant snapshot for: {}", value);
-                let place = value.place.create_snapshot(self)?;
-                self.encode_discriminant_call(parameter_value.into(), ty, position)?
+                let discriminant_call =
+                    self.encode_discriminant_call(operand_value.into(), ty, position)?;
+                self.encode_constant_snapshot(result_type, discriminant_call, position)?
             }
         };
         posts.push(exprp! { position => result_value == [assigned_value.clone()]});
