@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use crate::encoder::{
     errors::{EncodingError, EncodingResult, SpannedEncodingResult},
     mir::pure::PureFunctionEncoderInterface,
@@ -7,6 +8,7 @@ use vir_crate::{
     high::{self as vir_high, operations::ty::Typed},
     middle::{self as vir_mid, operations::ToMiddleExpression},
 };
+use vir_crate::common::identifier::WithIdentifier;
 
 pub(crate) trait HighPureFunctionEncoderInterface<'tcx> {
     fn encode_discriminant_call(
@@ -93,6 +95,11 @@ impl<'v, 'tcx: 'v> HighPureFunctionEncoderInterface<'tcx>
         let name = "subslice";
         let element_type = extract_container_element_type(&container)?;
         // TODO: add real lifetime here
+        dbg!("HELLO CUTYPIE!");
+        dbg!(&container.get_type());
+        // if let vir_high::ty::Reference(x) = container.get_type() {
+        //     dbg!(x);
+        // }
         let fake_lft = vir_high::ty::Lifetime {
             name: "lft_fake".to_string(),
         };

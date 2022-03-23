@@ -304,7 +304,8 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 // dbg!("lifetime_region ref #2:");
                 // dbg!(lifetime_id);
                 // let env = self.encoder.env();
-                // let mir = env.local_mir(maybe_def_id);
+                // let def_id = ... ?? ...
+                // let mir = env.local_mir(def_id);
                 let lft_name = String::from(format!("{}", region));
                 let lifetime = vir_crate::high::type_decl::Lifetime {name: lft_name};
                 vir::TypeDecl::reference(target_type, lifetime)
