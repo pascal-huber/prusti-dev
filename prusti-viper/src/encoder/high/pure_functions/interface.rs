@@ -93,8 +93,7 @@ impl<'v, 'tcx: 'v> HighPureFunctionEncoderInterface<'tcx>
         let name = "subslice";
         let element_type = extract_container_element_type(&container)?;
         // TODO: add real lifetime here
-        dbg!("HELLO CUTYPIE!");
-        println!("encode_subslice_call() #####################");
+        println!("PURE -> encode_subslice_call() #####################");
         println!("container.get_type(): {:?}", &container.get_type());
         println!("element_type: {:?}", element_type);
         // if let vir_high::ty::Reference(x) = container.get_type() {

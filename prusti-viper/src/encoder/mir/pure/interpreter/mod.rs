@@ -241,7 +241,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ExpressionBackwardInterpreter<'p, 'v, 'tcx> {
                     .encode_type_of_place_high(self.mir, *place)
                     .with_span(span)?;
                 // TODO: check if lifetime_name is correct #fake_lft
-                println!("apply_assign_statement() -> mr::Rvalue::Ref #####################");
+                println!("PURE -> apply_assign_statement() -> mr::Rvalue::Ref #####################");
                 let lft_name = String::from(format!("{}", region));
                 println!("ty: {:?}", ty);
                 println!("place: {:?}", place);
