@@ -232,21 +232,22 @@ impl<'p, 'v: 'p, 'tcx: 'v> ExpressionBackwardInterpreter<'p, 'v, 'tcx> {
                 let expr = self.encoder.encode_discriminant_call(arg).with_span(span)?;
                 state.substitute_value(&encoded_lhs, expr);
             }
-            mir::Rvalue::Ref(_, mir::BorrowKind::Unique, place)
-            | mir::Rvalue::Ref(_, mir::BorrowKind::Mut { .. }, place)
-            | mir::Rvalue::Ref(_, mir::BorrowKind::Shared, place) => {
+            mir::Rvalue::Ref(region, mir::BorrowKind::Unique, place)
+            | mir::Rvalue::Ref(region, mir::BorrowKind::Mut { .. }, place)
+            | mir::Rvalue::Ref(region, mir::BorrowKind::Shared, place) => {
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
                 let ty = self
                     .encoder
                     .encode_type_of_place_high(self.mir, *place)
                     .with_span(span)?;
-                // TODO: add real lifetime here?
-                let fake_lft = vir_high::ty::Lifetime {
-                    name: String::from("lft_fake"),
-                };
+                // TODO: check if lifetime_name is correct #fake_lft
+                let lft_name = String::from(format!("{}", region));
+                dbg!("lifetime rhs assignment:");
+                dbg!(&lft_name);
+                let lifetime = vir_high::ty::Lifetime {name: lft_name};
                 let encoded_ref = vir_high::Expression::addr_of_no_pos(
                     encoded_place,
-                    vir_high::Type::reference(ty, fake_lft),
+                    vir_high::Type::reference(ty, lifetime),
                 );
                 // Substitute the place
                 state.substitute_value(&encoded_lhs, encoded_ref);

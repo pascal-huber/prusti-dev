@@ -98,11 +98,11 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 vir::Type::pointer(self.encoder.encode_type_high(*ty)?)
             }
 
-            ty::TyKind::Ref(lifetime_id, ty, _) => {
+            ty::TyKind::Ref(region, ty, _) => {
                 // TODO: check if lifetime_name is correct #fake_lft
-                // dbg!("lifetime_id ref #1");
+                // dbg!("lifetime_region ref #1:");
                 // dbg!(lifetime_id);
-                let lft_name = String::from(format!("{}", lifetime_id));
+                let lft_name = String::from(format!("{}", region));
                 let lifetime = vir::ty::Lifetime {name: lft_name};
                 vir::Type::reference(self.encoder.encode_type_high(*ty)?, lifetime)
             }
@@ -298,14 +298,14 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 }
                 vir::TypeDecl::float(lower_bound, upper_bound)
             }
-            ty::TyKind::Ref(lifetime_id, ty, _) => {
+            ty::TyKind::Ref(region, ty, _) => {
                 let target_type = self.encoder.encode_type_high(*ty)?;
                 // TODO: check if lifetime_name is correct #fake_lft
-                // dbg!("lifetime_id ref #2");
+                // dbg!("lifetime_region ref #2:");
                 // dbg!(lifetime_id);
                 // let env = self.encoder.env();
                 // let mir = env.local_mir(maybe_def_id);
-                let lft_name = String::from(format!("{}", lifetime_id));
+                let lft_name = String::from(format!("{}", region));
                 let lifetime = vir_crate::high::type_decl::Lifetime {name: lft_name};
                 vir::TypeDecl::reference(target_type, lifetime)
             }
