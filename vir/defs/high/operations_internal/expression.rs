@@ -72,6 +72,20 @@ impl Expression {
             _ => false,
         }
     }
+    pub fn erase_lifetime(&mut self) {
+        // TODO: check if more cases have to be covered
+        let expr = match self {
+            Expression::Deref(Deref { base: box expr, .. }) => expr,
+            _ => self,
+        };
+        if let Expression::Local(Local {
+            variable,
+            position: _,
+        }) = expr
+        {
+            variable.ty.erase_lifetime();
+        }
+    }
     #[must_use]
     pub fn replace_place(self, target: &Expression, replacement: &Expression) -> Self {
         debug_assert!(target.is_place());
