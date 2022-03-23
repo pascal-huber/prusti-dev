@@ -52,6 +52,14 @@ impl Type {
             false
         }
     }
+    pub fn erase_lifetime(&mut self) {
+        if let Type::Reference(reference) = self {
+            let pure_lifetime = Lifetime {
+                name: String::from("pure_erased"),
+            };
+            reference.lifetime = pure_lifetime;
+        }
+    }
 }
 
 impl AsRef<str> for VariantIndex {

@@ -146,6 +146,7 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
         {
             let type_encoder = TypeEncoder::new(self, ty);
             let encoded_type = type_encoder.encode_type()?;
+
             assert!(self
                 .mir_type_encoder_state
                 .encoded_types

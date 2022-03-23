@@ -98,12 +98,10 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 vir::Type::pointer(self.encoder.encode_type_high(*ty)?)
             }
 
-            ty::TyKind::Ref(_, ty, _) => {
-                // TODO: add real lifetime here?
-                let fake_lft = vir::ty::Lifetime {
-                    name: String::from("lft_fake"),
-                };
-                vir::Type::reference(self.encoder.encode_type_high(*ty)?, fake_lft)
+            ty::TyKind::Ref(region, ty, _) => {
+                let lft_name = format!("{}", region);
+                let lifetime = vir::ty::Lifetime { name: lft_name };
+                vir::Type::reference(self.encoder.encode_type_high(*ty)?, lifetime)
             }
 
             ty::TyKind::Adt(adt_def, substs) if adt_def.is_struct() => vir::Type::struct_(
@@ -297,13 +295,11 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 }
                 vir::TypeDecl::float(lower_bound, upper_bound)
             }
-            ty::TyKind::Ref(_, ty, _) => {
+            ty::TyKind::Ref(region, ty, _) => {
                 let target_type = self.encoder.encode_type_high(*ty)?;
-                // TODO: add real lifetime here?
-                let fake_lft = vir_crate::high::type_decl::Lifetime {
-                    name: String::from("lft_fake"),
-                };
-                vir::TypeDecl::reference(target_type, fake_lft)
+                let lft_name = format!("{}", region);
+                let lifetime = vir_crate::high::type_decl::Lifetime { name: lft_name };
+                vir::TypeDecl::reference(target_type, lifetime)
             }
             ty::TyKind::Tuple(elems) => vir::TypeDecl::tuple(
                 elems
