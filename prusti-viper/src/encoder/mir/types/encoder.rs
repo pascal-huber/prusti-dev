@@ -98,12 +98,15 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 vir::Type::pointer(self.encoder.encode_type_high(*ty)?)
             }
 
-            ty::TyKind::Ref(region, ty, _) => {
+            ty::TyKind::Ref(region, ty, tyx) => {
                 // TODO: check if lifetime_name is correct #fake_lft
-                // dbg!("lifetime_region ref #1:");
-                // dbg!(lifetime_id);
+                println!("encode_type() -> ty::TyKind::Ref #####################");
+                println!("self.ty: {:?}", self.ty);
+                println!("tyx: {:?}", tyx);
                 let lft_name = String::from(format!("{}", region));
+                println!("lifetime_name: {:?}", &lft_name);
                 let lifetime = vir::ty::Lifetime {name: lft_name};
+                println!("-------------------------------------");
                 vir::Type::reference(self.encoder.encode_type_high(*ty)?, lifetime)
             }
 
@@ -298,15 +301,18 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 }
                 vir::TypeDecl::float(lower_bound, upper_bound)
             }
-            ty::TyKind::Ref(region, ty, _) => {
+            ty::TyKind::Ref(region, ty, tyx) => {
                 let target_type = self.encoder.encode_type_high(*ty)?;
                 // TODO: check if lifetime_name is correct #fake_lft
-                // dbg!("lifetime_region ref #2:");
-                // dbg!(lifetime_id);
+                println!("encode_type_def() -> ty::TyKind::Ref #####################");
                 // let env = self.encoder.env();
-                // let def_id = ... ?? ...
+                // TODO: what is the def_id here?
                 // let mir = env.local_mir(def_id);
                 let lft_name = String::from(format!("{}", region));
+                println!("ty: {:?}", ty);
+                println!("tyx: {:?}", tyx);
+                println!("lifetime_name: {:?}", &lft_name);
+                println!("-------------------------------------");
                 let lifetime = vir_crate::high::type_decl::Lifetime {name: lft_name};
                 vir::TypeDecl::reference(target_type, lifetime)
             }
