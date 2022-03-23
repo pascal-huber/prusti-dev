@@ -105,7 +105,7 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 println!("tyx: {:?}", tyx);
                 let lft_name = String::from(format!("{}", region));
                 println!("lifetime_name: {:?}", &lft_name);
-                let lifetime = vir::ty::Lifetime {name: lft_name};
+                let lifetime = vir::ty::Lifetime { name: lft_name };
                 println!("-------------------------------------");
                 vir::Type::reference(self.encoder.encode_type_high(*ty)?, lifetime)
             }
@@ -313,7 +313,7 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 println!("tyx: {:?}", tyx);
                 println!("lifetime_name: {:?}", &lft_name);
                 println!("-------------------------------------");
-                let lifetime = vir_crate::high::type_decl::Lifetime {name: lft_name};
+                let lifetime = vir_crate::high::type_decl::Lifetime { name: lft_name };
                 vir::TypeDecl::reference(target_type, lifetime)
             }
             ty::TyKind::Tuple(elems) => vir::TypeDecl::tuple(

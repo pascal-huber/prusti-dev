@@ -4,10 +4,10 @@ use crate::encoder::{
 };
 
 use vir_crate::{
+    common::identifier::WithIdentifier,
     high::{self as vir_high, operations::ty::Typed},
     middle::{self as vir_mid, operations::ToMiddleExpression},
 };
-use vir_crate::common::identifier::WithIdentifier;
 
 pub(crate) trait HighPureFunctionEncoderInterface<'tcx> {
     fn encode_discriminant_call(
@@ -95,25 +95,23 @@ impl<'v, 'tcx: 'v> HighPureFunctionEncoderInterface<'tcx>
         let element_type = extract_container_element_type(&container)?;
         // TODO: add real lifetime here
 
-        let lft = match container.get_type() {
+        let lft_name = match container.get_type() {
             vir_high::Type::Reference(vir_high::ty::Reference {
-                                              target_type: box vir_high::Type::Array(vir_high::ty::Array { element_type, .. }),
-                lifetime: lft
-                                        }) => lft.get_identifier(),
+                target_type: box vir_high::Type::Array(vir_high::ty::Array { .. }),
+                lifetime: lft,
+            }) => lft.get_identifier(),
             _ => String::from(""),
         };
 
         println!("PURE -> encode_subslice_call() #####################");
-        println!("lft: {:?}", lft);
+        println!("lft_name: {:?}", lft_name);
         println!("container.get_type(): {:?}", &container.get_type());
         println!("element_type: {:?}", element_type);
 
-        let fake_lft = vir_high::ty::Lifetime {
-            name: "lft_fake".to_string(),
-        };
+        let lifetime = vir_high::ty::Lifetime { name: lft_name };
         println!("-------------------------------------");
         let return_type =
-            vir_high::Type::reference(vir_high::Type::slice(element_type.clone()), fake_lft);
+            vir_high::Type::reference(vir_high::Type::slice(element_type.clone()), lifetime);
         Ok(vir_high::Expression::function_call(
             name,
             vec![element_type.clone()],
@@ -184,7 +182,6 @@ impl<'v, 'tcx: 'v> HighPureFunctionEncoderInterface<'tcx>
         ))
     }
 }
-
 
 fn extract_container_element_type(
     container: &vir_high::Expression,

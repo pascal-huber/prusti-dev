@@ -241,13 +241,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> ExpressionBackwardInterpreter<'p, 'v, 'tcx> {
                     .encode_type_of_place_high(self.mir, *place)
                     .with_span(span)?;
                 // TODO: check if lifetime_name is correct #fake_lft
-                println!("PURE -> apply_assign_statement() -> mr::Rvalue::Ref #####################");
+                println!(
+                    "PURE -> apply_assign_statement() -> mr::Rvalue::Ref #####################"
+                );
                 let lft_name = String::from(format!("{}", region));
                 println!("ty: {:?}", ty);
                 println!("place: {:?}", place);
                 println!("lifetime_name: {:?}", &lft_name);
                 println!("-------------------------------------");
-                let lifetime = vir_high::ty::Lifetime {name: lft_name};
+                let lifetime = vir_high::ty::Lifetime { name: lft_name };
                 let encoded_ref = vir_high::Expression::addr_of_no_pos(
                     encoded_place,
                     vir_high::Type::reference(ty, lifetime),
