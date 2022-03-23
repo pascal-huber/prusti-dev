@@ -11,6 +11,9 @@ pub(super) fn populate_graph(env: &Environment<'_>, def_id: DefId) -> Option<Gra
     eprintln!("populate_graph: {:?}", def_id);
     let procedure = Procedure::new(env, def_id);
     let mir = procedure.get_mir();
+    // println!("MIR BEGIN >>>> ");
+    // dbg!(&mir);
+    // println!("MIR END <<<< ");
     if let Some(facts) = env.try_get_local_mir_borrowck_facts(def_id.expect_local()) {
         let lifetimes = Lifetimes::new(facts);
 
@@ -29,6 +32,9 @@ pub(super) fn populate_graph(env: &Environment<'_>, def_id: DefId) -> Option<Gra
 
         let mut opaque_lifetimes_table = graph.create_table("Opaque lifetimes", &["lifetime"]);
         for lifetime in lifetimes.get_opaque_lifetimes_with_inclusions() {
+            println!(">>>>>>>>>>>>>");
+            dbg!(lifetime.to_text());
+            println!("<<<<<<<<<<<<<");
             opaque_lifetimes_table.add_row(vec![lifetime.to_text()]);
         }
         opaque_lifetimes_table.build();

@@ -297,12 +297,16 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 }
                 vir::TypeDecl::float(lower_bound, upper_bound)
             }
-            ty::TyKind::Ref(_, ty, _) => {
+            ty::TyKind::Ref(lifetime, ty, _) => {
                 let target_type = self.encoder.encode_type_high(*ty)?;
-                // TODO: add real lifetime here?
-                let fake_lft = vir_crate::high::type_decl::Lifetime {
-                    name: String::from("lft_fake"),
-                };
+                // TODO: check if lifetime_name is correct
+                let lft_name = String::from(format!("{}", lifetime));
+                let fake_lft = vir_crate::high::type_decl::Lifetime {name: lft_name};
+
+                // let env = self.encoder.env();
+                // let mir = env.local_mir(maybe_def_id);
+                dbg!(lifetime);
+
                 vir::TypeDecl::reference(target_type, fake_lft)
             }
             ty::TyKind::Tuple(elems) => vir::TypeDecl::tuple(
