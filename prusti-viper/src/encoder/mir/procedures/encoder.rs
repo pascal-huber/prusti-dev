@@ -35,6 +35,8 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         .env()
         .try_get_local_mir_borrowck_facts(def_id.expect_local())
     {
+        println!("encode_procedure():");
+        dbg!(&facts.input_facts);
         Lifetimes::new(facts)
     } else {
         return Err(SpannedEncodingError::internal(
@@ -243,7 +245,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             }
             _ => {
                 block_builder.add_comment("encode_statement: not encoded".to_string());
-            }
+            },
         }
         Ok(())
     }

@@ -4,7 +4,6 @@ use crate::encoder::{
 };
 
 use vir_crate::{
-    common::identifier::WithIdentifier,
     high::{self as vir_high, operations::ty::Typed},
     middle::{self as vir_mid, operations::ToMiddleExpression},
 };
@@ -93,25 +92,9 @@ impl<'v, 'tcx: 'v> HighPureFunctionEncoderInterface<'tcx>
         // FIXME: Should use encode_builtin_function_use.
         let name = "subslice";
         let element_type = extract_container_element_type(&container)?;
-        // TODO: add real lifetime here
-
-        let lft_name = match container.get_type() {
-            vir_high::Type::Reference(vir_high::ty::Reference {
-                target_type: box vir_high::Type::Array(vir_high::ty::Array { .. }),
-                lifetime: lft,
-            }) => lft.get_identifier(),
-            _ => String::from(""),
-        };
-
-        println!("PURE -> encode_subslice_call() #####################");
-        println!("lft_name: {:?}", lft_name);
-        println!("container.get_type(): {:?}", &container.get_type());
-        println!("element_type: {:?}", element_type);
-
-        let lifetime = vir_high::ty::Lifetime { name: lft_name };
-        println!("-------------------------------------");
+        let pure_lifetime = vir_high::ty::Lifetime {name: String::from("pure_erased")};
         let return_type =
-            vir_high::Type::reference(vir_high::Type::slice(element_type.clone()), lifetime);
+            vir_high::Type::reference(vir_high::Type::slice(element_type.clone()), pure_lifetime);
         Ok(vir_high::Expression::function_call(
             name,
             vec![element_type.clone()],

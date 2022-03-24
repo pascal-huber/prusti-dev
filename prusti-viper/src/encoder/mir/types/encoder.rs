@@ -100,13 +100,14 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
 
             ty::TyKind::Ref(region, ty, tyx) => {
                 // TODO: check if lifetime_name is correct #fake_lft
-                println!("encode_type() -> ty::TyKind::Ref #####################");
+                let lft_name = String::from(format!("{}", region));
+                println!("############");
+                println!("function: encode_type() -> ty::TyKind::Ref");
                 println!("self.ty: {:?}", self.ty);
                 println!("tyx: {:?}", tyx);
-                let lft_name = String::from(format!("{}", region));
                 println!("lifetime_name: {:?}", &lft_name);
-                let lifetime = vir::ty::Lifetime { name: lft_name };
                 println!("-------------------------------------");
+                let lifetime = vir::ty::Lifetime { name: lft_name };
                 vir::Type::reference(self.encoder.encode_type_high(*ty)?, lifetime)
             }
 
@@ -298,17 +299,18 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                         lower_bound = Some(Box::new(lower));
                         upper_bound = Some(Box::new(upper));
                     }
-                }
+            }
                 vir::TypeDecl::float(lower_bound, upper_bound)
             }
             ty::TyKind::Ref(region, ty, tyx) => {
                 let target_type = self.encoder.encode_type_high(*ty)?;
                 // TODO: check if lifetime_name is correct #fake_lft
-                println!("encode_type_def() -> ty::TyKind::Ref #####################");
                 // let env = self.encoder.env();
-                // TODO: what is the def_id here?
                 // let mir = env.local_mir(def_id);
                 let lft_name = String::from(format!("{}", region));
+                println!("encode_type_def() -> ty::TyKind::Ref #####################");
+                println!("target_type: {:?}", &target_type);
+                println!("self.ty: {:?}", self.ty);
                 println!("ty: {:?}", ty);
                 println!("tyx: {:?}", tyx);
                 println!("lifetime_name: {:?}", &lft_name);
