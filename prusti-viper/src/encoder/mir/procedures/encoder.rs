@@ -245,7 +245,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             }
             _ => {
                 block_builder.add_comment("encode_statement: not encoded".to_string());
-            },
+            }
         }
         Ok(())
     }

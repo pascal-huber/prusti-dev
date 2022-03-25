@@ -11,9 +11,6 @@ pub(super) fn populate_graph(env: &Environment<'_>, def_id: DefId) -> Option<Gra
     eprintln!("populate_graph: {:?}", def_id);
     let procedure = Procedure::new(env, def_id);
     let mir = procedure.get_mir();
-    println!("MIR BEGIN >>>> ");
-    dbg!(&mir);
-    println!("MIR END <<<< ");
     if let Some(facts) = env.try_get_local_mir_borrowck_facts(def_id.expect_local()) {
         let lifetimes = Lifetimes::new(facts);
 
@@ -32,9 +29,6 @@ pub(super) fn populate_graph(env: &Environment<'_>, def_id: DefId) -> Option<Gra
 
         let mut opaque_lifetimes_table = graph.create_table("Opaque lifetimes", &["lifetime"]);
         for lifetime in lifetimes.get_opaque_lifetimes_with_inclusions() {
-            println!(">>>>>>>>>>>>>");
-            dbg!(lifetime.to_text());
-            println!("<<<<<<<<<<<<<");
             opaque_lifetimes_table.add_row(vec![lifetime.to_text()]);
         }
         opaque_lifetimes_table.build();
@@ -94,16 +88,6 @@ fn visit_basic_block(
     };
     let terminator_index = statements.len();
     while location.statement_index < terminator_index {
-        // get target type
-        // let local = ...
-        // mir.vars_and_temps_iter()
-        // mir.local_decls[local].ty.to_text()
-        // println!("xxx---------");
-        // println!("index: {:?}", location.statement_index);
-        // println!("stmt: {:?}", &statements[location.statement_index]);
-        // let target_id: String = get_target_id(&statements[location.statement_index]);
-        // println!("target_id: {:?}", target_id);
-        // println!("xxx---------");
         visit_statement(
             &mut node_builder,
             location,
@@ -127,7 +111,6 @@ fn visit_statement(
     statement: &mir::Statement<'_>,
     lifetimes: &Lifetimes,
 ) {
-    dbg!(location);
     let subset_base_start = lifetimes.get_subset_base(RichLocation::Start(location));
     let subset_base_mid = lifetimes.get_subset_base(RichLocation::Mid(location));
     let subset_start = lifetimes.get_subset(RichLocation::Start(location));
@@ -141,8 +124,6 @@ fn visit_statement(
         lifetimes.get_origin_contains_loan_at(RichLocation::Start(location));
     let origin_contains_loan_at_mid =
         lifetimes.get_origin_contains_loan_at(RichLocation::Mid(location));
-
-    dbg!(&subset_mid);
 
     let mut row_builder_start = node_builder.create_row();
     row_builder_start.set("location", location.to_text());
