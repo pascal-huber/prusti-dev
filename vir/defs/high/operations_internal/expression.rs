@@ -39,6 +39,37 @@ impl BinaryOpKind {
     }
 }
 
+// TODO: remove this somewhere else?
+fn erase_lifetime_funcapp(expr: &mut Expression) {
+    if let Expression::FuncApp(FuncApp {
+        function_name: _,
+        type_arguments: _,
+        arguments,
+        parameters,
+        return_type: _, // TODO: also erase return_type lifetime?
+        ..
+    }) = expr
+    {
+        for argument in arguments.iter_mut() {
+            erase_lifetime_local(argument);
+        }
+        for parameter in parameters.iter_mut() {
+            parameter.ty.erase_lifetime();
+        }
+    }
+}
+
+// TODO: remove this somewhere else?
+fn erase_lifetime_local(expr: &mut Expression) {
+    if let Expression::Local(Local {
+        variable,
+        position: _,
+    }) = expr
+    {
+        variable.ty.erase_lifetime();
+    }
+}
+
 impl Expression {
     /// Only defined for places.
     pub fn get_base(&self) -> VariableDecl {
@@ -74,18 +105,14 @@ impl Expression {
     }
     pub fn erase_lifetime(&mut self) {
         // TODO: check if more cases have to be covered
-        let expr = match self {
-            Expression::Deref(Deref { base: box expr, .. }) => expr,
-            _ => self,
-        };
-        if let Expression::Local(Local {
-            variable,
-            position: _,
-        }) = expr
-        {
-            variable.ty.erase_lifetime();
+        match self {
+            Expression::Deref(Deref { base: box expr, .. }) => erase_lifetime_local(expr),
+            Expression::FuncApp(_) => erase_lifetime_funcapp(self),
+            Expression::Local(_) => erase_lifetime_local(self),
+            _ => {}
         }
     }
+
     #[must_use]
     pub fn replace_place(self, target: &Expression, replacement: &Expression) -> Self {
         debug_assert!(target.is_place());
