@@ -237,6 +237,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         location: mir::Location,
         statement: &mir::Statement<'tcx>,
     ) -> SpannedEncodingResult<()> {
+        // TODO: end lifetimes which are not needed anymore
         block_builder.add_comment(format!("{:?} {:?}", location, statement));
         match &statement.kind {
             mir::StatementKind::StorageLive(local) => {
@@ -302,9 +303,51 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 self.encode_assign_operand(block_builder, location, encoded_target, operand)?;
             }
             // mir::Rvalue::Repeat(Operand<'tcx>, Const<'tcx>),
-            // mir::Rvalue::Ref(Region<'tcx>, BorrowKind, Place<'tcx>),
+            mir::Rvalue::Ref(region, borrow_kind, place) => {
+                block_builder.add_comment("encode_statement_assign: not encoded for mir::Rvalue::Ref".to_string());
+                println!("mir::Rvalue::Ref not implemented");
+                dbg!(region);
+                dbg!(borrow_kind);
+                dbg!(place);
+                dbg!(&encoded_target);
+
+                let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
+                let _is_mut = match borrow_kind{
+                    mir::BorrowKind::Mut{ allow_two_phase_borrow: _ } => true,
+                    _ => false,
+                };
+                // TODO: create proper ref, add "is_mut" and lifetime/region
+                // TODO: ref_ and not ref because ref is reserved?
+                let encoded_rvalue = vir_high::Rvalue::ref_(encoded_place);
+                // TODO: is this where the borrow call and the lifetime creations will go?
+                // i.e. let x = &mut a;  ->
+                //    bw0 := newlft() // statemetn for new lifetime and endlft()
+                //    lft3 := bw0   // different assignment, new statement "GhostAssignment" with target&source expressions, target is variabledecl
+                //    lft4 := bw0
+                //    _2.ref := _1   <- for now
+                block_builder.add_statement(vir_high::Statement::assign(
+                    encoded_target,
+                    encoded_rvalue,
+                    self.register_error(location, ErrorCtxt::Assign),
+                ));
+                //    borrow(bw0, q, _2.ref)
+
+                // block_builder.add_statement(vir_high::Statement::create_borrow(
+                //     lifetime, q, encoded_target  // add BorrowKind in vir_high, Region
+                // )
+
+                // create_borrow wont work with this
+                //  it creates MutRef
+                //  assignment will create &mut T
+                // need to add params of create_borrow to encoded_rvalue::ref
+                // predicate Owned<&mut T> (lft, self) {
+                //     acc(self.ref) && MutRef$T(lft, self.ref)
+                // }
+                // creating predicate will com in lower layer
+
+            }
             // mir::Rvalue::ThreadLocalRef(DefId),
-            mir::Rvalue::AddressOf(_, place) => {
+            mir::Rvalue::AddressOf(_, place) => { // NOTE: raw pointers
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
                 let encoded_rvalue = vir_high::Rvalue::address_of(encoded_place);
                 block_builder.add_statement(vir_high::Statement::assign(

@@ -2,6 +2,9 @@ pub(crate) use super::{
     expression::Expression, position::Position, predicate::Predicate, rvalue::Rvalue,
 };
 
+// TODO: add borrowkind
+// TODO: add create_borrow
+
 #[derive_helpers]
 #[derive_visitors]
 #[derive(derive_more::From, derive_more::IsVariant)]
