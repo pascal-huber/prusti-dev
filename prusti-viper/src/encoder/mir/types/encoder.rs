@@ -27,6 +27,12 @@ pub struct TypeEncoder<'p, 'v: 'p, 'tcx: 'v> {
     ty: ty::Ty<'tcx>,
 }
 
+// TODO: move this?
+fn encode_lifetime_name(lft: String) -> String {
+    // TODO: check if all lifetime names have the parttern '_#7r
+    format!("lft{}", &lft[3..lft.len()-1])
+}
+
 impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
     pub fn new(encoder: &'p Encoder<'v, 'tcx>, ty: ty::Ty<'tcx>) -> Self {
         TypeEncoder { encoder, ty }
@@ -99,7 +105,7 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
             }
 
             ty::TyKind::Ref(region, ty, _) => {
-                let lft_name = format!("{}", region);
+                let lft_name = encode_lifetime_name(format!("{}", region));
                 let lifetime = vir::ty::Lifetime { name: lft_name };
                 vir::Type::reference(self.encoder.encode_type_high(*ty)?, lifetime)
             }
@@ -301,7 +307,7 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
             }
             ty::TyKind::Ref(region, ty, _) => {
                 let target_type = self.encoder.encode_type_high(*ty)?;
-                let lft_name = format!("{}", region);
+                let lft_name = encode_lifetime_name(format!("{}", region));
                 let lifetime = vir_crate::high::type_decl::Lifetime { name: lft_name };
                 vir::TypeDecl::reference(target_type, lifetime)
             }
