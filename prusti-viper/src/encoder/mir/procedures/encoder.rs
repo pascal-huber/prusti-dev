@@ -335,6 +335,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         };
         let terminator_index = statements.len();
         // TODO: keep track of active lifetimes here
+        // get bw0 here for newLft, endlft
         while location.statement_index < terminator_index {
             self.encode_statement(
                 &mut block_builder,
@@ -353,26 +354,28 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
     // returns the two lifetimes needed for the borrow
     fn get_lifetimes_borrow(&mut self, location: mir::Location) -> (String, String){
         // println!("--- getting lifetimes at loc");
-        // TODO: why is statement index usize and LocationIndex u32?
         // let statement_index = location.statement_index as u32;
         // TODO: how do I get index?
-        // let statement_loc = self.lifetimes.facts.location_table.borrow().start_index(location).index();
+        // TODO: move this to lifetimes.rs and make location_table() private again
+        let statement_location_index = self.lifetimes.location_table().start_index(location);
         // dbg!(statement_loc);
         // dbg!(p);
-        let statement_location_index: u32 = match location.statement_index {
-            4 => 9,
-            _ => 0,
-        };
+        // let statement_location_index: u32 = match location.statement_index {
+        //     4 => 9,
+        //     _ => 0,
+        // };
+        dbg!(&self.lifetimes.output_facts);
 
         // let statement_loc = 4; //location.as_u32();
-        for x in &self.lifetimes.output_facts.subset {
-            let subset_loc = x.0.as_u32();
-            if statement_location_index == subset_loc {
-                // println!("yes!");
-                // dbg!(x.1);
-                return (String::from("lft_3"), String::from("lft_4"))
-            }
-        }
+        // &self.lifetimes.output_facts.subset[statement_location_index]
+        // for x in &self.lifetimes.output_facts.subset {
+        //     let subset_loc = x.0.as_u32();
+        //     if statement_location_index == subset_loc {
+        //         // println!("yes!");
+        //         // dbg!(x.1);
+        //         return (String::from("lft_3"), String::from("lft_4"))
+        //     }
+        // }
         // dbg!(&self.lifetimes.output_facts.subset);
         (String::from("lft_a"), String::from("lft_b"))
     }
@@ -419,6 +422,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let memory_block_drop = self
                     .encoder
                     .encode_memory_block_drop_for_local(self.mir, *local)?;
+                // NOTE: use the following line everywhere
                 block_builder.add_statement(self.set_statement_error(
                     location,
                     ErrorCtxt::UnexpectedStorageDead,
@@ -493,6 +497,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         )
                     )
                 );
+                // NOTE: enough
+                // put variableDecl in newLft instead of String to reuse later
                 let statement_new_lft = vir_high::Statement::new_lft_no_pos(lft_bw_name.clone());
 
                 //    lft3 := bw0
@@ -500,6 +506,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let lft_a = vir_high::ty::Lifetime{ name: String::from("lft_static") };
                 let lft_a_type: vir_high::ty::Type = vir_high::ty::Type::Lifetime(lft_a);
                 let lft_a_decl = vir_high::VariableDecl::new( lft_a_name.clone(), lft_a_type);
+                // No local, use variableDecl directly
                 let lft_a_local = vir_high::Expression::local_no_pos(lft_a_decl);
                 let ghost_assignment_lft_a = vir_high::Statement::ghost_assignment_no_pos(
                     lft_a_local,
@@ -522,7 +529,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 };
                 dbg!(&_is_mut);
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
-                let encoded_rvalue = vir_high::Rvalue::ref_(encoded_place);
+                let encoded_rvalue = vir_high::Rvalue::ref_(encoded_place, lft_a_name.clone(), rd_perm, encoded_target.clone());
                 // dbg!(&encoded_target);
                 // dbg!(&encoded_rvalue);
                 let assign_statement = vir_high::Statement::assign(
@@ -534,15 +541,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 // TODO: why does add_statement crash here?
                 block_builder.add_statement(assign_statement);
 
+                // NOTE: add Rvalue
                 //    borrow(lft3, q, _2.ref)
                 // TODO: compute real read_permission
                 // TODO: how to add .ref to encoded_target, i.e. "_2" -> "_2.ref"?
+                // TODO: store rd_perm as u32 1000
                 let rd_perm = String::from("1/1000");
-                let borrow_statement = vir_high::Statement::borrow_no_pos(
-                    lft_a_name.clone(),
-                    rd_perm,
-                    encoded_target.clone(),
-                );
+                // let borrow_statement = vir_high::Statement::borrow_no_pos(
+                //     lft_a_name.clone(), // TODO: use region
+                //     rd_perm,
+                //     encoded_target.clone(),
+                // );
                 dbg!(&borrow_statement);
                 block_builder.add_statement(borrow_statement);
 

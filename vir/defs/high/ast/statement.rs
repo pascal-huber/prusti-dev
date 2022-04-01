@@ -182,7 +182,7 @@ pub struct EndLft {
 // TODO: does that mean that as of middle, this is the same as a normal assignment?
 #[display(fmt = "assign {} := {}", target, value)]
 pub struct GhostAssignment {
-    pub target: Expression,
+    pub target: Expression, // NOTE: make this VariableDecl
     pub position: Position,
     pub value: Expression, // TODO: Rvalue seems wrong?
 }
