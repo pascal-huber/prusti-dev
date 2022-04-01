@@ -32,6 +32,8 @@ pub enum Type {
     FunctionDef(FunctionDef),
     Projection(Projection),
     Unsupported(Unsupported),
+    // TODO: is this okay?
+    Lifetime(Lifetime),
 }
 
 #[derive(Copy)]

@@ -49,11 +49,14 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         def_id,
         _procedure: &procedure,
         mir: procedure.get_mir(),
-        _lifetimes: lifetimes,
+        lifetimes: lifetimes,
         check_panics: config::check_panics(),
         discriminants: Default::default(),
         fresh_id_generator: 0,
     };
+    // // println!("lifetimes:");
+    // dbg!(&procedure_encoder.lifetimes.facts.location_table);
+    dbg!(&procedure_encoder.lifetimes.output_facts);
     procedure_encoder.encode()
 }
 
@@ -62,7 +65,7 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     def_id: DefId,
     _procedure: &'p Procedure<'tcx>,
     mir: &'p mir::Body<'tcx>,
-    _lifetimes: Lifetimes,
+    lifetimes: Lifetimes,
     check_panics: bool,
     discriminants: BTreeSet<mir::Local>,
     fresh_id_generator: usize,
@@ -81,6 +84,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             deallocate_returns,
         );
         self.encode_body(&mut procedure_builder)?;
+        println!("END OF ENCODE_BODY");
         self.encode_discriminants(&mut procedure_builder)?;
         Ok(procedure_builder.build())
     }
@@ -206,6 +210,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         procedure_builder: &mut ProcedureBuilder,
         bb: mir::BasicBlock,
     ) -> SpannedEncodingResult<()> {
+        println!("####################### ENCODE BB #######################");
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
         let mir::BasicBlockData {
@@ -218,6 +223,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
         let terminator_index = statements.len();
+        // TODO: keep track of active lifetimes here
         while location.statement_index < terminator_index {
             self.encode_statement(
                 &mut block_builder,
@@ -233,12 +239,43 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
+    // returns the two lifetimes needed for the borrow
+    fn get_lifetimes_borrow(&mut self, location: mir::Location) -> (String, String){
+        // println!("--- getting lifetimes at loc");
+        // TODO: why is statement index usize and LocationIndex u32?
+        // let statement_index = location.statement_index as u32;
+        // TODO: how do I get index?
+        // let statement_loc = self.lifetimes.facts.location_table.borrow().start_index(location).index();
+        // dbg!(statement_loc);
+        // dbg!(p);
+        let statement_location_index: u32 = match location.statement_index {
+            4 => 9,
+            _ => 0,
+        };
+
+        // let statement_loc = 4; //location.as_u32();
+        for x in &self.lifetimes.output_facts.subset {
+            let subset_loc = x.0.as_u32();
+            if statement_location_index == subset_loc {
+                // println!("yes!");
+                // dbg!(x.1);
+                return (String::from("lft_3"), String::from("lft_4"))
+            }
+        }
+        // dbg!(&self.lifetimes.output_facts.subset);
+        (String::from("lft_a"), String::from("lft_b"))
+    }
+
     fn encode_statement(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
         statement: &mir::Statement<'tcx>,
     ) -> SpannedEncodingResult<()> {
+        // TODO: end lifetimes which are not needed anymore
+        println!("####################### ENCODE STATEMENT ##################");
+        dbg!(&location);
+        dbg!(&statement);
         block_builder.add_comment(format!("{:?} {:?}", location, statement));
         match &statement.kind {
             mir::StatementKind::StorageLive(local) => {
@@ -313,6 +350,82 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             }
             // mir::Rvalue::Repeat(Operand<'tcx>, Const<'tcx>),
             // mir::Rvalue::Ref(Region<'tcx>, BorrowKind, Place<'tcx>),
+            mir::Rvalue::Ref(region, borrow_kind, place) => {
+                println!("--- encode_statement_assign - Ref");
+                dbg!(region);
+                dbg!(borrow_kind);
+                dbg!(place);
+                dbg!(&encoded_target);
+
+                block_builder.add_comment(
+                    "encode_statement_assign: not encoded for mir::Rvalue::Ref".to_string(),
+                );
+
+                // TODO: implement get_lifetimes_borrow
+                let (lft_a_name,  lft_b_name) = self.get_lifetimes_borrow(location);
+                dbg!(&lft_a_name);
+                dbg!(&lft_b_name);
+
+                // i.e. let x = &mut a;  ->
+
+                //    bw0 := newlft() // statemetn for new lifetime and endlft()
+                // TODO: do I need a position or is _no_pos() ok?
+                // TODO: shoulnd't newlft() be an expression as it "returns something"?
+                // TODO: get name of lifetime bw0
+                let statement_new_lft = vir_high::Statement::new_lft_no_pos(String::from("bw0"));
+
+                //    lft3 := bw0
+                // TODO: implement "GhostAssignment" with target&source expressions, target is variabledecl
+                let lft_a = vir_high::ty::Lifetime{ name: "lft_static" };
+                let lft_a_type: vir_high::ty::Type = vir_high::ty::Type::Lifetime(lft_a);
+                let lft_a_decl = vir_high::VariableDecl::new( lft_a_name, lft_a_type);
+                let lft_a_local = vir_high::Expression::local_no_pos(lft_a_decl);
+                dbg!(lft_a_local);
+                // let ghost_assignment = vir_high::Statement::new_ghost_assignment_no_pos(
+                //     target: lft_a_local, // Expression
+                //     value: lft_a_value, // VariableDecl?
+                // );
+
+                //    lft4 := bw0
+                // TODO: do the same as with lft3
+
+                //    _2.ref := _1
+                // TODO: create proper ref, add "is_mut" and lifetime/region
+                // dbg!(&statement_assign);
+                // let statement_assign = ;
+                // let _is_mut = match borrow_kind {
+                //     mir::BorrowKind::Mut {
+                //         allow_two_phase_borrow: _,
+                //     } => true,
+                //     _ => false,
+                // };
+                let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
+                let encoded_rvalue = vir_high::Rvalue::ref_(encoded_place);
+                dbg!(&encoded_target);
+                dbg!(&encoded_rvalue);
+                let assign_statement = vir_high::Statement::assign(
+                    encoded_target,
+                    encoded_rvalue,
+                    self.register_error(location, ErrorCtxt::Assign),
+                );
+                dbg!(&assign_statement);
+                block_builder.add_statement(assign_statement);
+
+                //    borrow(bw0, q, _2.ref)
+
+                // block_builder.add_statement(vir_high::Statement::create_borrow(
+                //     lifetime, q, encoded_target  // add BorrowKind in vir_high, Region
+                // )
+
+                // create_borrow wont work with this
+                //  it creates MutRef
+                //  assignment will create &mut T
+                // need to add params of create_borrow to encoded_rvalue::ref
+                // predicate Owned<&mut T> (lft, self) {
+                //     acc(self.ref) && MutRef$T(lft, self.ref)
+                // }
+                // creating predicate will com in lower layer
+            }
             // mir::Rvalue::ThreadLocalRef(DefId),
             mir::Rvalue::AddressOf(_, place) => {
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;

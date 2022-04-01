@@ -1,0 +1,71 @@
+diff a/prusti-viper/src/encoder/mir/procedures/encoder.rs b/prusti-viper/src/encoder/mir/procedures/encoder.rs	(rejected hunks)
+@@ -302,9 +308,67 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
+                 self.encode_assign_operand(block_builder, location, encoded_target, operand)?;
+             }
+             // mir::Rvalue::Repeat(Operand<'tcx>, Const<'tcx>),
+-            // mir::Rvalue::Ref(Region<'tcx>, BorrowKind, Place<'tcx>),
++            mir::Rvalue::Ref(region, borrow_kind, place) => {
++                println!("--- encode_statement_assign - Ref");
++                dbg!(region);
++                dbg!(borrow_kind);
++                dbg!(place);
++                dbg!(&encoded_target);
++
++                block_builder.add_comment("encode_statement_assign: not encoded for mir::Rvalue::Ref".to_string());
++
++                let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
++                let _is_mut = match borrow_kind{
++                    mir::BorrowKind::Mut{ allow_two_phase_borrow: _ } => true,
++                    _ => false,
++                };
++                // TODO: create proper ref, add "is_mut" and lifetime/region
++                let encoded_rvalue = vir_high::Rvalue::ref_(encoded_place);
++                dbg!(&encoded_rvalue);
++                // i.e. let x = &mut a;  ->
++
++                //    bw0 := newlft() // statemetn for new lifetime and endlft()
++                // TODO: should I add a position?
++                // TODO: shoulnd't newlft() be an expression as it returns "something"?
++                // TODO: use real lifetime name here
++
++                let statement_new_lft = vir_high::Statement::new_lft_no_pos();
++                let encoded_target_a = vir_high::VariableDecl::new("lft_a", vir_high::ty::TypeVar::Lifetime);
++                let encoded_target_b = vir_high::VariableDecl::new("lft_b", vir_high::ty::TypeVar::Lifetime);
++
++                //    lft3 := bw0   // different assignment, new statement "GhostAssignment" with target&source expressions, target is variabledecl
++                // let ghost_assignment = vir_high::Statement::new_ghost_assignment_no_pos(
++                //     target: // Expression
++                //     value:  // Rvalue
++                // )
++                //    lft4 := bw0
++
++                //    _2.ref := _1   <- for now
++                let statement_assign = vir_high::Statement::assign(
++                    encoded_target,
++                    encoded_rvalue,
++                    self.register_error(location, ErrorCtxt::Assign),
++                );
++                dbg!(&statement_assign);
++                block_builder.add_statement(statement_assign);
++                //    borrow(bw0, q, _2.ref)
++
++                // block_builder.add_statement(vir_high::Statement::create_borrow(
++                //     lifetime, q, encoded_target  // add BorrowKind in vir_high, Region
++                // )
++
++                // create_borrow wont work with this
++                //  it creates MutRef
++                //  assignment will create &mut T
++                // need to add params of create_borrow to encoded_rvalue::ref
++                // predicate Owned<&mut T> (lft, self) {
++                //     acc(self.ref) && MutRef$T(lft, self.ref)
++                // }
++                // creating predicate will com in lower layer
++
++            }
+             // mir::Rvalue::ThreadLocalRef(DefId),
+-            mir::Rvalue::AddressOf(_, place) => {
++            mir::Rvalue::AddressOf(_, place) => { // NOTE: raw pointers
+                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
+                 let encoded_rvalue = vir_high::Rvalue::address_of(encoded_place);
+                 block_builder.add_statement(vir_high::Statement::assign(

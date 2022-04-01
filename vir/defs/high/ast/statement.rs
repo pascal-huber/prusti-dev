@@ -24,6 +24,13 @@ pub enum Statement {
     WriteAddress(WriteAddress),
     Assign(Assign),
     LeakAll(LeakAll),
+    // TODO: add newlft
+    NewLft(NewLft),
+    // TODO: add endlft
+    EndLft(EndLft),
+    // TODO: add "GhostAssignment" with target&source expressions, target is variabledecl
+    GhostAssignment(GhostAssignment), // TODO: add borrowkind
+                                      // TODO: add create_borrow
 }
 
 #[display(fmt = "// {}", comment)]
@@ -149,3 +156,23 @@ pub struct Assign {
 /// Tells fold-unfold to leak all predicates. This marks the end of the
 /// unwinding path.
 pub struct LeakAll {}
+
+#[display(fmt = "{} = newlft()", name)]
+pub struct NewLft {
+    pub name: String,
+    pub position: Position,
+}
+
+#[display(fmt = "endlft({})", name)]
+pub struct EndLft {
+    pub name: String,
+    pub position: Position,
+}
+
+// TODO: does that mean that as of middle, this is the same as a normal assignment?
+#[display(fmt = "assign {} := {}", target, value)]
+pub struct GhostAssignment {
+    pub target: Expression,
+    pub position: Position,
+    pub value: Expression, // TODO: Rvalue seems wrong?
+}

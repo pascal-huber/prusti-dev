@@ -54,4 +54,28 @@ impl<'v, 'tcx> ToMiddleStatementLowerer for crate::encoder::Encoder<'v, 'tcx> {
     ) -> Result<vir_mid::Operand, Self::Error> {
         operand.to_middle_rvalue(self)
     }
+
+    // fn to_middle_statement_ghost_assignment(
+    //     &self,
+    //     _statement: vir_high::GhostAssignment,
+    // ) -> SpannedEncodingResult<vir_mid::GhostAssignment> {
+    //     unimplemented!()
+    //     // unreachable!("leak-all statement cannot be lowered")
+    // }
+
+    //     fn to_middle_statement_statement_end_lft(
+    //         &self,
+    //         endlft: vir_high::EndLft,
+    //     ) -> SpannedEncodingResult<vir_mid::Statement> {
+    // //        endlft.to_middle_statement_end_lft(self)
+    //         unreachable!("end lft not yet lowerable to mid")
+    //     }
+    //
+    //     fn to_middle_statement_statement_new_lft(
+    //         &self,
+    //
+    //     ) -> SpannedEncodingResult<vir_mid::Statement> {
+    //         unreachable!("end lft not yet lowerable to mid")
+    //     }
+    //
 }

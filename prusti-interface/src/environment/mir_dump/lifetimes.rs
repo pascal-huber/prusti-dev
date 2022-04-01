@@ -11,8 +11,8 @@ use std::{
 };
 
 pub struct Lifetimes {
-    facts: Rc<BorrowckFacts>,
-    output_facts: AllOutputFacts,
+    pub facts: Rc<BorrowckFacts>,
+    pub output_facts: AllOutputFacts,
 }
 
 pub(super) struct LifetimeWithInclusions {

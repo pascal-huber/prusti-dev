@@ -27,6 +27,9 @@ pub enum Statement {
     WritePlace(WritePlace),
     WriteAddress(WriteAddress),
     Assign(Assign),
+    NewLft(NewLft),
+    EndLft(EndLft),
+    GhostAssignment(GhostAssignment),
 }
 
 #[display(fmt = "// {}", comment)]
@@ -164,4 +167,23 @@ pub struct Assign {
     pub target: Expression,
     pub value: Rvalue,
     pub position: Position,
+}
+
+#[display(fmt = "{} = newlft()", name)]
+pub struct NewLft {
+    pub name: String,
+    pub position: Position,
+}
+
+#[display(fmt = "endlft({})", name)]
+pub struct EndLft {
+    pub name: String,
+    pub position: Position,
+}
+
+#[display(fmt = "assign {} := {}", target, value)]
+pub struct GhostAssignment {
+    pub target: Expression,
+    pub position: Position,
+    pub value: Expression,
 }
