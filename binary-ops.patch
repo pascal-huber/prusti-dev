@@ -1,0 +1,327 @@
+diff --git a/.cargo/config b/.cargo/config
+index 8b13789179..e69de29bb2 100644
+--- a/.cargo/config
++++ b/.cargo/config
+@@ -1 +0,0 @@
+-
+diff --git a/prusti-viper/src/encoder/high/procedures/inference/semantics.rs b/prusti-viper/src/encoder/high/procedures/inference/semantics.rs
+index 8ded6f9007..2464373496 100644
+--- a/prusti-viper/src/encoder/high/procedures/inference/semantics.rs
++++ b/prusti-viper/src/encoder/high/procedures/inference/semantics.rs
+@@ -195,6 +195,7 @@ impl CollectPermissionChanges for vir_high::Rvalue {
+         match self {
+             Self::UnaryOp(rvalue) => rvalue.collect(consumed_permissions, produced_permissions),
+             Self::BinaryOp(rvalue) => rvalue.collect(consumed_permissions, produced_permissions),
++            Self::Reference(rvalue) => unimplemented!(),
+         }
+     }
+ }
+diff --git a/prusti-viper/src/encoder/high/procedures/inference/visitor/mod.rs b/prusti-viper/src/encoder/high/procedures/inference/visitor/mod.rs
+index 10067793cf..e897fae27b 100644
+--- a/prusti-viper/src/encoder/high/procedures/inference/visitor/mod.rs
++++ b/prusti-viper/src/encoder/high/procedures/inference/visitor/mod.rs
+@@ -134,6 +134,8 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
+             self.state_at_entry
+                 .remove(self.current_label.as_ref().unwrap())
+                 .unwrap()
++            // TODO: ????
++            // unwrap?
+         };
+         for statement in old_block.statements {
+             self.lower_statement(statement, &mut state)?;
+diff --git a/prusti-viper/src/encoder/middle/core_proof/builtin_methods/interface.rs b/prusti-viper/src/encoder/middle/core_proof/builtin_methods/interface.rs
+index ff59b43f83..78201fbb80 100644
+--- a/prusti-viper/src/encoder/middle/core_proof/builtin_methods/interface.rs
++++ b/prusti-viper/src/encoder/middle/core_proof/builtin_methods/interface.rs
+@@ -136,6 +136,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
+                 self.encode_operand_arguments(arguments, &value.left)?;
+                 self.encode_operand_arguments(arguments, &value.right)?;
+             }
++            vir_mid::Rvalue::Reference(value) => {
++                unimplemented!();
++            }
+         }
+         Ok(())
+     }
+@@ -255,6 +258,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
+             vir_mid::Rvalue::BinaryOp(_value) => {
+                 unimplemented!();
+             }
++            vir_mid::Rvalue::Reference(_value) => {
++                unimplemented!();
++            }
+         };
+         posts.push(exprp! { position => result_value == [assigned_value.clone()]});
+         pre_write_statements.push(vir_low::Statement::assign(
+diff --git a/prusti-viper/src/encoder/mir/procedures/encoder.rs b/prusti-viper/src/encoder/mir/procedures/encoder.rs
+index 6a79d1d02c..478a3869d1 100644
+--- a/prusti-viper/src/encoder/mir/procedures/encoder.rs
++++ b/prusti-viper/src/encoder/mir/procedures/encoder.rs
+@@ -1,4 +1,5 @@
+ use super::MirProcedureEncoderInterface;
++use rustc_middle::ty::Region;
+ use crate::encoder::{
+     errors::{ErrorCtxt, SpannedEncodingError, SpannedEncodingResult, WithSpan},
+     mir::{
+@@ -257,10 +258,101 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
+         encoded_target: vir_crate::high::Expression,
+         source: &mir::Rvalue<'tcx>,
+     ) -> SpannedEncodingResult<()> {
++        println!("##### Encode Statement Assign");
++        dbg!(source);
++        dbg!(&encoded_target);
+         match source {
+             mir::Rvalue::Use(operand) => {
+                 self.encode_assign_operand(block_builder, location, encoded_target, operand)?;
+             }
++            mir::Rvalue::Repeat(op, constant) => {
++                println!(">> Repeat");
++                dbg!(op);
++                dbg!(constant);
++                block_builder.add_comment("encode_statement_assign: not encoded".to_string());
++                unimplemented!("{:?}", source);
++            }
++            // mir::Rvalue::ThreadLocalRef(def_id) => {
++            //     println!(">> ThreadLocalRef");
++            //     dbg!(def_id);
++            //     block_builder.add_comment("encode_statement_assign: not encoded".to_string());
++            //     unimplemented!("{:?}", source);
++            // }
++            // mir::Rvalue::AddressOf(mutability, place) => {
++            //     println!(">> AddressOf");
++            //     dbg!(mutability);
++            //     dbg!(place);
++            //     block_builder.add_comment("encode_statement_assign: not encoded".to_string());
++            //     unimplemented!("{:?}", source);
++            // }
++
++
++
++            // mir::Rvalue::Cast(cast_kind, operand, ty) => {
++            //     println!(">> Cast");
++            //     dbg!(cast_kind);
++            //     dbg!(operand);
++            //     dbg!(ty);
++            //     block_builder.add_comment("encode_statement_assign: not encoded".to_string());
++            //     unimplemented!("{:?}", source);
++            // }
++            mir::Rvalue::BinaryOp(op, operand_box) => {
++                // let encoded_operand_1 = self.encode_statement_operand(location, operand_box
++                println!(">> BinaryOp");
++                dbg!(op);
++                // dbg!(operand_box);
++                dbg!(&*operand_box);
++                block_builder.add_comment("encode_statement_assign: not encoded".to_string());
++                unimplemented!("{:?}", source);
++            }
++            mir::Rvalue::CheckedBinaryOp(op, operand_box) => {
++                println!(">> CheckedBinaryOp");
++                let op_1 = &operand_box.0;
++                let op_2 = &operand_box.1;
++                let kind = match op {
++                    mir::BinOp::Add => vir_high::BinaryOpKind::Add,
++                    _ => {
++                        block_builder.add_comment("binop for this not encoded".to_string());
++                        unimplemented!("{:?}", source);
++                    }
++                };
++                let left = self.encode_statement_operand(location, op_1)?;
++                let right = self.encode_statement_operand(location, op_2)?;
++                // let encoded_rvalue = vir_high::Rvalue::unary_op(kind, encoded_operand);
++                let encoded_rvalue = vir_high::Rvalue::binary_op(kind, left, right);
++                dbg!(&encoded_rvalue);
++                block_builder.add_statement(vir_high::Statement::assign(
++                    encoded_target,
++                    encoded_rvalue,
++                    self.register_error(location, ErrorCtxt::Assign),
++                ));
++            }
++            mir::Rvalue::Ref(region, borrow_kind, place) => {
++                block_builder.add_comment("encode_statement_assign: not encoded for mir::Rvalue::Ref".to_string());
++                // block_builder.add_statement(vir_high::Statement::
++                println!("mir::Rvalue::Ref not implemented");
++                dbg!(region);
++                dbg!(borrow_kind);
++                dbg!(place);
++
++
++                // block_builder.add_statement(vir_high::Statement::assign(
++                //     encoded_target,
++                //     encoded_rvalue,
++                //     self.register_error(location, ErrorCtxt::Assign),
++                // ));
++
++
++                // self.encode_statement_assign_ref(
++                //     block_builder,
++                //     location,
++                //     encoded_target,
++                //     region,
++                //     borrow_kind,
++                //     place
++                // );
++                unimplemented!("{:?}", source);
++            }
+             mir::Rvalue::Aggregate(box aggregate_kind, operands) => {
+                 self.encode_statement_assign_aggregate(
+                     block_builder,
+@@ -271,6 +363,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
+                 )?;
+             }
+             mir::Rvalue::UnaryOp(op, operand) => {
++                println!(">> mir::Rvalue::UnaryOp");
++                dbg!(op);
++                dbg!(operand);
+                 let encoded_operand = self.encode_statement_operand(location, operand)?;
+                 let kind = match op {
+                     mir::UnOp::Not => vir_high::UnaryOpKind::Not,
+@@ -291,6 +386,22 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
+         Ok(())
+     }
+ 
++    fn encode_statement_assign_ref(
++        &self,
++        block_builder: &mut BasicBlockBuilder,
++        location: mir::Location,
++        encoded_target: vir_crate::high::Expression,
++        region: &Region<'tcx>, // TODO: is this the right Region type?
++        borrow_kind: &mir::BorrowKind,
++        place: &mir::Place<'tcx>,
++    ){
++        println!("mir::Rvalue::Ref not implemented");
++        dbg!(region);
++        dbg!(borrow_kind);
++        dbg!(place);
++        //
++    }
++
+     fn encode_statement_assign_aggregate(
+         &self,
+         block_builder: &mut BasicBlockBuilder,
+@@ -382,6 +493,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
+         Ok(())
+     }
+ 
++    // fn encode_reference_operand(
++    //     &self,
++    //     location: mir::Location,
++    // ) -> SpannedEncodingResult<vir_high::
++
+     fn encode_statement_operand(
+         &self,
+         location: mir::Location,
+@@ -457,14 +573,21 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
+                 cleanup,
+                 *fn_span,
+             )?,
+-            // TerminatorKind::Assert {
+-            //     target, cleanup, ..
+-            // } => {
+-            //     graph.add_regular_edge(bb, target);
+-            //     if let Some(target) = cleanup {
+-            //         graph.add_unwind_edge(bb, target);
+-            //     }
+-            // }
++            TerminatorKind::Assert {
++                cond,
++                expected,
++                msg,
++                target,
++                cleanup,
++            } => self.encode_terminator_assert(
++                block_builder,
++                span,
++                cond,
++                expected,
++                msg,
++                target,
++                cleanup
++            )?,
+             // TerminatorKind::Yield { .. } => {
+             //     graph.add_exit_edge(bb, "yield");
+             // }
+@@ -545,6 +668,40 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
+         )))
+     }
+ 
++    #[allow(clippy::too_many_arguments)]
++    fn encode_terminator_assert(
++        &mut self,
++        block_builder: &mut BasicBlockBuilder,
++        span: Span,
++        cond: &mir::Operand<'tcx>,
++        expected: &bool,
++        msg: &mir::AssertMessage<'tcx>,
++        target: &mir::BasicBlock,
++        cleanup: &Option<mir::BasicBlock>,
++    ) -> SpannedEncodingResult<SuccessorBuilder> {
++        println!("terminator kind assert");
++        dbg!(&cond);
++        dbg!(&expected);
++        dbg!(&msg);
++        dbg!(&target);
++        dbg!(&cleanup);
++        // TODO: check overflow?
++        let sb = SuccessorBuilder::jump(vir_high::Successor::Goto(
++            self.encode_basic_block_label(*target),
++        ));
++        Ok(sb)
++        // if let Some(cleanup) = cleanup {
++        //     // overflow
++        //     let sb = SuccessorBuilder::jump(vir_high::Successor::Goto(
++        //         self.encode_basic_block_label(*cleanup),
++        //     ));
++        //     Ok(sb)
++        // } else {
++        //     // non overflow
++        //     unimplemented!();
++        // }
++    }
++
+     #[allow(clippy::too_many_arguments)]
+     fn encode_terminator_call(
+         &mut self,
+diff --git a/vir/defs/high/ast/rvalue.rs b/vir/defs/high/ast/rvalue.rs
+index 64908a00d8..6eb20efc62 100644
+--- a/vir/defs/high/ast/rvalue.rs
++++ b/vir/defs/high/ast/rvalue.rs
+@@ -10,8 +10,17 @@ pub(crate) use super::super::{
+ pub enum Rvalue {
+     UnaryOp(UnaryOp),
+     BinaryOp(BinaryOp),
++    Reference(Reference),
+ }
+ 
++#[display(fmt = "{} &{} {}", region, is_mut, place)]
++pub struct Reference {
++    pub region: String,
++    pub is_mut: bool,
++    pub place: String,
++}
++
++
+ #[display(fmt = "{}({})", kind, argument)]
+ pub struct UnaryOp {
+     pub kind: UnaryOpKind,
+diff --git a/vir/defs/high/operations_internal/identifier/rvalue.rs b/vir/defs/high/operations_internal/identifier/rvalue.rs
+index ed29c12f43..ec409deb0a 100644
+--- a/vir/defs/high/operations_internal/identifier/rvalue.rs
++++ b/vir/defs/high/operations_internal/identifier/rvalue.rs
+@@ -6,10 +6,17 @@ impl WithIdentifier for Rvalue {
+         match self {
+             Self::UnaryOp(value) => value.get_identifier(),
+             Self::BinaryOp(value) => value.get_identifier(),
++            Self::Reference(value) => value.get_identifier(),
+         }
+     }
+ }
+ 
++impl WithIdentifier for Reference {
++    fn get_identifier(&self) -> String {
++        format!("Reference${}${}${}", self.region, self.is_mut, self.place)
++    }
++}
++
+ impl WithIdentifier for UnaryOp {
+     fn get_identifier(&self) -> String {
+         format!("UnaryOp${}${}", self.kind, self.argument.get_identifier())

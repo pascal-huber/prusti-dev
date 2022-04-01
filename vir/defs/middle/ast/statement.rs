@@ -30,6 +30,7 @@ pub enum Statement {
     NewLft(NewLft),
     EndLft(EndLft),
     GhostAssignment(GhostAssignment),
+    Borrow(Borrow),
 }
 
 #[display(fmt = "// {}", comment)]
@@ -186,4 +187,12 @@ pub struct GhostAssignment {
     pub target: Expression,
     pub position: Position,
     pub value: Expression,
+}
+
+#[display(fmt = "borrow({}, {}, {})", lifetime, rd_perm, reference)]
+pub struct Borrow {
+    pub lifetime: String,
+    pub rd_perm: String,
+    pub reference: Expression,
+    pub position: Position,
 }

@@ -358,7 +358,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 dbg!(&encoded_target);
 
                 block_builder.add_comment(
-                    "encode_statement_assign: not encoded for mir::Rvalue::Ref".to_string(),
+                    "encode_statement_assign: for mir::Rvalue::Ref".to_string(),
                 );
 
                 // TODO: implement get_lifetimes_borrow
@@ -371,20 +371,30 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 //    bw0 := newlft() // statemetn for new lifetime and endlft()
                 // TODO: do I need a position or is _no_pos() ok?
                 // TODO: shoulnd't newlft() be an expression as it "returns something"?
+                // TODO: bad idea to make Lifetime a Type?
                 // TODO: get name of lifetime bw0
-                let statement_new_lft = vir_high::Statement::new_lft_no_pos(String::from("bw0"));
+                let lft_bw_name = String::from("bw0");
+                let lft_bw = vir_high::Expression::local_no_pos(
+                    vir_high::VariableDecl::new(
+                        lft_bw_name.clone(),
+                        vir_high::ty::Type::Lifetime(
+                            vir_high::ty::Lifetime {name: String::from("lft_static")}
+                        )
+                    )
+                );
+                let statement_new_lft = vir_high::Statement::new_lft_no_pos(lft_bw_name.clone());
 
                 //    lft3 := bw0
                 // TODO: implement "GhostAssignment" with target&source expressions, target is variabledecl
-                let lft_a = vir_high::ty::Lifetime{ name: "lft_static" };
+                let lft_a = vir_high::ty::Lifetime{ name: String::from("lft_static") };
                 let lft_a_type: vir_high::ty::Type = vir_high::ty::Type::Lifetime(lft_a);
-                let lft_a_decl = vir_high::VariableDecl::new( lft_a_name, lft_a_type);
+                let lft_a_decl = vir_high::VariableDecl::new( lft_a_name.clone(), lft_a_type);
                 let lft_a_local = vir_high::Expression::local_no_pos(lft_a_decl);
-                dbg!(lft_a_local);
-                // let ghost_assignment = vir_high::Statement::new_ghost_assignment_no_pos(
-                //     target: lft_a_local, // Expression
-                //     value: lft_a_value, // VariableDecl?
-                // );
+                let ghost_assignment_lft_a = vir_high::Statement::ghost_assignment_no_pos(
+                    lft_a_local,
+                    lft_bw,
+                );
+                dbg!(&ghost_assignment_lft_a);
 
                 //    lft4 := bw0
                 // TODO: do the same as with lft3
@@ -393,30 +403,43 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 // TODO: create proper ref, add "is_mut" and lifetime/region
                 // dbg!(&statement_assign);
                 // let statement_assign = ;
-                // let _is_mut = match borrow_kind {
-                //     mir::BorrowKind::Mut {
-                //         allow_two_phase_borrow: _,
-                //     } => true,
-                //     _ => false,
-                // };
+                let _is_mut = match borrow_kind {
+                    mir::BorrowKind::Mut {
+                        allow_two_phase_borrow: _,
+                    } => true,
+                    _ => false,
+                };
+                dbg!(&_is_mut);
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
                 let encoded_rvalue = vir_high::Rvalue::ref_(encoded_place);
-                dbg!(&encoded_target);
-                dbg!(&encoded_rvalue);
+                // dbg!(&encoded_target);
+                // dbg!(&encoded_rvalue);
                 let assign_statement = vir_high::Statement::assign(
-                    encoded_target,
+                    encoded_target.clone(),
                     encoded_rvalue,
                     self.register_error(location, ErrorCtxt::Assign),
                 );
                 dbg!(&assign_statement);
+                // TODO: why does add_statement crash here?
                 block_builder.add_statement(assign_statement);
 
-                //    borrow(bw0, q, _2.ref)
+                //    borrow(lft3, q, _2.ref)
+                // TODO: compute real read_permission
+                // TODO: how to add .ref to encoded_target, i.e. "_2" -> "_2.ref"?
+                let rd_perm = String::from("1/1000");
+                let borrow_statement = vir_high::Statement::borrow_no_pos(
+                    lft_a_name.clone(),
+                    rd_perm,
+                    encoded_target.clone(),
+                );
+                dbg!(&borrow_statement);
+                block_builder.add_statement(borrow_statement);
 
                 // block_builder.add_statement(vir_high::Statement::create_borrow(
                 //     lifetime, q, encoded_target  // add BorrowKind in vir_high, Region
                 // )
 
+                // TODO: I don't understand this.
                 // create_borrow wont work with this
                 //  it creates MutRef
                 //  assignment will create &mut T
