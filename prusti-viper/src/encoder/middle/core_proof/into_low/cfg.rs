@@ -102,6 +102,7 @@ impl IntoLow for vir_mid::Statement {
             Self::NewLft(_statement) => unimplemented!("NewLft"),
             Self::EndLft(_statement) => unimplemented!("EndLft"),
             Self::GhostAssignment(_statement) => unimplemented!("GhostAssignment"),
+            Self::Borrow(_statement) => unimplemented!("GhostAssignment"),
             Self::Comment(statement) => Ok(vec![Statement::comment(statement.comment)]),
             Self::Inhale(statement) => {
                 if let vir_mid::Predicate::OwnedNonAliased(owned) = &statement.predicate {

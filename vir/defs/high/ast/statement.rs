@@ -30,8 +30,10 @@ pub enum Statement {
     // TODO: add endlft
     EndLft(EndLft),
     // TODO: add "GhostAssignment" with target&source expressions, target is variabledecl
-    GhostAssignment(GhostAssignment), // TODO: add borrowkind
-                                      // TODO: add create_borrow
+    GhostAssignment(GhostAssignment),
+    // TODO: add borrowkind ?????
+    // TODO: add create_borrow
+    Borrow(Borrow),
 }
 
 #[display(fmt = "// {}", comment)]
@@ -183,4 +185,13 @@ pub struct GhostAssignment {
     pub target: Expression,
     pub position: Position,
     pub value: Expression, // TODO: Rvalue seems wrong?
+}
+
+#[display(fmt = "borrow({}, {}, {})", lifetime, rd_perm, reference)]
+pub struct Borrow {
+    // TODO: add correct types for borrow
+    pub lifetime: String,
+    pub rd_perm: String,
+    pub reference: Expression,
+    pub position: Position,
 }
