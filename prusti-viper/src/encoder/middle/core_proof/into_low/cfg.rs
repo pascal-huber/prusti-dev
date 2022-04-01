@@ -99,6 +99,9 @@ impl IntoLow for vir_mid::Statement {
     ) -> SpannedEncodingResult<Self::Target> {
         use vir_low::{macros::*, Statement};
         match self {
+            Self::NewLft(_statement) => unimplemented!("NewLft"),
+            Self::EndLft(_statement) => unimplemented!("EndLft"),
+            Self::GhostAssignment(_statement) => unimplemented!("GhostAssignment"),
             Self::Comment(statement) => Ok(vec![Statement::comment(statement.comment)]),
             Self::Inhale(statement) => {
                 if let vir_mid::Predicate::OwnedNonAliased(owned) = &statement.predicate {

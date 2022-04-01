@@ -92,6 +92,7 @@ impl ProcedureBuilder {
             successor: vir_high::Successor::Exit,
         };
         assert!(basic_blocks.insert(self.end_label, end_block).is_none());
+        println!("------ end of build -------");
         vir_high::ProcedureDecl {
             name: self.name,
             entry: self.start_label,

@@ -120,6 +120,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         value: &vir_mid::Rvalue,
     ) -> SpannedEncodingResult<()> {
         match value {
+            vir_mid::Rvalue::Ref(value) => {
+                self.encode_place_arguments(arguments, &value.place)?;
+            }
             vir_mid::Rvalue::AddressOf(value) => {
                 self.encode_place_arguments(arguments, &value.place)?;
             }
@@ -291,6 +294,29 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<()> {
         use vir_low::macros::*;
         let assigned_value = match value {
+            vir_mid::Rvalue::Ref(value) => {
+                // TODO: what am I doing here?
+                // the actual borrowing
+                // good enough for now...
+                let ty = value.place.get_type();
+                var_decls! {
+                    operand_place: Place,
+                    operand_address: Address,
+                    operand_value: { ty.create_snapshot(self)? }
+                };
+                let predicate = expr! {
+                    acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
+                };
+                let compute_address = ty!(Address);
+                let address =
+                    expr! { ComputeAddress::compute_address(operand_place, operand_address) };
+                pres.push(predicate.clone());
+                posts.push(predicate);
+                parameters.push(operand_place);
+                parameters.push(operand_address);
+                parameters.push(operand_value);
+                self.construct_constant_snapshot(result_type, address, position)?
+            }
             vir_mid::Rvalue::AddressOf(value) => {
                 let ty = value.place.get_type();
                 var_decls! {

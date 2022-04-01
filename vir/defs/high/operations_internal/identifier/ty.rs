@@ -27,6 +27,7 @@ impl WithIdentifier for ty::Type {
             ty::Type::FunctionDef(ty) => ty.get_identifier(),
             ty::Type::Projection(ty) => ty.get_identifier(),
             ty::Type::Unsupported(ty) => ty.get_identifier(),
+            ty::Type::Lifetime(ty) => ty.get_identifier(),
         }
     }
 }
