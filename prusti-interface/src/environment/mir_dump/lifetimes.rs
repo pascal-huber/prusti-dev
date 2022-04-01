@@ -53,7 +53,7 @@ impl Lifetimes {
     fn borrowck_out_facts(&self) -> &AllOutputFacts {
         &self.output_facts
     }
-    fn location_table(&self) -> Ref<LocationTable> {
+    pub fn location_table(&self) -> Ref<LocationTable> {
         Ref::map(self.facts.location_table.borrow(), |table| {
             table.as_ref().unwrap()
         })

@@ -11,6 +11,8 @@ pub enum Type {
     /// Mathematical floats that corresponds to Viper's Float.
     MFloat32,
     MFloat64,
+    // TODO: is this okay? remove struct
+    Lifetime(Lifetime),
     /// Rust's Bool allocated on the Viper heap.
     Bool,
     /// Rust's Int allocated on the Viper heap.
@@ -32,8 +34,6 @@ pub enum Type {
     FunctionDef(FunctionDef),
     Projection(Projection),
     Unsupported(Unsupported),
-    // TODO: is this okay?
-    Lifetime(Lifetime),
 }
 
 #[derive(Copy)]
