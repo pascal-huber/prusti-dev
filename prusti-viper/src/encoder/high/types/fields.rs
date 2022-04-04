@@ -53,7 +53,8 @@ pub(crate) fn create_value_field(ty: vir::Type) -> EncodingResult<vir::FieldDecl
         }
 
         // TODO: add lifetime?
-        vir::Type::Lifetime(_) => unimplemented!(), //vir::FieldDecl::new("val_int", vir::Type::MInt),
+        vir::Type::Lifetime(_) => unimplemented!(),
+        vir::Type::NonameLifetime => unimplemented!(),
 
         vir::Type::MBool | vir::Type::MInt | vir::Type::MFloat32 | vir::Type::MFloat64 => {
             unreachable!()

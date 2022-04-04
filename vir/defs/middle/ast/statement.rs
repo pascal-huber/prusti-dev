@@ -192,9 +192,9 @@ pub struct EndLft {
 
 #[display(fmt = "assign {} := {}", target, value)]
 pub struct GhostAssignment {
-    pub target: Expression,
-    pub position: Position,
+    pub target: VariableDecl,
     pub value: Expression,
+    pub position: Position,
 }
 
 #[display(fmt = "borrow({}, {}, {})", lifetime, rd_perm, reference)]
