@@ -16,7 +16,7 @@ use rustc_data_structures::graph::WithStartNode;
 use rustc_hir::def_id::DefId;
 use rustc_middle::{mir, ty, ty::subst::SubstsRef};
 use rustc_span::Span;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use vir_crate::{
     common::expression::{BinaryOperationHelpers, UnaryOperationHelpers},
     high::{
@@ -223,9 +223,33 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
         let terminator_index = statements.len();
-        // TODO: keep track of active lifetimes here
-        // get bw0 here for newLft, endlft
+        let mut original_lifetimes: BTreeSet<String> = BTreeSet::new();
+        let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         while location.statement_index < terminator_index {
+            let (new_lifetimes, ended_lifetimes, new_derived_lifetimes) =
+                self.update_lifetimes(&mut original_lifetimes, &mut derived_lifetimes, location);
+            println!("-----------");
+            dbg!(&location);
+            dbg!(&original_lifetimes);
+            dbg!(&derived_lifetimes);
+            self.encode_end_lifetimes(
+                &mut block_builder,
+                location,
+                &statements[location.statement_index],
+                ended_lifetimes,
+            )?;
+            self.encode_new_lifetimes(
+                &mut block_builder,
+                location,
+                &statements[location.statement_index],
+                new_lifetimes,
+            )?;
+            self.encode_new_derived_lifetimes(
+                &mut block_builder,
+                location,
+                &statements[location.statement_index],
+                new_derived_lifetimes,
+            )?;
             self.encode_statement(
                 &mut block_builder,
                 location,
@@ -240,8 +264,134 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
+    fn encode_end_lifetimes(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        statement: &mir::Statement<'tcx>,
+        lifetimes: BTreeSet<String>,
+    ) -> SpannedEncodingResult<()> {
+        for lifetime in lifetimes {
+            block_builder.add_statement(self.set_statement_error(
+                location,
+                ErrorCtxt::LifetimeEncoding,
+                vir_high::Statement::end_lft_no_pos(lifetime),
+            )?);
+        }
+        Ok(())
+    }
+
+    fn encode_new_lifetimes(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        statement: &mir::Statement<'tcx>,
+        lifetimes: BTreeSet<String>,
+    ) -> SpannedEncodingResult<()> {
+        for lifetime in lifetimes {
+            block_builder.add_statement(self.set_statement_error(
+                location,
+                ErrorCtxt::LifetimeEncoding,
+                vir_high::Statement::new_lft_no_pos(lifetime),
+            )?);
+        }
+        Ok(())
+    }
+
+    fn encode_new_derived_lifetimes(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        statement: &mir::Statement<'tcx>,
+        lifetimes: BTreeMap<String, BTreeSet<String>>,
+    ) -> SpannedEncodingResult<()> {
+        // TODO: implement this
+        for (k, v) in lifetimes {
+            if v.len() > 1 {
+                unimplemented!("Union lifetimes not yet supported");
+            }
+            let target = vir_high::VariableDecl::new(k, vir_high::ty::Type::NonameLifetime {});
+            let value = vir_high::Expression::local_no_pos(vir_high::VariableDecl::new(
+                // TODO: is this really the best way to get first item of btreeset?
+                v.iter().next().unwrap().clone(),
+                vir_high::ty::Type::NonameLifetime {},
+            ));
+            block_builder.add_statement(self.set_statement_error(
+                location,
+                ErrorCtxt::LifetimeEncoding,
+                vir_high::Statement::ghost_assignment_no_pos(target, value),
+            )?);
+        }
+        Ok(())
+    }
+
+    // updates original and derived lifetimes
+    // returns the changes (
+    fn update_lifetimes(
+        &mut self,
+        old_original_lifetimes: &mut BTreeSet<String>,
+        old_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
+        location: mir::Location,
+    ) -> (
+        BTreeSet<String>,
+        BTreeSet<String>,
+        BTreeMap<String, BTreeSet<String>>,
+    ) {
+        let statement_location_index = self.lifetimes.location_table().start_index(location);
+        let mut original_lifetimes = self.lifetimes.get_loan_live_at_start(location);
+        let derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
+        let derived_flat: BTreeSet<String> =
+            derived_lifetimes.clone().into_values().flatten().collect();
+
+        // get lifetimes which have to be created
+        // i.e. lifetimes that are used in derived_lifetimes but are not in old_original_lifetimes
+        let mut lifetimes_to_create: BTreeSet<String> = derived_flat
+            .clone()
+            .into_iter()
+            .filter(|x| !old_original_lifetimes.contains(x))
+            .collect();
+
+        // get original_lifetimes which are not needed anymore
+        // i.e.  lifetimes which are in old_original_lifetimes but nowhere in derived_lifetimes
+        let lifetimes_to_end: BTreeSet<String> = old_original_lifetimes
+            .clone()
+            .into_iter()
+            .filter(|x| !derived_flat.contains(x))
+            .collect();
+
+        // get new derived lifetimes
+        // i.e. lifetimes which are in derived_lifetimes but not in old_derived_lifetimes
+        let derived_lifetimes_to_create: BTreeMap<String, BTreeSet<String>> = derived_lifetimes
+            .clone()
+            .into_iter()
+            .filter(|(k, v)| !old_derived_lifetimes.contains_key(k))
+            .collect();
+
+        // update collections and return
+        *old_derived_lifetimes = derived_lifetimes;
+        original_lifetimes.append(&mut lifetimes_to_create.clone());
+        *old_original_lifetimes = original_lifetimes;
+        (
+            lifetimes_to_create,
+            lifetimes_to_end,
+            derived_lifetimes_to_create,
+        )
+    }
+
+    // fn get_original_lifetimes(&mut self, location: mir::Location) -> BTreeSet<String> {
+    //     let statement_location_index = self.lifetimes.location_table().start_index(location);
+    //     let loan_live_at_start = self.lifetimes.get_loan_live_at_start(location);
+    //     loan_live_at_start
+    // }
+
+    // fn get_derived_lifetimes(&mut self, location: mir::Location) -> BTreeMap<String, BTreeSet<String>> {
+    //     let statement_location_index = self.lifetimes.location_table().start_index(location);
+    //     let origin_contains_loan_at_mid = self.lifetimes.get_origin_contains_loan_at_mid(location);
+    //     origin_contains_loan_at_mid
+    // }
+
     // returns the two lifetimes needed for the borrow
-    fn get_lifetimes_borrow(&mut self, location: mir::Location) -> (String, String){
+    fn get_lifetimes_borrow(&mut self, location: mir::Location) -> (String, String) {
         // println!("--- getting lifetimes at loc");
         // let statement_index = location.statement_index as u32;
         // TODO: how do I get index?
@@ -355,70 +505,71 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             // mir::Rvalue::Repeat(Operand<'tcx>, Const<'tcx>),
             // mir::Rvalue::Ref(Region<'tcx>, BorrowKind, Place<'tcx>),
             mir::Rvalue::Ref(region, borrow_kind, place) => {
-                println!("--- encode_statement_assign - Ref");
-                dbg!(region);
-                dbg!(borrow_kind);
-                dbg!(place);
-                dbg!(&encoded_target);
-
-                block_builder.add_comment(
-                    "encode_statement_assign: for mir::Rvalue::Ref".to_string(),
-                );
-
-                // TODO: implement get_lifetimes_borrow
-                let (lft_a_name,  lft_b_name) = self.get_lifetimes_borrow(location);
-                dbg!(&lft_a_name);
-                dbg!(&lft_b_name);
-
-                // i.e. let x = &mut a;  ->
-
-                //    bw0 := newlft() // statemetn for new lifetime and endlft()
-                // TODO: do I need a position or is _no_pos() ok?
-                // TODO: shoulnd't newlft() be an expression as it "returns something"?
-                // TODO: bad idea to make Lifetime a Type?
-                // TODO: get name of lifetime bw0
-                let lft_bw_name = String::from("bw0");
-                let lft_bw = vir_high::Expression::local_no_pos(
-                    vir_high::VariableDecl::new(
-                        lft_bw_name.clone(),
-                        vir_high::ty::Type::Lifetime(
-                            vir_high::ty::Lifetime {name: String::from("lft_static")}
-                        )
-                    )
-                );
-                // NOTE: enough
-                // put variableDecl in newLft instead of String to reuse later
-                let statement_new_lft = vir_high::Statement::new_lft_no_pos(lft_bw_name.clone());
-
-                //    lft3 := bw0
-                // TODO: implement "GhostAssignment" with target&source expressions, target is variabledecl
-                let lft_a = vir_high::ty::Lifetime{ name: String::from("lft_static") };
-                let lft_a_type: vir_high::ty::Type = vir_high::ty::Type::Lifetime(lft_a);
-                let lft_a_decl = vir_high::VariableDecl::new( lft_a_name.clone(), lft_a_type);
-                // No local, use variableDecl directly
-                let lft_a_local = vir_high::Expression::local_no_pos(lft_a_decl);
-                let ghost_assignment_lft_a = vir_high::Statement::ghost_assignment_no_pos(
-                    lft_a_local,
-                    lft_bw,
-                );
-                dbg!(&ghost_assignment_lft_a);
-
-                //    lft4 := bw0
-                // TODO: do the same as with lft3
-
+                // println!("--- encode_statement_assign - Ref");
+                // dbg!(region);
+                // dbg!(borrow_kind);
+                // dbg!(place);
+                // dbg!(&encoded_target);
+                //
+                // // TODO: implement get_lifetimes_borrow
+                // let (lft_a_name, lft_b_name) = self.get_lifetimes_borrow(location);
+                // dbg!(&lft_a_name);
+                // dbg!(&lft_b_name);
+                //
+                // // i.e. let x = &mut a;  ->
+                //
+                // //    bw0 := newlft() // statemetn for new lifetime and endlft()
+                // // TODO: do I need a position or is _no_pos() ok?
+                // // TODO: shoulnd't newlft() be an expression as it "returns something"?
+                // // TODO: bad idea to make Lifetime a Type?
+                // // TODO: get name of lifetime bw0
+                // let lft_bw_name = String::from("bw0");
+                // let lft_bw = vir_high::Expression::local_no_pos(vir_high::VariableDecl::new(
+                //     lft_bw_name.clone(),
+                //     vir_high::ty::Type::Lifetime(vir_high::ty::Lifetime {
+                //         name: String::from("lft_static"),
+                //     }),
+                // ));
+                // // NOTE: enough
+                // // put variableDecl in newLft instead of String to reuse later
+                // let statement_new_lft = vir_high::Statement::new_lft_no_pos(lft_bw_name.clone());
+                //
+                // //    lft3 := bw0
+                // // TODO: implement "GhostAssignment" with target&source expressions, target is variabledecl
+                // let lft_a = vir_high::ty::Lifetime {
+                //     name: String::from("lft_static"),
+                // };
+                // let lft_a_type: vir_high::ty::Type = vir_high::ty::Type::Lifetime(lft_a);
+                // let lft_a_decl = vir_high::VariableDecl::new(lft_a_name.clone(), lft_a_type);
+                // // No local, use variableDecl directly
+                // let lft_a_local = vir_high::Expression::local_no_pos(lft_a_decl);
+                // let ghost_assignment_lft_a =
+                //     vir_high::Statement::ghost_assignment_no_pos(lft_a_local, lft_bw);
+                // dbg!(&ghost_assignment_lft_a);
+                //
+                // //    lft4 := bw0
+                // // TODO: do the same as with lft3
+                //
                 //    _2.ref := _1
                 // TODO: create proper ref, add "is_mut" and lifetime/region
                 // dbg!(&statement_assign);
                 // let statement_assign = ;
-                let _is_mut = match borrow_kind {
-                    mir::BorrowKind::Mut {
-                        allow_two_phase_borrow: _,
-                    } => true,
-                    _ => false,
-                };
-                dbg!(&_is_mut);
+                // let _is_mut = match borrow_kind {
+                //     mir::BorrowKind::Mut {
+                //         allow_two_phase_borrow: _,
+                //     } => true,
+                //     _ => false,
+                // };
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
-                let encoded_rvalue = vir_high::Rvalue::ref_(encoded_place, lft_a_name.clone(), rd_perm, encoded_target.clone());
+                let rd_perm = "1/1000".to_string();
+                // TODO: compute proper region name
+                let region_name: String = format!("lft{}", region);
+                let encoded_rvalue = vir_high::Rvalue::ref_(
+                    encoded_place,
+                    region_name,
+                    rd_perm,
+                    encoded_target.clone(),
+                );
                 // dbg!(&encoded_target);
                 // dbg!(&encoded_rvalue);
                 let assign_statement = vir_high::Statement::assign(
@@ -428,35 +579,40 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 );
                 dbg!(&assign_statement);
                 // TODO: why does add_statement crash here?
-                block_builder.add_statement(assign_statement);
-
-                // NOTE: add Rvalue
-                //    borrow(lft3, q, _2.ref)
-                // TODO: compute real read_permission
-                // TODO: how to add .ref to encoded_target, i.e. "_2" -> "_2.ref"?
-                // TODO: store rd_perm as u32 1000
-                let rd_perm = String::from("1/1000");
-                // let borrow_statement = vir_high::Statement::borrow_no_pos(
-                //     lft_a_name.clone(), // TODO: use region
-                //     rd_perm,
-                //     encoded_target.clone(),
-                // );
-                dbg!(&borrow_statement);
-                block_builder.add_statement(borrow_statement);
-
-                // block_builder.add_statement(vir_high::Statement::create_borrow(
-                //     lifetime, q, encoded_target  // add BorrowKind in vir_high, Region
-                // )
-
-                // TODO: I don't understand this.
-                // create_borrow wont work with this
-                //  it creates MutRef
-                //  assignment will create &mut T
-                // need to add params of create_borrow to encoded_rvalue::ref
-                // predicate Owned<&mut T> (lft, self) {
-                //     acc(self.ref) && MutRef$T(lft, self.ref)
-                // }
-                // creating predicate will com in lower layer
+                // block_builder.add_statement(assign_statement);
+                block_builder.add_statement(self.set_statement_error(
+                    location,
+                    ErrorCtxt::Assign,
+                    assign_statement,
+                )?);
+                //
+                // // NOTE: add Rvalue
+                // //    borrow(lft3, q, _2.ref)
+                // // TODO: compute real read_permission
+                // // TODO: how to add .ref to encoded_target, i.e. "_2" -> "_2.ref"?
+                // // TODO: store rd_perm as u32 1000
+                // let rd_perm = String::from("1/1000");
+                // // let borrow_statement = vir_high::Statement::borrow_no_pos(
+                // //     lft_a_name.clone(), // TODO: use region
+                // //     rd_perm,
+                // //     encoded_target.clone(),
+                // // );
+                // // dbg!(&borrow_statement);
+                // // block_builder.add_statement(borrow_statement);
+                //
+                // // block_builder.add_statement(vir_high::Statement::create_borrow(
+                // //     lifetime, q, encoded_target  // add BorrowKind in vir_high, Region
+                // // )
+                //
+                // // TODO: I don't understand this.
+                // // create_borrow wont work with this
+                // //  it creates MutRef
+                // //  assignment will create &mut T
+                // // need to add params of create_borrow to encoded_rvalue::ref
+                // // predicate Owned<&mut T> (lft, self) {
+                // //     acc(self.ref) && MutRef$T(lft, self.ref)
+                // // }
+                // // creating predicate will com in lower layer
             }
             // mir::Rvalue::ThreadLocalRef(DefId),
             mir::Rvalue::AddressOf(_, place) => {

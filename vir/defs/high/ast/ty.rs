@@ -13,6 +13,7 @@ pub enum Type {
     MFloat64,
     // TODO: is this okay? remove struct
     Lifetime(Lifetime),
+    NonameLifetime,
     /// Rust's Bool allocated on the Viper heap.
     Bool,
     /// Rust's Int allocated on the Viper heap.
@@ -64,6 +65,9 @@ pub enum Float {
 pub struct Lifetime {
     pub name: String,
 }
+
+#[display(fmt = "NoNameLifetime")]
+pub struct NonameLifetime {}
 
 #[display(fmt = "{}", name)]
 pub struct GenericType {

@@ -55,6 +55,20 @@ impl<'v, 'tcx> ToMiddleStatementLowerer for crate::encoder::Encoder<'v, 'tcx> {
         operand.to_middle_rvalue(self)
     }
 
+    // fn to_middle_statement_variable_decl(
+    //     &self,
+    //     _statement: vir_high::VariableDecl,
+    // ) -> SpannedEncodingResult<vir_mid::Statement> {
+    //     unimplemented!("VariableDecl to_middle_statement");
+    // }
+
+    fn to_middle_statement_variable_decl(
+        &self,
+        _: vir_high::VariableDecl,
+    ) -> Result<vir_mid::VariableDecl, <Self as ToMiddleStatementLowerer>::Error> {
+        todo!()
+    }
+
     // fn to_middle_statement_ghost_assignment(
     //     &self,
     //     _statement: vir_high::GhostAssignment,
