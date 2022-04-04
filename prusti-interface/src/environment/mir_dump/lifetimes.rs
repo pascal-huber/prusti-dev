@@ -124,36 +124,14 @@ impl Lifetimes {
             Vec::new()
         }
     }
-    // TODO: kinda duplicate function
-    pub fn get_loan_live_at_start(&self, loc: mir::Location) -> BTreeSet<String> {
-        let location = RichLocation::Start(loc);
-        let point = self.location_to_point(location);
-        let borrowck_out_facts = self.borrowck_out_facts();
-        if let Some(loans) = borrowck_out_facts.loan_live_at.get(&point) {
-            loans
-                .clone()
-                .into_iter()
-                .map(|x| format!("bw{}", x.index()))
-                .collect()
-        } else {
-            BTreeSet::new()
-        }
+
+    pub fn get_loan_live_at_start(&self, location: mir::Location) -> BTreeSet<String> {
+        let info = self.get_loan_live_at(RichLocation::Start(location));
+        info.into_iter()
+            .map(|x| format!("bw{}", x.index()))
+            .collect()
     }
-    // TODO: kinda duplicate function
-    pub fn get_loan_live_at_mid(&self, loc: mir::Location) -> Vec<String> {
-        let location = RichLocation::Mid(loc);
-        let point = self.location_to_point(location);
-        let borrowck_out_facts = self.borrowck_out_facts();
-        if let Some(loans) = borrowck_out_facts.loan_live_at.get(&point) {
-            loans
-                .clone()
-                .into_iter()
-                .map(|x| format!("bw{}", x.index()))
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
+
     pub(super) fn get_loan_live_at(&self, location: RichLocation) -> Vec<Loan> {
         let point = self.location_to_point(location);
         let borrowck_out_facts = self.borrowck_out_facts();
@@ -163,57 +141,22 @@ impl Lifetimes {
             Vec::new()
         }
     }
-    // // TODO: kinda duplicate function
-    // pub fn get_origin_contains_loan_at_mid(&self, loc: mir::Location) -> BTreeSet<String> {
-    //     let location = RichLocation::Mid(loc);
-    //     let point = self.location_to_point(location);
-    //     let borrowck_out_facts = self.borrowck_out_facts();
-    //     if let Some(map) = borrowck_out_facts.origin_contains_loan_at.get(&point) {
-    //         let mut key_lifetimes: BTreeSet<String> = map
-    //             .clone()
-    //             .into_keys()
-    //             .map(|x| format!("lft{}", x.index()))
-    //             .collect();
-    //         // TODO: refactor this hard
-    //         let mut val_lifetimes: BTreeSet<String> = map
-    //             .clone()
-    //             .into_values()
-    //             .map(|x| {
-    //                 x.iter()
-    //                     .map(|y| format!("bw{}", y.index()))
-    //                     .collect::<BTreeSet<String>>()
-    //             })
-    //             .flatten()
-    //             .collect::<BTreeSet<String>>();
-    //         key_lifetimes.append(&mut val_lifetimes);
-    //         key_lifetimes
-    //     } else {
-    //         BTreeSet::new()
-    //     }
-    // }
-    // returns the lifetimes to create
-    // TODO: kinda duplicate function
+
     pub fn get_origin_contains_loan_at_mid(
         &self,
-        loc: mir::Location,
+        location: mir::Location,
     ) -> BTreeMap<String, BTreeSet<String>> {
-        let location = RichLocation::Mid(loc);
-        let point = self.location_to_point(location);
-        let borrowck_out_facts = self.borrowck_out_facts();
-        if let Some(map) = borrowck_out_facts.origin_contains_loan_at.get(&point) {
-            map.clone()
-                .iter()
-                .map(|(k, v)| {
-                    (
-                        format!("lft{}", k.index()),
-                        v.iter().map(|x| format!("bw{}", x.index())).collect(),
-                    )
-                })
-                .collect()
-        } else {
-            BTreeMap::new()
-        }
+        let info = self.get_origin_contains_loan_at(RichLocation::Mid(location));
+        info.iter()
+            .map(|(k, v)| {
+                (
+                    format!("lft{}", k.index()),
+                    v.iter().map(|x| format!("bw{}", x.index())).collect(),
+                )
+            })
+            .collect()
     }
+
     pub(super) fn get_origin_contains_loan_at(
         &self,
         location: RichLocation,
