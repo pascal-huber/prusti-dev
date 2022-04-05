@@ -66,6 +66,11 @@ pub struct LifetimeConst {
 
 #[display(fmt = "NoNameLifetime")]
 pub struct Lifetime {}
+impl Default for Lifetime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[display(fmt = "{}", name)]
 pub struct GenericType {
