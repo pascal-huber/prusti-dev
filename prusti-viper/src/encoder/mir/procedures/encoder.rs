@@ -55,9 +55,6 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         discriminants: Default::default(),
         fresh_id_generator: 0,
     };
-    // // println!("lifetimes:");
-    // dbg!(&procedure_encoder.lifetimes.facts.location_table);
-    // dbg!(&procedure_encoder.lifetimes.output_facts);
     procedure_encoder.encode()
 }
 
@@ -587,12 +584,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
 
                 //    _2.ref := _1
                 // TODO: create proper ref, add "is_mut" and lifetime/region
-                let _is_mut = match borrow_kind {
+                let _is_mut = matches!(
+                    borrow_kind,
                     mir::BorrowKind::Mut {
                         allow_two_phase_borrow: _,
-                    } => true,
-                    _ => false,
-                };
+                    }
+                );
+
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
                 let rd_perm: u32 = self.read_permission_amount();
                 // TODO: compute region name somewhere else
@@ -600,12 +598,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let region_name: String = format!("lft{}", &region_str[3..region_str.len() - 1]);
                 let encoded_rvalue = vir_high::Rvalue::ref_(
                     encoded_place,
-                    region_name,
+                    region_name.clone(),
                     rd_perm,
                     encoded_target.clone(),
                 );
                 let assign_statement = vir_high::Statement::assign(
-                    encoded_target,
+                    encoded_target.clone(),
                     encoded_rvalue,
                     self.register_error(location, ErrorCtxt::Assign),
                 );
@@ -614,36 +612,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     ErrorCtxt::Assign,
                     assign_statement,
                 )?);
-
-                // TODO: make borrow...
-                //
-                // // NOTE: add Rvalue
-                // //    borrow(lft3, q, _2.ref)
-                // // TODO: compute real read_permission
-                // // TODO: how to add .ref to encoded_target, i.e. "_2" -> "_2.ref"?
-                // // TODO: store rd_perm as u32 1000
-                // let rd_perm = String::from("1/1000");
-                // // let borrow_statement = vir_high::Statement::borrow_no_pos(
-                // //     lft_a_name.clone(), // TODO: use region
-                // //     rd_perm,
-                // //     encoded_target.clone(),
-                // // );
-                // // dbg!(&borrow_statement);
-                // // block_builder.add_statement(borrow_statement);
-                //
-                // // block_builder.add_statement(vir_high::Statement::create_borrow(
-                // //     lifetime, q, encoded_target  // add BorrowKind in vir_high, Region
-                // // )
-                //
-                // // TODO: I don't understand this.
-                // // create_borrow wont work with this
-                // //  it creates MutRef
-                // //  assignment will create &mut T
-                // // need to add params of create_borrow to encoded_rvalue::ref
-                // // predicate Owned<&mut T> (lft, self) {
-                // //     acc(self.ref) && MutRef$T(lft, self.ref)
-                // // }
-                // // creating predicate will com in lower layer
+                // TODO: add Rvalue for borrow
+                let borrow_statement =
+                    vir_high::Statement::borrow_no_pos(region_name, rd_perm, encoded_target);
+                block_builder.add_statement(self.set_statement_error(
+                    location,
+                    ErrorCtxt::Assign,
+                    borrow_statement,
+                )?);
             }
             // mir::Rvalue::ThreadLocalRef(DefId),
             mir::Rvalue::AddressOf(_, place) => {

@@ -62,7 +62,9 @@ impl IntoPolymorphic<vir_poly::TypeVar> for vir_high::ty::TypeVar {
         vir_poly::TypeVar {
             label: match self {
                 vir_high::ty::TypeVar::GenericType(generic_type) => generic_type.get_identifier(),
-                vir_high::ty::TypeVar::LifetimeConst(lifetime_const) => lifetime_const.get_identifier(),
+                vir_high::ty::TypeVar::LifetimeConst(lifetime_const) => {
+                    lifetime_const.get_identifier()
+                }
             },
         }
     }

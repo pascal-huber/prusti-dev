@@ -25,11 +25,8 @@ pub enum Statement {
     WriteAddress(WriteAddress),
     Assign(Assign),
     LeakAll(LeakAll),
-    // TODO: add newlft
     NewLft(NewLft),
-    // TODO: add endlft
     EndLft(EndLft),
-    // TODO: add "GhostAssignment" with target&source expressions, target is variabledecl
     GhostAssignment(GhostAssignment),
     // TODO: add borrowkind ?????
     // TODO: add create_borrow

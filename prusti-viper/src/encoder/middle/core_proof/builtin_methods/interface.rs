@@ -295,9 +295,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         use vir_low::macros::*;
         let assigned_value = match value {
             vir_mid::Rvalue::Ref(value) => {
-                // TODO: what am I doing here?
-                // the actual borrowing
-                // good enough for now...
                 let ty = value.place.get_type();
                 var_decls! {
                     operand_place: Place,
