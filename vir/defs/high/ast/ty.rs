@@ -11,7 +11,7 @@ pub enum Type {
     /// Mathematical floats that corresponds to Viper's Float.
     MFloat32,
     MFloat64,
-    NonameLifetime,
+    Lifetime,
     /// Rust's Bool allocated on the Viper heap.
     Bool,
     /// Rust's Int allocated on the Viper heap.
@@ -60,12 +60,12 @@ pub enum Float {
 }
 
 #[display(fmt = "{}", name)]
-pub struct Lifetime {
+pub struct LifetimeConst {
     pub name: String,
 }
 
 #[display(fmt = "NoNameLifetime")]
-pub struct NonameLifetime {}
+pub struct Lifetime {}
 
 #[display(fmt = "{}", name)]
 pub struct GenericType {
@@ -75,7 +75,7 @@ pub struct GenericType {
 #[derive_helpers]
 #[derive(derive_more::Unwrap)]
 pub enum TypeVar {
-    Lifetime(Lifetime),
+    LifetimeConst(LifetimeConst),
     GenericType(GenericType),
 }
 
@@ -134,7 +134,7 @@ pub struct Slice {
 #[display(fmt = "&{}", target_type)]
 pub struct Reference {
     pub target_type: Box<Type>,
-    pub lifetime: Lifetime,
+    pub lifetime_const: LifetimeConst,
 }
 
 #[display(fmt = "*{}", target_type)]

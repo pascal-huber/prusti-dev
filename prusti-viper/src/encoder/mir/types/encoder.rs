@@ -107,7 +107,7 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
 
             ty::TyKind::Ref(region, ty, _) => {
                 let lft_name = self.encode_lifetime_name(region);
-                let lifetime = vir::ty::Lifetime { name: lft_name };
+                let lifetime = vir::ty::LifetimeConst { name: lft_name };
                 vir::Type::reference(self.encoder.encode_type_high(*ty)?, lifetime)
             }
 
@@ -311,7 +311,7 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
             ty::TyKind::Ref(region, ty, _) => {
                 let target_type = self.encoder.encode_type_high(*ty)?;
                 let lft_name = self.encode_lifetime_name(region);
-                let lifetime = vir_crate::high::type_decl::Lifetime { name: lft_name };
+                let lifetime = vir_crate::high::type_decl::LifetimeConst { name: lft_name };
                 vir::TypeDecl::reference(target_type, lifetime)
             }
             ty::TyKind::Tuple(elems) => vir::TypeDecl::tuple(
