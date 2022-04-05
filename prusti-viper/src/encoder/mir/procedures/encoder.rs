@@ -431,11 +431,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             if v.len() > 1 {
                 unimplemented!("Union lifetimes not yet supported");
             }
-            let target = vir_high::VariableDecl::new(k, vir_high::ty::Type::NonameLifetime {});
+            let target = vir_high::VariableDecl::new(k, vir_high::ty::Type::Lifetime {});
             let value = vir_high::Expression::local_no_pos(vir_high::VariableDecl::new(
                 // TODO: is this really the best way to get first item of btreeset?
                 v.iter().next().unwrap().clone(),
-                vir_high::ty::Type::NonameLifetime {},
+                vir_high::ty::Type::Lifetime {},
             ));
             block_builder.add_statement(self.set_statement_error(
                 location,

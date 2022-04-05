@@ -8,7 +8,7 @@ use super::{
             *,
         },
         position::Position,
-        ty::{visitors::TypeFolder, Lifetime, Type},
+        ty::{visitors::TypeFolder, LifetimeConst, Type},
     },
     ty::Typed,
 };
@@ -104,8 +104,8 @@ impl Expression {
             }
         }
         impl TypeFolder for DefaultLifetimeEraser {
-            fn fold_lifetime(&mut self, _lifetime: Lifetime) -> Lifetime {
-                Lifetime {
+            fn fold_lifetime_const(&mut self, _lifetime: LifetimeConst) -> LifetimeConst {
+                LifetimeConst {
                     name: String::from("pure_erased"),
                 }
             }
