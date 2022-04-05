@@ -197,10 +197,10 @@ pub struct GhostAssignment {
     pub position: Position,
 }
 
-#[display(fmt = "borrow({}, {}, {})", lifetime, rd_perm, reference)]
+#[display(fmt = "borrow({}, 1/{}, {})", lifetime, rd_perm, reference)]
 pub struct Borrow {
     pub lifetime: String,
-    pub rd_perm: String,
+    pub rd_perm: u32,
     pub reference: Expression,
     pub position: Position,
 }

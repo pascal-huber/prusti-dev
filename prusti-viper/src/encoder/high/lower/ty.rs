@@ -33,7 +33,6 @@ impl IntoPolymorphic<vir_poly::Type> for vir_high::Type {
             vir_high::Type::FunctionDef(ty) => vir_poly::Type::TypedRef(ty.lower(encoder)),
             vir_high::Type::Projection(ty) => vir_poly::Type::TypedRef(ty.lower(encoder)),
             vir_high::Type::Unsupported(ty) => vir_poly::Type::TypedRef(ty.lower(encoder)),
-            vir_high::Type::Lifetime(_ty) => unimplemented!(),
             vir_high::Type::NonameLifetime => unimplemented!(),
         })
     }

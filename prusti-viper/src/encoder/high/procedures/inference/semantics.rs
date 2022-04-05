@@ -390,25 +390,13 @@ impl CollectPermissionChanges for vir_high::EndLft {
     }
 }
 
-// impl CollectPermissionChanges for vir_high::GhostAssignment {
-//     fn collect(
-//         &self,
-//         consumed_permissions: &mut Vec<Permission>,
-//         produced_permissions: &mut Vec<Permission>,
-//     ) -> SpannedEncodingResult<()> {
-//         consumed_permissions.push(Permission::MemoryBlock(self.target.clone()));
-//         produced_permissions.push(Permission::Owned(self.target.clone()));
-//         self.value
-//             .collect(consumed_permissions, produced_permissions)
-//     }
-// }
 impl CollectPermissionChanges for vir_high::GhostAssignment {
     fn collect(
         &self,
         _consumed_permissions: &mut Vec<Permission>,
         _produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
-        todo!();
+        Ok(())
     }
 }
 
@@ -418,7 +406,6 @@ impl CollectPermissionChanges for vir_high::Borrow {
         _consumed_permissions: &mut Vec<Permission>,
         _produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
-        // No requirements and nothing ensured.
         Ok(())
     }
 }

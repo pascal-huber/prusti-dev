@@ -316,12 +316,22 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
+    // TODO: improve read_permission_amount
+    fn read_permission_amount(&mut self) -> u32 {
+        self.lifetimes
+            .facts
+            .input_facts
+            .take()
+            .unwrap()
+            .cfg_edge
+            .len() as u32
+    }
+
     fn encode_basic_block(
         &mut self,
         procedure_builder: &mut ProcedureBuilder,
         bb: mir::BasicBlock,
     ) -> SpannedEncodingResult<()> {
-        println!("####################### ENCODE BB #######################");
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
         let mir::BasicBlockData {
@@ -584,10 +594,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     _ => false,
                 };
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
-                // TODO: compute permission fraction outside
-                let rd_perm = "1/1000".to_string();
-                // TODO: compute proper region name
-                let region_name: String = format!("lft{}", region);
+                let rd_perm: u32 = self.read_permission_amount();
+                // TODO: compute region name somewhere else
+                let region_str = format!("{region}");
+                let region_name: String = format!("lft{}", &region_str[3..region_str.len() - 1]);
                 let encoded_rvalue = vir_high::Rvalue::ref_(
                     encoded_place,
                     region_name,

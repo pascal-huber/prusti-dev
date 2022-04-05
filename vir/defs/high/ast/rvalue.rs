@@ -34,7 +34,7 @@ pub struct Ref {
 
     // add for compile (?)
     pub lifetime_name: String,
-    pub rd_perm: String,
+    pub rd_perm: u32,
     pub target: Expression,
 }
 
