@@ -174,16 +174,16 @@ pub struct EndLft {
 // TODO: does that mean that as of middle, this is the same as a normal assignment?
 #[display(fmt = "assign {} := {}", target, value)]
 pub struct GhostAssignment {
-    pub target: VariableDecl, // NOTE: make this VariableDecl
-    pub value: Expression,    // TODO: Rvalue seems wrong?
+    pub target: VariableDecl,
+    pub value: Expression,
     pub position: Position,
 }
 
-#[display(fmt = "borrow({}, {}, {})", lifetime, rd_perm, reference)]
+#[display(fmt = "borrow({}, 1/{}, {})", lifetime, rd_perm, reference)]
 pub struct Borrow {
     // TODO: add correct types for borrow
     pub lifetime: String,
-    pub rd_perm: String,
+    pub rd_perm: u32,
     pub reference: Expression,
     pub position: Position,
 }
