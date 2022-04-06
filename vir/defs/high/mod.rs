@@ -17,7 +17,7 @@ pub use self::{
         },
         rvalue::{Operand, OperandKind, Rvalue},
         statement::{
-            Assert, Assign, Borrow, Assume, Comment, Consume, CopyPlace, EndLft, Exhale,
+            Assert, Assign, Assume, Borrow, Comment, Consume, CopyPlace, EndLft, Exhale,
             GhostAssignment, Inhale, LeakAll, MovePlace, NewLft, Statement, WriteAddress,
             WritePlace,
         },

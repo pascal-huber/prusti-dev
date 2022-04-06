@@ -1,6 +1,9 @@
-use crate::environment::{
-    borrowck::facts::{AllInputFacts, AllOutputFacts, BorrowckFacts, Loan, PointIndex, Region},
-    mir_dump::graphviz::{loan_to_text, to_sorted_text},
+use crate::{
+    environment::{
+        borrowck::facts::{AllInputFacts, AllOutputFacts, BorrowckFacts, Loan, PointIndex, Region},
+        mir_dump::graphviz::{loan_to_text, to_sorted_text},
+    },
+    lifetime_formatter::{opaque_lifetime_string, LifetimeString},
 };
 use rustc_borrowck::consumers::{LocationTable, RichLocation};
 
@@ -12,8 +15,8 @@ use std::{
 };
 
 pub struct Lifetimes {
-    pub facts: Rc<BorrowckFacts>,
-    pub output_facts: AllOutputFacts,
+    facts: Rc<BorrowckFacts>,
+    output_facts: AllOutputFacts,
 }
 
 pub(super) struct LifetimeWithInclusions {
@@ -46,6 +49,32 @@ impl Lifetimes {
             output_facts,
         }
     }
+    pub fn get_loan_live_at_start(&self, location: mir::Location) -> BTreeSet<String> {
+        let info = self.get_loan_live_at(RichLocation::Start(location));
+        info.into_iter()
+            // TODO: do lifetime names somewhere else
+            .map(|x| opaque_lifetime_string(x.index()))
+            .collect()
+    }
+    pub fn get_origin_contains_loan_at_mid(
+        &self,
+        location: mir::Location,
+    ) -> BTreeMap<String, BTreeSet<String>> {
+        let info = self.get_origin_contains_loan_at(RichLocation::Mid(location));
+        info.iter()
+            .map(|(k, v)| {
+                (
+                    k.lifetime_string(),
+                    v.iter()
+                        .map(|x| opaque_lifetime_string(x.index()))
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+    pub fn edge_count(&self) -> u32 {
+        self.facts.input_facts.take().unwrap().cfg_edge.len() as u32
+    }
     fn borrowck_in_facts(&self) -> Ref<AllInputFacts> {
         Ref::map(self.facts.input_facts.borrow(), |facts| {
             facts.as_ref().unwrap()
@@ -54,7 +83,7 @@ impl Lifetimes {
     fn borrowck_out_facts(&self) -> &AllOutputFacts {
         &self.output_facts
     }
-    pub fn location_table(&self) -> Ref<LocationTable> {
+    fn location_table(&self) -> Ref<LocationTable> {
         Ref::map(self.facts.location_table.borrow(), |table| {
             table.as_ref().unwrap()
         })
@@ -124,14 +153,6 @@ impl Lifetimes {
             Vec::new()
         }
     }
-
-    pub fn get_loan_live_at_start(&self, location: mir::Location) -> BTreeSet<String> {
-        let info = self.get_loan_live_at(RichLocation::Start(location));
-        info.into_iter()
-            .map(|x| format!("bw{}", x.index()))
-            .collect()
-    }
-
     pub(super) fn get_loan_live_at(&self, location: RichLocation) -> Vec<Loan> {
         let point = self.location_to_point(location);
         let borrowck_out_facts = self.borrowck_out_facts();
@@ -141,22 +162,6 @@ impl Lifetimes {
             Vec::new()
         }
     }
-
-    pub fn get_origin_contains_loan_at_mid(
-        &self,
-        location: mir::Location,
-    ) -> BTreeMap<String, BTreeSet<String>> {
-        let info = self.get_origin_contains_loan_at(RichLocation::Mid(location));
-        info.iter()
-            .map(|(k, v)| {
-                (
-                    format!("lft{}", k.index()),
-                    v.iter().map(|x| format!("bw{}", x.index())).collect(),
-                )
-            })
-            .collect()
-    }
-
     pub(super) fn get_origin_contains_loan_at(
         &self,
         location: RichLocation,
