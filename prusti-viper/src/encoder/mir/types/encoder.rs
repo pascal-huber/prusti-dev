@@ -19,6 +19,7 @@ use prusti_common::config;
 use rustc_hir::def_id::DefId;
 use rustc_middle::ty;
 use rustc_span::MultiSpan;
+use prusti_interface::lifetime_formatter::LifetimeString;
 
 use vir_crate::{
     common::expression::BinaryOperationHelpers,
@@ -65,7 +66,7 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
     }
 
     fn encode_lifetime_name(&self, region: &ty::Region) -> String {
-        self.encoder.encode_lifetime_name(region)
+        region.lifetime_string()
     }
 
     fn compute_array_len(&self, size: ty::Const<'tcx>) -> u64 {

@@ -11,7 +11,10 @@ use crate::encoder::{
 };
 use log::debug;
 use prusti_common::config;
-use prusti_interface::environment::{mir_dump::lifetimes::Lifetimes, Procedure};
+use prusti_interface::{
+    environment::{mir_dump::lifetimes::Lifetimes, Procedure},
+    lifetime_formatter::LifetimeString,
+};
 use rustc_data_structures::graph::WithStartNode;
 use rustc_hir::def_id::DefId;
 use rustc_middle::{mir, ty, ty::subst::SubstsRef};
@@ -81,7 +84,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             deallocate_returns,
         );
         self.encode_body(&mut procedure_builder)?;
-        println!("END OF ENCODE_BODY");
         self.encode_discriminants(&mut procedure_builder)?;
         Ok(procedure_builder.build())
     }
@@ -202,15 +204,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    // TODO: improve read_permission_amount
     fn read_permission_amount(&mut self) -> u32 {
-        self.lifetimes
-            .facts
-            .input_facts
-            .take()
-            .unwrap()
-            .cfg_edge
-            .len() as u32
+        // TODO: count lifetimes, not cfg_edges
+        self.lifetimes.edge_count()
     }
 
     fn encode_basic_block(
@@ -479,12 +475,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         allow_two_phase_borrow: _,
                     }
                 );
-
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
                 let rd_perm: u32 = self.read_permission_amount();
-                // TODO: compute region name somewhere else
-                let region_str = format!("{region}");
-                let region_name: String = format!("lft{}", &region_str[3..region_str.len() - 1]);
+                let region_name = region.lifetime_string();
                 let encoded_rvalue = vir_high::Rvalue::ref_(
                     encoded_place,
                     region_name.clone(),
