@@ -232,8 +232,6 @@ impl CollectPermissionChanges for vir_high::Rvalue {
         consumed_permissions: &mut Vec<Permission>,
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
-        // NOTE: what permissions are needed for executing the borrow
-        // NOTE: shared refs will require extensions
         match self {
             Self::Ref(rvalue) => rvalue.collect(consumed_permissions, produced_permissions),
             Self::AddressOf(rvalue) => rvalue.collect(consumed_permissions, produced_permissions),

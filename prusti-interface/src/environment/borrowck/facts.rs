@@ -17,6 +17,7 @@ pub type Loan = <RustcFacts as FactTypes>::Loan;
 pub type PointIndex = <RustcFacts as FactTypes>::Point;
 pub type Variable = <RustcFacts as FactTypes>::Variable;
 pub type Path = <RustcFacts as FactTypes>::Path;
+
 pub type AllInputFacts = rustc_borrowck::consumers::PoloniusInput;
 pub type AllOutputFacts = rustc_borrowck::consumers::PoloniusOutput;
 

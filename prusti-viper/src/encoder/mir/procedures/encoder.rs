@@ -369,13 +369,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<()> {
         let (new_lifetimes, ended_lifetimes, new_derived_lifetimes) =
             self.update_lifetimes(original_lifetimes, derived_lifetimes, location);
-        // println!("-----------");
-        // dbg!(&location);
-        // dbg!(&original_lifetimes);
-        // dbg!(&derived_lifetimes);
-        // dbg!(&new_lifetimes);
-        // dbg!(&new_derived_lifetimes);
-        // dbg!(&ended_lifetimes);
         self.encode_end_lft(block_builder, location, ended_lifetimes)?;
         self.encode_new_lft(block_builder, location, new_lifetimes)?;
         self.encode_lft_assignment(block_builder, location, new_derived_lifetimes)?;
@@ -426,7 +419,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             }
             let target = vir_high::VariableDecl::new(k, vir_high::ty::Type::Lifetime {});
             let value = vir_high::Expression::local_no_pos(vir_high::VariableDecl::new(
-                // TODO: is this really the best way to get first item of btreeset?
                 v.iter().next().unwrap().clone(),
                 vir_high::ty::Type::Lifetime {},
             ));
@@ -439,8 +431,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    // updates original and derived lifetimes
-    // returns the changes (
     fn update_lifetimes(
         &mut self,
         old_original_lifetimes: &mut BTreeSet<String>,
@@ -456,34 +446,28 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let derived_from: BTreeSet<String> =
             derived_lifetimes.clone().into_values().flatten().collect();
 
-        // get lifetimes which have to be created
-        // i.e. lifetimes that are used in derived_lifetimes but are not in old_original_lifetimes
         let lifetimes_to_create: BTreeSet<String> = derived_from
             .clone()
             .into_iter()
             .filter(|x| !old_original_lifetimes.contains(x))
             .collect();
 
-        // get original_lifetimes which are not needed anymore
-        // i.e.  lifetimes which are in old_original_lifetimes but nowhere in derived_lifetimes
         let lifetimes_to_end: BTreeSet<String> = old_original_lifetimes
             .clone()
             .into_iter()
             .filter(|x| !derived_from.contains(x))
             .collect();
 
-        // get new derived lifetimes
-        // i.e. lifetimes which are in derived_lifetimes but not in old_derived_lifetimes
         let derived_lifetimes_to_create: BTreeMap<String, BTreeSet<String>> = derived_lifetimes
             .clone()
             .into_iter()
             .filter(|(k, _)| !old_derived_lifetimes.contains_key(k))
             .collect();
 
-        // update collections and return
         *old_derived_lifetimes = derived_lifetimes;
         original_lifetimes.append(&mut lifetimes_to_create.clone());
         *old_original_lifetimes = original_lifetimes;
+
         (
             lifetimes_to_create,
             lifetimes_to_end,
@@ -529,7 +513,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let memory_block_drop = self
                     .encoder
                     .encode_memory_block_drop_for_local(self.mir, *local)?;
-                // NOTE: use the following line everywhere
                 block_builder.add_statement(self.set_statement_error(
                     location,
                     ErrorCtxt::UnexpectedStorageDead,
@@ -572,13 +555,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             }
             // mir::Rvalue::Repeat(Operand<'tcx>, Const<'tcx>),
             mir::Rvalue::Ref(region, borrow_kind, place) => {
-                // println!("--- encode_statement_assign - Ref");
-                // dbg!(region);
-                // dbg!(borrow_kind);
-                // dbg!(place);
-                // dbg!(&encoded_target);
-
-                //    _2.ref := _1
                 // TODO: create proper ref, add "is_mut" and lifetime/region
                 let _is_mut = matches!(
                     borrow_kind,
