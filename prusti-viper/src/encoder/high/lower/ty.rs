@@ -33,7 +33,7 @@ impl IntoPolymorphic<vir_poly::Type> for vir_high::Type {
             vir_high::Type::FunctionDef(ty) => vir_poly::Type::TypedRef(ty.lower(encoder)),
             vir_high::Type::Projection(ty) => vir_poly::Type::TypedRef(ty.lower(encoder)),
             vir_high::Type::Unsupported(ty) => vir_poly::Type::TypedRef(ty.lower(encoder)),
-            vir_high::Type::Lifetime => unimplemented!(),
+            vir_high::Type::Lifetime => unreachable!("Lifetimes ignored"),
         })
     }
 }
@@ -50,7 +50,6 @@ impl IntoPolymorphic<Vec<vir_poly::TypeVar>> for Vec<vir_high::ty::TypeVar> {
     }
 }
 
-// TODO: add lifetime?
 // impl IntoPolymorphic<Vec<vir_poly::TypeVar>> for Vec<vir_high::ty::Lifetime> {
 //     fn lower(&self, encoder: &impl HighTypeEncoderInterfacePrivate) -> Vec<vir_poly::Lifetime> {
 //         self.iter().map(|ty| ty.lower(encoder)).collect()
