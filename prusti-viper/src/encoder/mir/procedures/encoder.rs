@@ -303,21 +303,41 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         lifetimes: BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         for (k, v) in lifetimes {
-            if v.len() > 1 {
-                unimplemented!("Union lifetimes not yet supported");
+            if v.len() > 2 {
+                unreachable!("lifetime can't depend on  more than 2 others (yet?)");
             }
-            let target = vir_high::VariableDecl::new(k, vir_high::ty::Type::Lifetime {});
-            let value = vir_high::Expression::local_no_pos(vir_high::VariableDecl::new(
-                v.iter().next().unwrap().clone(),
-                vir_high::ty::Type::Lifetime {},
-            ));
+            let encoded_target = vir_high::VariableDecl::new(k, vir_high::ty::Type::Lifetime {});
+            let encoded_value;
+            if v.len() == 1 {
+                encoded_value = self.enocde_lft_assignment_single(v.iter().next().unwrap().clone());
+            } else {
+                encoded_value = self.enocde_lft_assignment_union(v);
+            }
             block_builder.add_statement(self.set_statement_error(
                 location,
                 ErrorCtxt::LifetimeEncoding,
-                vir_high::Statement::ghost_assignment_no_pos(target, value),
+                vir_high::Statement::ghost_assignment_no_pos(encoded_target, encoded_value),
             )?);
         }
         Ok(())
+    }
+
+    fn enocde_lft_assignment_single(
+        &mut self,
+        value: String
+    ) -> vir_high::Expression {
+         vir_high::Expression::local_no_pos(vir_high::VariableDecl::new(
+            value,
+            vir_high::ty::Type::Lifetime {},
+         ))
+    }
+
+    fn enocde_lft_assignment_union(
+        &mut self,
+        _values: BTreeSet<String>
+    ) -> vir_high::Expression {
+        // e.g. lft4 := lft_tok_sep_take(bw0, bw1, q)
+        unimplemented!("lft_tok_sep_take");
     }
 
     fn update_lifetimes(
