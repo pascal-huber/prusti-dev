@@ -30,10 +30,7 @@ pub enum Rvalue {
 #[display(fmt = "ref {}", place)]
 pub struct Ref {
     pub place: Expression,
-    // pub region: Region, // TODO: what type? Same Lifetime
-    // pub is_mut: bool, // not necessary
-
-    // add for compile (?)
+    // pub region: Region, // TODO: lifetime_name seems easier and sufficient?
     pub lifetime_name: String,
     pub rd_perm: u32,
     pub target: Expression,
