@@ -180,7 +180,6 @@ pub struct GhostAssignment {
 
 #[display(fmt = "borrow({}, 1/{}, {})", lifetime, rd_perm, reference)]
 pub struct Borrow {
-    // TODO: add correct types for borrow
     pub lifetime: String,
     pub rd_perm: u32,
     pub reference: Expression,

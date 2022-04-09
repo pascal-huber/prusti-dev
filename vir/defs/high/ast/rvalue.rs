@@ -24,7 +24,6 @@ pub enum Rvalue {
     Discriminant(Discriminant),
     Aggregate(Aggregate),
     // ShallowInitBox(ShallowInitBox),
-    // Borrow(Borrow),
 }
 
 #[display(fmt = "ref {}", place)]
@@ -79,8 +78,3 @@ pub enum OperandKind {
     Move,
     Constant,
 }
-
-// #[display(fmt = "borrow")]
-// pub struct Borrow {
-//
-// }
