@@ -418,12 +418,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 unreachable!("lifetime can't depend on  more than 2 others (yet?)");
             }
             let encoded_target = vir_high::VariableDecl::new(k, vir_high::ty::Type::Lifetime {});
-            let encoded_value;
-            if v.len() == 1 {
-                encoded_value = self.enocde_lft_assignment_single(v.iter().next().unwrap().clone());
+            let encoded_value: vir_high::Expression = if v.len() == 1 {
+                self.enocde_lft_assignment_single(v.iter().next().unwrap().clone())
             } else {
-                encoded_value = self.enocde_lft_assignment_union(v);
-            }
+                self.enocde_lft_assignment_union(v)
+            };
             block_builder.add_statement(self.set_statement_error(
                 location,
                 ErrorCtxt::LifetimeEncoding,
@@ -433,20 +432,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    fn enocde_lft_assignment_single(
-        &mut self,
-        value: String
-    ) -> vir_high::Expression {
-         vir_high::Expression::local_no_pos(vir_high::VariableDecl::new(
+    fn enocde_lft_assignment_single(&mut self, value: String) -> vir_high::Expression {
+        vir_high::Expression::local_no_pos(vir_high::VariableDecl::new(
             value,
             vir_high::ty::Type::Lifetime {},
-         ))
+        ))
     }
 
-    fn enocde_lft_assignment_union(
-        &mut self,
-        _values: BTreeSet<String>
-    ) -> vir_high::Expression {
+    fn enocde_lft_assignment_union(&mut self, _values: BTreeSet<String>) -> vir_high::Expression {
         // e.g. lft4 := lft_tok_sep_take(bw0, bw1, q)
         unimplemented!("lft_tok_sep_take");
     }
@@ -562,6 +555,24 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
+    fn encode_rvalue_borrow(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        encoded_target: vir_crate::high::Expression,
+        region_name: String,
+        rd_perm: u32,
+    ) -> SpannedEncodingResult<()> {
+        let borrow_statement =
+            vir_high::Statement::borrow_no_pos(region_name, rd_perm, encoded_target);
+        block_builder.add_statement(self.set_statement_error(
+            location,
+            ErrorCtxt::Assign,
+            borrow_statement,
+        )?);
+        Ok(())
+    }
+
     fn encode_statement_assign(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
@@ -601,14 +612,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     ErrorCtxt::Assign,
                     assign_statement,
                 )?);
-                // TODO: add Rvalue for borrow
-                let borrow_statement =
-                    vir_high::Statement::borrow_no_pos(region_name, rd_perm, encoded_target);
-                block_builder.add_statement(self.set_statement_error(
+                // TODO: check here if borrow or reborrow?
+                self.encode_rvalue_borrow(
+                    block_builder,
                     location,
-                    ErrorCtxt::Assign,
-                    borrow_statement,
-                )?);
+                    encoded_target,
+                    region_name,
+                    rd_perm,
+                )?;
             }
             // mir::Rvalue::ThreadLocalRef(DefId),
             mir::Rvalue::AddressOf(_, place) => {
