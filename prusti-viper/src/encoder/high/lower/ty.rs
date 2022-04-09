@@ -50,12 +50,6 @@ impl IntoPolymorphic<Vec<vir_poly::TypeVar>> for Vec<vir_high::ty::TypeVar> {
     }
 }
 
-// impl IntoPolymorphic<Vec<vir_poly::TypeVar>> for Vec<vir_high::ty::Lifetime> {
-//     fn lower(&self, encoder: &impl HighTypeEncoderInterfacePrivate) -> Vec<vir_poly::Lifetime> {
-//         self.iter().map(|ty| ty.lower(encoder)).collect()
-//     }
-// }
-
 impl IntoPolymorphic<vir_poly::TypeVar> for vir_high::ty::TypeVar {
     fn lower(&self, _encoder: &impl HighTypeEncoderInterfacePrivate) -> vir_poly::TypeVar {
         vir_poly::TypeVar {
