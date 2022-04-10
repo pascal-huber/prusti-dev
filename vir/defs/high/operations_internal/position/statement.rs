@@ -98,20 +98,17 @@ impl Positioned for NewLft {
 impl Positioned for EndLft {
     fn position(&self) -> Position {
         self.position
-        // Default::default()
     }
 }
 
 impl Positioned for GhostAssignment {
     fn position(&self) -> Position {
-        // self.position
-        Default::default()
+        self.position
     }
 }
 
 impl Positioned for Borrow {
     fn position(&self) -> Position {
-        // self.position
-        Default::default()
+        self.position
     }
 }
