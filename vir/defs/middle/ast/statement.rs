@@ -190,7 +190,7 @@ pub struct EndLft {
     pub position: Position,
 }
 
-#[display(fmt = "assign {} := {}", target, value)]
+#[display(fmt = "ghost-assign {} := {}", target, value)]
 pub struct GhostAssignment {
     pub target: VariableDecl,
     pub value: Expression,
