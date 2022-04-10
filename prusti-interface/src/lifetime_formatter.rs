@@ -38,21 +38,3 @@ impl<'tcx> LifetimeString for ty::Region<'tcx> {
         }
     }
 }
-
-
-// impl LifetimeString for Loan {
-//     fn lifetime_string(&self) -> String {
-//         format!("bw{}", self.index())
-//     }
-// }
-
-// impl<T: rustc_index::vec::Idx> LifetimeString for T {
-//     fn lifetime_string(&self) -> String {
-//         String::from("asdf")
-//     }
-// }
-
-
-// pub fn get_lifetime_string(x: Atom) {
-//
-// }
