@@ -29,8 +29,8 @@ pub enum Rvalue {
 #[display(fmt = "ref {}", place)]
 pub struct Ref {
     pub place: Expression,
-    // pub region: Region, // TODO: lifetime_name seems easier and sufficient?
     pub lifetime_name: String,
+    pub is_mut: bool,
     pub rd_perm: u32,
     pub target: Expression,
 }
