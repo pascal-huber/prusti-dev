@@ -84,9 +84,7 @@ pub(crate) fn loan_to_text(loan: &crate::environment::borrowck::facts::Loan) -> 
     format!("{:?}", loan)
 }
 
-pub(crate) fn loans_to_text(
-    loans: &[crate::environment::borrowck::facts::Loan],
-) -> String {
+pub(crate) fn loans_to_text(loans: &[crate::environment::borrowck::facts::Loan]) -> String {
     let mut strings: Vec<_> = loans.iter().map(loan_to_text).collect();
     strings.sort();
     strings.join(", ")
