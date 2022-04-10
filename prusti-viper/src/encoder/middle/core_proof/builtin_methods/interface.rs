@@ -301,9 +301,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     operand_address: Address,
                     operand_value: { ty.create_snapshot(self)? }
                 };
-                let predicate = expr! {
-                    acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
-                };
+                let predicate = if value.is_mut { expr! {
+                    acc(MutBorrowedNonAliased<ty>(operand_place, operand_address, operand_value))
+                }} else { expr! {
+                    acc(SharedBorrowedNonAliased<ty>(operand_place, operand_address, operand_value))
+                }};
                 let compute_address = ty!(Address);
                 let address =
                     expr! { ComputeAddress::compute_address(operand_place, operand_address) };

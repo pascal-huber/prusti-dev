@@ -587,7 +587,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             // mir::Rvalue::Repeat(Operand<'tcx>, Const<'tcx>),
             mir::Rvalue::Ref(region, borrow_kind, place) => {
                 // TODO: create proper ref, add "is_mut" and lifetime/region
-                let _is_mut = matches!(
+                let is_mut = matches!(
                     borrow_kind,
                     mir::BorrowKind::Mut {
                         allow_two_phase_borrow: _,
@@ -599,6 +599,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let encoded_rvalue = vir_high::Rvalue::ref_(
                     encoded_place,
                     region_name.clone(),
+                    is_mut,
                     rd_perm,
                     encoded_target.clone(),
                 );
