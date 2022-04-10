@@ -170,7 +170,6 @@ pub struct EndLft {
     pub position: Position,
 }
 
-// TODO: does that mean that as of middle, this is the same as a normal assignment?
 #[display(fmt = "ghost-assign {} := {}", target, value)]
 pub struct GhostAssignment {
     pub target: VariableDecl,
