@@ -419,9 +419,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             }
             let encoded_target = vir_high::VariableDecl::new(k, vir_high::ty::Type::Lifetime {});
             let encoded_value: vir_high::Expression = if v.len() == 1 {
-                self.enocde_lft_assignment_single(v.iter().next().unwrap().clone())
+                self.encode_lft_assignment_single(v.iter().next().unwrap().clone())
             } else {
-                self.enocde_lft_assignment_union(v)
+                self.encode_lft_assignment_union(v)
             };
             block_builder.add_statement(self.set_statement_error(
                 location,
@@ -432,14 +432,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    fn enocde_lft_assignment_single(&mut self, value: String) -> vir_high::Expression {
+    fn encode_lft_assignment_single(&mut self, value: String) -> vir_high::Expression {
         vir_high::Expression::local_no_pos(vir_high::VariableDecl::new(
             value,
             vir_high::ty::Type::Lifetime {},
         ))
     }
 
-    fn enocde_lft_assignment_union(&mut self, _values: BTreeSet<String>) -> vir_high::Expression {
+    fn encode_lft_assignment_union(&mut self, _values: BTreeSet<String>) -> vir_high::Expression {
         // e.g. lft4 := lft_tok_sep_take(bw0, bw1, q)
         unimplemented!("lft_tok_sep_take");
     }
