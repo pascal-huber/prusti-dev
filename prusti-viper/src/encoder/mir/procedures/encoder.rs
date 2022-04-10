@@ -13,8 +13,8 @@ use crate::encoder::{
 use log::debug;
 use prusti_common::config;
 use prusti_interface::{
-    environment::{mir_dump::lifetimes::Lifetimes, Procedure},
-    lifetime_formatter::LifetimeString,
+    environment::Procedure,
+    lifetimes::{lifetime_formatter::LifetimeString, lifetimes::Lifetimes},
 };
 use rustc_data_structures::graph::WithStartNode;
 use rustc_hir::def_id::DefId;

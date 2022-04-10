@@ -40,10 +40,10 @@ extern crate lazy_static;
 
 pub mod data;
 pub mod environment;
+pub mod lifetimes;
 pub mod specs;
 pub mod utils;
 
 pub use prusti_error::*;
 
 mod prusti_error;
-pub mod lifetime_formatter;
