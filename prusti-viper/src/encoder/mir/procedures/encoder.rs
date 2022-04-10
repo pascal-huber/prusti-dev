@@ -594,7 +594,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     }
                 );
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
-                let rd_perm: u32 = self.read_permission_amount();
+                let rd_perm = self.read_permission_amount();
                 let region_name = region.lifetime_string();
                 let encoded_rvalue = vir_high::Rvalue::ref_(
                     encoded_place,

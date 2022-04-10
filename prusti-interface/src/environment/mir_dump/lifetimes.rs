@@ -72,7 +72,14 @@ impl Lifetimes {
             .collect()
     }
     pub fn edge_count(&self) -> u32 {
-        self.facts.input_facts.take().unwrap().cfg_edge.len() as u32
+        self.facts
+            .input_facts
+            .take()
+            .unwrap()
+            .cfg_edge
+            .len()
+            .try_into()
+            .unwrap()
     }
     fn borrowck_in_facts(&self) -> Ref<AllInputFacts> {
         Ref::map(self.facts.input_facts.borrow(), |facts| {
