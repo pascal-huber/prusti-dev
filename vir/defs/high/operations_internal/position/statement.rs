@@ -99,7 +99,6 @@ impl Positioned for LeakAll {
 impl Positioned for NewLft {
     fn position(&self) -> Position {
         self.position
-        // Default::default()
     }
 }
 
