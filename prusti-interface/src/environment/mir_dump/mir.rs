@@ -1,11 +1,11 @@
 use super::{
     graphviz::{Graph, NodeBuilder},
-    lifetimes::Lifetimes,
 };
-use crate::environment::{mir_dump::graphviz::ToText, Environment, Procedure};
+use crate::environment::{Environment, mir_dump::graphviz::ToText, Procedure};
 use rustc_borrowck::consumers::RichLocation;
 use rustc_middle::mir;
 use rustc_span::def_id::DefId;
+use crate::lifetimes::lifetimes::Lifetimes;
 
 pub(super) fn populate_graph(env: &Environment<'_>, def_id: DefId) -> Option<Graph> {
     eprintln!("populate_graph: {:?}", def_id);

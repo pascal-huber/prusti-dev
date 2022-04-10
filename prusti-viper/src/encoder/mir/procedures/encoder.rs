@@ -1,5 +1,6 @@
 use super::MirProcedureEncoderInterface;
 use crate::encoder::{
+    Encoder,
     errors::{ErrorCtxt, SpannedEncodingError, SpannedEncodingResult, WithSpan},
     mir::{
         casts::CastsEncoderInterface, constants::ConstantsEncoderInterface, errors::ErrorInterface,
@@ -7,19 +8,19 @@ use crate::encoder::{
         predicates::MirPredicateEncoderInterface, spans::SpanInterface,
         type_layouts::MirTypeLayoutsEncoderInterface,
     },
-    Encoder,
 };
 use log::debug;
 use prusti_common::config;
 use prusti_interface::{
-    environment::{mir_dump::lifetimes::Lifetimes, Procedure},
-    lifetime_formatter::LifetimeString,
+    environment::Procedure,
+    lifetimes::lifetime_formatter::LifetimeString,
 };
 use rustc_data_structures::graph::WithStartNode;
 use rustc_hir::def_id::DefId;
 use rustc_middle::{mir, ty, ty::subst::SubstsRef};
 use rustc_span::Span;
 use std::collections::{BTreeMap, BTreeSet};
+use prusti_interface::lifetimes::lifetimes::Lifetimes;
 use vir_crate::{
     common::expression::{BinaryOperationHelpers, UnaryOperationHelpers},
     high::{

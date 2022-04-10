@@ -2,8 +2,7 @@ use super::Environment;
 
 use rustc_span::def_id::DefId;
 
-mod graphviz;
-pub mod lifetimes;
+pub(crate) mod graphviz;
 mod mir;
 
 pub(crate) fn dump_mir_info(env: &Environment<'_>, def_id: DefId) {

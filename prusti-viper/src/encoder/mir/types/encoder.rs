@@ -16,7 +16,7 @@ use crate::encoder::{
 use log::debug;
 use prusti_common::config;
 
-use prusti_interface::lifetime_formatter::LifetimeString;
+use prusti_interface::lifetimes::lifetime_formatter::LifetimeString;
 use rustc_hir::def_id::DefId;
 use rustc_middle::ty;
 use rustc_span::MultiSpan;
