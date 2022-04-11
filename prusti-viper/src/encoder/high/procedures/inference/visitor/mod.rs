@@ -241,6 +241,38 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
                         position,
                     )
                 }
+                Action::Unfold(FoldingActionState {
+                    kind: PermissionKind::MutBorrowed,
+                    place: _,
+                    enum_variant: _,
+                    condition: _,
+                }) => {
+                    unimplemented!("lower_statement Action::Unfold for MutBorrowed");
+                }
+                Action::Fold(FoldingActionState {
+                    kind: PermissionKind::MutBorrowed,
+                    place: _,
+                    enum_variant: _,
+                    condition: _,
+                }) => {
+                    unimplemented!("lower_statement Action::Fold for MutBorrowed");
+                }
+                Action::Unfold(FoldingActionState {
+                    kind: PermissionKind::SharedBorrowed,
+                    place: _,
+                    enum_variant: _,
+                    condition: _,
+                }) => {
+                    unimplemented!("lower_statement Action::Unfold for SharedBorrowed");
+                }
+                Action::Fold(FoldingActionState {
+                    kind: PermissionKind::SharedBorrowed,
+                    place: _,
+                    enum_variant: _,
+                    condition: _,
+                }) => {
+                    unimplemented!("lower_statement Action::Fold for SharedBorrowed");
+                }
             };
             self.current_statements.push(statement);
         }
