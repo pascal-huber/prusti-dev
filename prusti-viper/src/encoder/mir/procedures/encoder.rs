@@ -586,7 +586,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             }
             // mir::Rvalue::Repeat(Operand<'tcx>, Const<'tcx>),
             mir::Rvalue::Ref(region, borrow_kind, place) => {
-                // TODO: create proper ref, add "is_mut" and lifetime/region
                 let is_mut = matches!(
                     borrow_kind,
                     mir::BorrowKind::Mut {

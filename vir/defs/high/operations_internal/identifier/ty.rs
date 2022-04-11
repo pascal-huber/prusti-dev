@@ -53,7 +53,6 @@ impl WithIdentifier for ty::TypeVar {
     }
 }
 
-// TODO: needed?
 impl WithIdentifier for ty::LifetimeConst {
     fn get_identifier(&self) -> String {
         self.name.clone()
