@@ -8,8 +8,10 @@ use vir_crate::{high as vir_high, middle as vir_mid};
 
 #[derive(Clone, Default)]
 pub(super) struct PredicateState {
-    owned_non_aliased: BTreeSet<vir_high::Expression>,
     memory_block_stack: BTreeSet<vir_high::Expression>,
+    mut_borrow: BTreeSet<vir_high::Expression>,
+    owned_non_aliased: BTreeSet<vir_high::Expression>,
+    shared_borrow: BTreeSet<vir_high::Expression>,
 }
 
 #[derive(Clone)]
@@ -56,7 +58,9 @@ impl PredicateState {
         self.check_no_default_position();
         match kind {
             PermissionKind::MemoryBlock => &mut self.memory_block_stack,
+            PermissionKind::MutBorrowed => &mut self.mut_borrow,
             PermissionKind::Owned => &mut self.owned_non_aliased,
+            PermissionKind::SharedBorrowed => &mut self.shared_borrow,
         }
     }
 
@@ -64,7 +68,9 @@ impl PredicateState {
         self.check_no_default_position();
         match kind {
             PermissionKind::MemoryBlock => &self.memory_block_stack,
+            PermissionKind::MutBorrowed => &self.mut_borrow,
             PermissionKind::Owned => &self.owned_non_aliased,
+            PermissionKind::SharedBorrowed => &self.shared_borrow,
         }
     }
 
@@ -350,6 +356,23 @@ impl FoldUnfoldState {
         Ok(())
     }
 
+    pub(in super::super) fn insert_mut_borrowed(
+        &mut self,
+        place: vir_high::Expression,
+    ) -> SpannedEncodingResult<()> {
+        assert!(place.is_place());
+        assert!(self.unconditional.mut_borrow.insert(place));
+        Ok(())
+    }
+
+    pub(in super::super) fn insert_shared_borrowed(
+        &mut self,
+        _place: vir_high::Expression,
+    ) -> SpannedEncodingResult<()> {
+        // TODO: implement this
+        unimplemented!("insert_shared_borrowed");
+    }
+
     pub(in super::super) fn remove_memory_block(
         &mut self,
         place: &vir_high::Expression,
@@ -378,6 +401,26 @@ impl FoldUnfoldState {
         Ok(())
     }
 
+    pub(in super::super) fn remove_mut_borrowed(
+        &mut self,
+        place: &vir_high::Expression,
+    ) -> SpannedEncodingResult<()> {
+        assert!(place.is_place());
+        assert!(
+            self.unconditional.mut_borrow.remove(place),
+            "not found place: {}",
+            place
+        );
+        Ok(())
+    }
+
+    pub(in super::super) fn remove_shared_borrowed(
+        &mut self,
+        _place: &vir_high::Expression,
+    ) -> SpannedEncodingResult<()> {
+        unimplemented!("remove_shared_borrowed");
+    }
+
     pub(in super::super) fn insert_permissions(
         &mut self,
         permissions: Vec<Permission>,
@@ -397,6 +440,8 @@ impl FoldUnfoldState {
         match permission {
             Permission::MemoryBlock(place) => self.insert_memory_block(place)?,
             Permission::Owned(place) => self.insert_owned(place)?,
+            Permission::MutBorrowed(place) => self.insert_mut_borrowed(place)?,
+            Permission::SharedBorrowed(place) => self.insert_shared_borrowed(place)?,
         }
         self.check_no_default_position();
         Ok(())
@@ -421,6 +466,8 @@ impl FoldUnfoldState {
         match permission {
             Permission::MemoryBlock(place) => self.remove_memory_block(place)?,
             Permission::Owned(place) => self.remove_owned(place)?,
+            Permission::MutBorrowed(place) => self.remove_mut_borrowed(place)?,
+            Permission::SharedBorrowed(place) => self.remove_shared_borrowed(place)?,
         }
         Ok(())
     }

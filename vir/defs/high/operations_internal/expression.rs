@@ -57,6 +57,7 @@ impl Expression {
             Expression::Local(_) => None,
             Expression::Variant(Variant { box ref base, .. })
             | Expression::Field(Field { box ref base, .. })
+            | Expression::Deref(Deref { box ref base, .. })
             | Expression::AddrOf(AddrOf { box ref base, .. }) => Some(base),
             Expression::LabelledOld(_) => None,
             expr => unreachable!("{}", expr),
