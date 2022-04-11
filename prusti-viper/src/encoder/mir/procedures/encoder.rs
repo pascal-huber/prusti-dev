@@ -14,7 +14,7 @@ use log::debug;
 use prusti_common::config;
 use prusti_interface::{
     environment::Procedure,
-    lifetimes::{lifetime_formatter::LifetimeString, lifetimes::Lifetimes},
+    lifetimes::{lifetime_formatter::LifetimeString, Lifetimes},
 };
 use rustc_data_structures::graph::WithStartNode;
 use rustc_hir::def_id::DefId;

@@ -1,7 +1,7 @@
 use super::graphviz::{Graph, NodeBuilder};
 use crate::{
     environment::{mir_dump::graphviz::ToText, Environment, Procedure},
-    lifetimes::lifetimes::Lifetimes,
+    lifetimes::Lifetimes,
 };
 use rustc_borrowck::consumers::RichLocation;
 use rustc_middle::mir;
