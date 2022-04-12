@@ -152,8 +152,8 @@ impl<'tcx> ToText for rustc_middle::ty::Region<'tcx> {
             rustc_middle::ty::ReEarlyBound(_) => {
                 unimplemented!("ReEarlyBound: {}", format!("{}", self));
             }
-            rustc_middle::ty::ReLateBound(_, _) => {
-                unimplemented!("ReLateBound: {}", format!("{}", self));
+            rustc_middle::ty::ReLateBound(debruijn, bound_reg) => {
+                format!("lft_late_{}_{}", debruijn.index(), bound_reg.var.index())
             }
             rustc_middle::ty::ReFree(_) => {
                 unimplemented!("ReFree: {}", format!("{}", self));
