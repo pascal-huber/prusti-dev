@@ -177,9 +177,9 @@ pub struct Assign {
     pub position: Position,
 }
 
-#[display(fmt = "{} = newlft()", name)]
+#[display(fmt = "{} = newlft()", target)]
 pub struct NewLft {
-    pub name: String,
+    pub target: VariableDecl,
     pub position: Position,
 }
 
