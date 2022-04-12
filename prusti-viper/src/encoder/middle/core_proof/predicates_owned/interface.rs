@@ -216,7 +216,21 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 }
             }
             // vir_mid::TypeDecl::Array(Array) => {},
-            // vir_mid::TypeDecl::Reference(Reference) => {},
+            vir_mid::TypeDecl::Reference(_) => {
+                // TODO: implement this (6)
+                // println!("TODO 6");
+                // dbg!(_reference);
+                // unimplemented!();
+                // like Pointer?
+                predicate! {
+                    OwnedNonAliased<ty>(place: Place, root_address: Address, snapshot: {snapshot_type})
+                    {(
+                        ([validity]) &&
+                        (acc(MemoryBlock([compute_address], [size_of]))) &&
+                        (([bytes]) == (Snap<ty>::to_bytes(snapshot)))
+                    )}
+                }
+            }
             // vir_mid::TypeDecl::Never => {},
             // vir_mid::TypeDecl::Closure(Closure) => {},
             // vir_mid::TypeDecl::Unsupported(Unsupported) => {},

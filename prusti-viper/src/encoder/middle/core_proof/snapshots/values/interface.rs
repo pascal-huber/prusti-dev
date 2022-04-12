@@ -174,6 +174,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotValuesInterface for Lowerer<'p, 'v, 'tcx> {
             vir_mid::Type::Bool => vir_low::Type::Bool,
             vir_mid::Type::Int(_) => vir_low::Type::Int,
             vir_mid::Type::Pointer(_) => self.address_type()?,
+            vir_mid::Type::Reference(_) => {
+                // TODO: implement this (5)
+                self.address_type()?
+            }
             x => unimplemented!("{:?}", x),
         };
         vir_low::operations::ty::Typed::set_type(&mut argument, low_type);
