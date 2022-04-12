@@ -12,9 +12,9 @@ use crate::encoder::{
 };
 use log::debug;
 use prusti_common::config;
-use prusti_interface::{
-    environment::Procedure,
-    lifetimes::{lifetime_formatter::LifetimeString, Lifetimes},
+use prusti_interface::environment::{
+    mir_dump::{graphviz::ToText, lifetimes::Lifetimes},
+    Procedure,
 };
 use rustc_data_structures::graph::WithStartNode;
 use rustc_hir::def_id::DefId;
@@ -594,7 +594,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 );
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place)?;
                 let rd_perm = self.read_permission_amount();
-                let region_name = region.lifetime_string();
+                let region_name = region.to_text();
                 let encoded_rvalue = vir_high::Rvalue::ref_(
                     encoded_place,
                     region_name.clone(),
