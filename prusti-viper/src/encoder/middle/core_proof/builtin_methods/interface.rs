@@ -1043,7 +1043,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     unimplemented!()
                 }
                 vir_mid::TypeDecl::Reference(_) => {
-                    unimplemented!()
+                    // TODO: implement this (2)
+                    self.encode_write_address_method(ty)?;
+                    statements.push(stmtp! { position =>
+                        call write_address<ty>([address.clone()], value)
+                    });
                 }
                 vir_mid::TypeDecl::Never => {
                     unimplemented!()
@@ -1569,7 +1573,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                 }
                             }
                             vir_mid::TypeDecl::Array(_) => unimplemented!("ty: {}", ty),
-                            vir_mid::TypeDecl::Reference(_) => unimplemented!("ty: {}", ty),
+                            vir_mid::TypeDecl::Reference(_) => {
+                                // TODO: implement this (4)
+                            }
                             vir_mid::TypeDecl::Never => unimplemented!("ty: {}", ty),
                             vir_mid::TypeDecl::Closure(_) => unimplemented!("ty: {}", ty),
                             vir_mid::TypeDecl::Unsupported(_) => unimplemented!("ty: {}", ty),
