@@ -164,9 +164,9 @@ pub struct NewLft {
     pub position: Position,
 }
 
-#[display(fmt = "endlft({})", name)]
+#[display(fmt = "endlft({})", lifetime)]
 pub struct EndLft {
-    pub name: String,
+    pub lifetime: VariableDecl,
     pub position: Position,
 }
 
