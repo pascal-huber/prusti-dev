@@ -382,10 +382,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         lifetimes: BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
         for lifetime in lifetimes {
+            let lifetime_var = vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
             block_builder.add_statement(self.set_statement_error(
                 location,
                 ErrorCtxt::LifetimeEncoding,
-                vir_high::Statement::end_lft_no_pos(lifetime),
+                vir_high::Statement::end_lft_no_pos(lifetime_var),
             )?);
         }
         Ok(())
