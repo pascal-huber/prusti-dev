@@ -158,9 +158,9 @@ pub struct Assign {
 /// unwinding path.
 pub struct LeakAll {}
 
-#[display(fmt = "{} = newlft()", name)]
+#[display(fmt = "{} = newlft()", target)]
 pub struct NewLft {
-    pub name: String,
+    pub target: VariableDecl,
     pub position: Position,
 }
 

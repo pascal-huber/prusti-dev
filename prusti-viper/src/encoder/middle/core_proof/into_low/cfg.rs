@@ -102,7 +102,21 @@ impl IntoLow for vir_mid::Statement {
     ) -> SpannedEncodingResult<Self::Target> {
         use vir_low::{macros::*, Statement};
         match self {
-            Self::NewLft(_statement) => unimplemented!("NewLft"),
+            Self::NewLft(statement) => {
+                let new_lft_call = vir_low::Expression::func_app_no_pos(
+                    String::from("newlft"),
+                    vec![],
+                    vec![],
+                    vir_low::ty::Type::Domain(vir_low::ty::Domain {
+                        name: String::from("Lifetime"),
+                    }),
+                );
+                Ok(vec![Statement::assign(
+                    statement.target.into_low(lowerer)?,
+                    new_lft_call,
+                    statement.position,
+                )])
+            }
             Self::EndLft(_statement) => unimplemented!("EndLft"),
             Self::GhostAssignment(_statement) => unimplemented!("GhostAssignment"),
             Self::Comment(statement) => Ok(vec![Statement::comment(statement.comment)]),
