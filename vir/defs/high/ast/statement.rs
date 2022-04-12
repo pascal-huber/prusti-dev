@@ -7,6 +7,7 @@ pub(crate) use super::{
     variable::VariableDecl,
 };
 use crate::common::display;
+use std::collections::BTreeSet;
 
 #[derive_helpers]
 #[derive_visitors]
@@ -30,7 +31,6 @@ pub enum Statement {
     GhostAssignment(GhostAssignment),
     // TODO: add borrowkind ?????
     // TODO: add create_borrow
-    Borrow(Borrow),
     // LftTokSepTake(LftTokSepTake),
     // LftTokSepReturn(LftTokSepReturn),
 }
@@ -178,17 +178,10 @@ pub struct EndLft {
     pub position: Position,
 }
 
-#[display(fmt = "ghost-assign {} := {}", target, value)]
+#[display(fmt = "ghost-assign {} := {:?}", target, value)]
 pub struct GhostAssignment {
     pub target: VariableDecl,
-    pub value: Expression,
-    pub position: Position,
-}
-
-#[display(fmt = "borrow({}, 1/{}, {})", lifetime, rd_perm, reference)]
-pub struct Borrow {
-    pub lifetime: String,
-    pub rd_perm: u32,
-    pub reference: Expression,
+    // TODO: why can't I use a BTreeSet here?
+    pub value: Vec<String>,
     pub position: Position,
 }
