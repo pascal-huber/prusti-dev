@@ -58,9 +58,7 @@ fn ensure_required_permission(
 
     let (place, permission_kind) = match required_permission {
         Permission::MemoryBlock(place) => (place, PermissionKind::MemoryBlock),
-        Permission::MutBorrowed(place) => (place, PermissionKind::MutBorrowed),
         Permission::Owned(place) => (place, PermissionKind::Owned),
-        Permission::SharedBorrowed(place) => (place, PermissionKind::SharedBorrowed),
     };
 
     let unconditional_predicate_state = state.get_unconditional_state()?;
