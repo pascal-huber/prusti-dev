@@ -1,8 +1,8 @@
-use super::graphviz::{Graph, NodeBuilder};
-use crate::{
-    environment::{mir_dump::graphviz::ToText, Environment, Procedure},
+use super::{
+    graphviz::{Graph, NodeBuilder},
     lifetimes::Lifetimes,
 };
+use crate::environment::{mir_dump::graphviz::ToText, Environment, Procedure};
 use rustc_borrowck::consumers::RichLocation;
 use rustc_middle::mir;
 use rustc_span::def_id::DefId;

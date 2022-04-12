@@ -40,7 +40,6 @@ extern crate lazy_static;
 
 pub mod data;
 pub mod environment;
-pub mod lifetimes;
 pub mod specs;
 pub mod utils;
 

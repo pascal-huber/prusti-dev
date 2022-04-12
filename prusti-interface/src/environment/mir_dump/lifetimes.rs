@@ -1,35 +1,28 @@
-
-use crate::{
-    environment::{
-        borrowck::facts::{AllInputFacts, AllOutputFacts, BorrowckFacts, Loan, PointIndex, Region},
-        mir_dump::graphviz::{loan_to_text, to_sorted_text},
-    },
-    lifetimes::lifetime_formatter::{LifetimeString, opaque_lifetime_string},
+use crate::environment::{
+    borrowck::facts::{AllInputFacts, AllOutputFacts, BorrowckFacts, Loan, PointIndex, Region},
+    mir_dump::graphviz::{loan_to_text, opaque_lifetime_string, to_sorted_text, ToText},
 };
 use rustc_borrowck::consumers::{LocationTable, RichLocation};
-
-use rustc_middle::mir;
 use std::{
     cell::Ref,
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
 };
-use crate::environment::mir_dump::graphviz::to_text::ToText;
 
-pub mod lifetime_formatter;
+use rustc_middle::mir;
 
 pub struct Lifetimes {
     facts: Rc<BorrowckFacts>,
     output_facts: AllOutputFacts,
 }
 
-pub(crate) struct LifetimeWithInclusions {
+pub(super) struct LifetimeWithInclusions {
     lifetime: Region,
     loan: Loan,
     included_in: Vec<Region>,
 }
 
-impl ToText for super::lifetimes::LifetimeWithInclusions {
+impl super::graphviz::ToText for super::lifetimes::LifetimeWithInclusions {
     fn to_text(&self) -> String {
         let lifetimes = to_sorted_text(&self.included_in);
         format!(
@@ -67,7 +60,7 @@ impl Lifetimes {
         info.iter()
             .map(|(k, v)| {
                 (
-                    k.lifetime_string(),
+                    k.to_text(),
                     v.iter()
                         .map(|x| opaque_lifetime_string(x.index()))
                         .collect(),
@@ -98,13 +91,13 @@ impl Lifetimes {
             table.as_ref().unwrap()
         })
     }
-    pub(crate) fn debug_borrowck_in_facts(&self) {
+    pub(super) fn debug_borrowck_in_facts(&self) {
         eprintln!("{:?}", self.borrowck_in_facts());
     }
-    pub(crate) fn debug_borrowck_out_facts(&self) {
+    pub(super) fn debug_borrowck_out_facts(&self) {
         eprintln!("{:?}", self.borrowck_out_facts());
     }
-    pub(crate) fn get_opaque_lifetimes_with_inclusions(&self) -> Vec<LifetimeWithInclusions> {
+    pub(super) fn get_opaque_lifetimes_with_inclusions(&self) -> Vec<LifetimeWithInclusions> {
         let borrowck_in_facts = self.borrowck_in_facts();
         let mut opaque_lifetimes = Vec::new();
         for &(placeholder, loan) in &borrowck_in_facts.placeholder {
@@ -122,14 +115,14 @@ impl Lifetimes {
         }
         opaque_lifetimes
     }
-    pub(crate) fn get_original_lifetimes(&self) -> Vec<Region> {
+    pub(super) fn get_original_lifetimes(&self) -> Vec<Region> {
         self.borrowck_in_facts()
             .loan_issued_at
             .iter()
             .map(|(region, _, _)| *region)
             .collect()
     }
-    pub(crate) fn get_subset_base(&self, location: RichLocation) -> Vec<(Region, Region)> {
+    pub(super) fn get_subset_base(&self, location: RichLocation) -> Vec<(Region, Region)> {
         let point = self.location_to_point(location);
         let borrowck_in_facts = self.borrowck_in_facts();
         borrowck_in_facts
@@ -145,7 +138,7 @@ impl Lifetimes {
             RichLocation::Mid(location) => table.mid_index(location),
         }
     }
-    pub(crate) fn get_subset(&self, location: RichLocation) -> BTreeMap<Region, BTreeSet<Region>> {
+    pub(super) fn get_subset(&self, location: RichLocation) -> BTreeMap<Region, BTreeSet<Region>> {
         let point = self.location_to_point(location);
         let borrowck_out_facts = self.borrowck_out_facts();
         if let Some(map) = borrowck_out_facts.subset.get(&point) {
@@ -154,7 +147,7 @@ impl Lifetimes {
             BTreeMap::new()
         }
     }
-    pub(crate) fn get_origin_live_on_entry(&self, location: RichLocation) -> Vec<Region> {
+    pub(super) fn get_origin_live_on_entry(&self, location: RichLocation) -> Vec<Region> {
         let point = self.location_to_point(location);
         let borrowck_out_facts = self.borrowck_out_facts();
         if let Some(origins) = borrowck_out_facts.origin_live_on_entry.get(&point) {
@@ -163,7 +156,7 @@ impl Lifetimes {
             Vec::new()
         }
     }
-    pub(crate) fn get_loan_live_at(&self, location: RichLocation) -> Vec<Loan> {
+    pub(super) fn get_loan_live_at(&self, location: RichLocation) -> Vec<Loan> {
         let point = self.location_to_point(location);
         let borrowck_out_facts = self.borrowck_out_facts();
         if let Some(loans) = borrowck_out_facts.loan_live_at.get(&point) {
@@ -172,7 +165,7 @@ impl Lifetimes {
             Vec::new()
         }
     }
-    pub(crate) fn get_origin_contains_loan_at(
+    pub(super) fn get_origin_contains_loan_at(
         &self,
         location: RichLocation,
     ) -> BTreeMap<Region, BTreeSet<Loan>> {
