@@ -137,6 +137,9 @@ impl IntoLow for vir_mid::Statement {
                     _ => unimplemented!(),
                 }])
             }
+            Self::ShortenLifetime(_statement) => {
+                unimplemented!()
+            }
             Self::Comment(statement) => Ok(vec![Statement::comment(statement.comment)]),
             Self::Inhale(statement) => {
                 if let vir_mid::Predicate::OwnedNonAliased(owned) = &statement.predicate {

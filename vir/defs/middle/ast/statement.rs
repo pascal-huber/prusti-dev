@@ -31,6 +31,7 @@ pub enum Statement {
     NewLft(NewLft),
     EndLft(EndLft),
     GhostAssignment(GhostAssignment),
+    ShortenLifetime(ShortenLifetime),
 }
 
 #[display(fmt = "// {}", comment)]
@@ -194,5 +195,13 @@ pub struct GhostAssignment {
     pub target: VariableDecl,
     // TODO: why can't I use a BTreeSet here?
     pub value: Vec<String>,
+    pub position: Position,
+}
+
+#[display(fmt = "{} := shorten_lifetime({:?}, {})", target, value, rd_perm)]
+pub struct ShortenLifetime {
+    pub target: VariableDecl,
+    pub value: Vec<String>,
+    pub rd_perm: u32,
     pub position: Position,
 }
