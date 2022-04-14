@@ -128,7 +128,7 @@ impl WithIdentifier for ty::Slice {
 
 impl WithIdentifier for ty::Reference {
     fn get_identifier(&self) -> String {
-        format!("ref${}", self.target_type.get_identifier())
+        format!("ref${}${}", self.target_type.get_identifier(), self.lifetime_const.get_identifier())
     }
 }
 
