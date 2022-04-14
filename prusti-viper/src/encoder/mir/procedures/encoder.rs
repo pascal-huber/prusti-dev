@@ -408,7 +408,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
     fn encode_body(
         &mut self,
         procedure_builder: &mut ProcedureBuilder,
-        _new_original_lifetimes: &BTreeMap<vir_high::BasicBlockId, BTreeSet<String>>,
+        new_original_lifetimes: &BTreeMap<vir_high::BasicBlockId, BTreeSet<String>>,
         rd_perm: u32,
     ) -> SpannedEncodingResult<()> {
         let entry_label = vir_high::BasicBlockId::new("label_entry".to_string());
@@ -422,8 +422,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         }
         block_builder.build();
         procedure_builder.set_entry(entry_label);
+        let mut merge_blocks: BTreeMap<mir::BasicBlock, mir::BasicBlock> = BTreeMap::new();
         for bb in self.mir.basic_blocks().indices() {
-            self.encode_basic_block(procedure_builder, bb, rd_perm)?;
+            self.encode_basic_block(procedure_builder, bb, new_original_lifetimes, rd_perm, &mut merge_blocks)?;
         }
         Ok(())
     }
@@ -469,7 +470,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         &mut self,
         procedure_builder: &mut ProcedureBuilder,
         bb: mir::BasicBlock,
+        new_original_lifetimes: &BTreeMap<vir_high::BasicBlockId, BTreeSet<String>>,
         rd_perm: u32,
+        merge_blocks: &mut BTreeMap<mir::BasicBlock, mir::BasicBlock>,
     ) -> SpannedEncodingResult<()> {
         // println!("basic block:");
         // dbg!(&bb);
@@ -505,7 +508,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         // TODO: merging blocks before terminator
         // for this need to know the state of the else branch
         if let Some(terminator) = terminator {
-            self.encode_terminator(&mut block_builder, location, terminator)?;
+            self.encode_terminator(&mut block_builder, location, terminator, new_original_lifetimes, merge_blocks)?;
         }
         block_builder.build();
         Ok(())
@@ -1004,6 +1007,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
         terminator: &mir::Terminator<'tcx>,
+        _new_original_lifetimes: &BTreeMap<vir_high::BasicBlockId, BTreeSet<String>>,
+        merge_blocks: &mut BTreeMap<mir::BasicBlock, mir::BasicBlock>,
     ) -> SpannedEncodingResult<()> {
         println!("termintator:");
         dbg!(&terminator);
@@ -1011,16 +1016,27 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let span = self.encoder.get_span_of_location(self.mir, location);
         use rustc_middle::mir::TerminatorKind;
         let successor = match &terminator.kind {
-            TerminatorKind::Goto { target } => SuccessorBuilder::jump(vir_high::Successor::Goto(
+            TerminatorKind::Goto { target } => {
                 // TODO: sync basic blocks here
-                // for this we need to
-                self.encode_basic_block_label(*target),
-            )),
+                // we require:
+                // - info of lifetimes of all blocks (done)
+                // - info which is the "brother" block of the current
+                println!("GOTO:");
+                dbg!(&merge_blocks);
+                SuccessorBuilder::jump(vir_high::Successor::Goto(
+                    self.encode_basic_block_label(*target),
+                ))
+            },
             TerminatorKind::SwitchInt {
                 targets,
                 discr,
                 switch_ty,
-            } => self.encode_terminator_switch_int(span, targets, discr, *switch_ty)?,
+            } => {
+                let blocks = targets.all_targets();
+                merge_blocks.insert(blocks[0], blocks[1]);
+                merge_blocks.insert(blocks[1], blocks[0]);
+                self.encode_terminator_switch_int(span, targets, discr, *switch_ty)?
+            },
             TerminatorKind::Resume => SuccessorBuilder::exit_resume_panic(),
             // TerminatorKind::Abort => {
             //     graph.add_exit_edge(bb, "abort");
