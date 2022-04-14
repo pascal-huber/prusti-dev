@@ -68,15 +68,21 @@ impl Lifetimes {
             })
             .collect()
     }
+    pub fn lifetime_count(&self) -> u32 {
+        // println!("{:#?}", &self.facts.input_facts.take());
+        1000
+    }
     pub fn edge_count(&self) -> u32 {
-        self.facts
-            .input_facts
-            .take()
-            .unwrap()
-            .cfg_edge
-            .len()
-            .try_into()
-            .unwrap()
+        1000
+        // TODO: why None after first unwrap???
+        // self.facts
+        //     .input_facts
+        //     .take()
+        //     .unwrap()
+        //     .cfg_edge
+        //     .len()
+        //     .try_into()
+        //     .unwrap()
     }
     fn borrowck_in_facts(&self) -> Ref<AllInputFacts> {
         Ref::map(self.facts.input_facts.borrow(), |facts| {

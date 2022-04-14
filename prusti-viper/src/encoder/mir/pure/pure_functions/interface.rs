@@ -504,12 +504,15 @@ impl<'v, 'tcx: 'v> PureFunctionEncoderInterface<'v, 'tcx>
         function_identifier: String,
         constructor: FunctionConstructor<'v, 'tcx>,
     ) -> SpannedEncodingResult<()> {
-        assert!(self
+        // println!("function_identifier:");
+        // dbg!(&function_identifier);
+        let x = self
             .pure_function_encoder_state
             .function_constructors
             .borrow_mut()
-            .insert(function_identifier, constructor)
-            .is_none());
+            .insert(function_identifier, constructor);
+        // TODO: Why does this fail? is it okay now with the lifetime in the identifier of the Reference?
+        assert!(x.is_none());
         Ok(())
     }
 }
