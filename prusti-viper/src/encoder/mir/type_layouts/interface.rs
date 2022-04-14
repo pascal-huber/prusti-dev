@@ -32,13 +32,21 @@ impl<'v, 'tcx: 'v> MirTypeLayoutsEncoderInterface<'tcx> for super::super::super:
             Vec::new(),
             vir_high::ty::Type::Int(vir_high::ty::Int::Usize),
         );
+        // println!("registered_size_functions:");
+        // dbg!(&self
+        //     .mir_type_layouts_encoder_state
+        //     .registered_size_functions);
+        // println!("encoded_ty:");
+        // dbg!(&encoded_ty);
         if !self
             .mir_type_layouts_encoder_state
             .registered_size_functions
             .borrow()
             .contains(&encoded_ty)
         {
+            // println!(" is not contained");
             let encoded_ty_clone = encoded_ty.clone();
+            // TODO: this fails, <-- does it still?
             self.register_function_constructor_mir(
                 function_call.get_identifier(),
                 Box::new(move |_encoder| {

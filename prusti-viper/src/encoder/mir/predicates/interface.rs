@@ -25,8 +25,12 @@ impl<'v, 'tcx: 'v> MirPredicateEncoderInterface<'tcx> for super::super::super::E
         mir: &mir::Body<'tcx>,
         local: mir::Local,
     ) -> SpannedEncodingResult<vir_high::Predicate> {
+        // println!("----encode_memory_block_for_local");
+        // dbg!(&local);
         let variable = self.encode_local_high(mir, local)?;
+        // dbg!(&variable);
         let mir_type = self.get_local_type(mir, local)?;
+        // dbg!(&mir_type);
         let size = self.encode_type_size_expression(mir_type)?;
         Ok(vir_high::Predicate::memory_block_stack(
             variable.into(),
