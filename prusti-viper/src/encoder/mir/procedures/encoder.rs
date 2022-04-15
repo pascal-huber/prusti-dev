@@ -28,10 +28,7 @@ use rustc_data_structures::graph::WithStartNode;
 use rustc_hir::def_id::DefId;
 use rustc_middle::{mir, ty, ty::subst::SubstsRef};
 use rustc_span::Span;
-use std::{
-    borrow::BorrowMut,
-    collections::{BTreeMap, BTreeSet},
-};
+use std::collections::{BTreeMap, BTreeSet};
 use vir_crate::{
     common::{
         expression::{BinaryOperationHelpers, UnaryOperationHelpers},
@@ -64,6 +61,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     };
     let mir = procedure.get_mir();
     let locals_without_explicit_allocation: BTreeSet<_> = mir.vars_and_temps_iter().collect();
+    // dbg!(&lifetimes.output_facts);
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
         def_id,
@@ -74,6 +72,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         locals_without_explicit_allocation,
         fresh_id_generator: 0,
     };
+    // dbg!(lifetimes.facts);
     procedure_encoder.encode()
 }
 
@@ -99,38 +98,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let (assume_preconditions, assert_postconditions) =
             self.encode_functional_specifications()?;
         let mut procedure_builder = ProcedureBuilder::new(
-            name.clone(),
-            allocate_parameters.clone(),
-            allocate_returns.clone(),
-            assume_preconditions.clone(),
-            deallocate_parameters.clone(),
-            deallocate_returns.clone(),
-            assert_postconditions.clone(),
-        );
-        // To "merge" blocks (if-else), we require info about the lifetimes of the "other" block
-        // lets collect the info here:
-        // - original lifetimes created and not ended in bb
-        //   example lookup: original_lifetimes[bb1] = ["bw0"]
-        let mut introduced_original_lifetimes: BTreeMap<mir::BasicBlock, BTreeSet<String>> =
-            BTreeMap::new();
-        // - derived lifetimes created and not ended in bb
-        //   example lookup: derived_lifetimes[bb1] = [("lft6" -> ["bw0"])]
-        let mut introduced_derived_lifetimes: BTreeMap<
-            mir::BasicBlock,
-            BTreeMap<String, BTreeSet<String>>,
-        > = BTreeMap::new();
-
-        // TODO: thats still not quite all of them
-        let mut all_lifetimes: BTreeSet<String> = BTreeSet::new();
-
-        self.extract_lifetimes(
-            &mut procedure_builder,
-            &mut introduced_original_lifetimes,
-            &mut introduced_derived_lifetimes,
-            &mut all_lifetimes,
-        )?;
-        // mayday mayday mayday, we need a new procedure builder, the old one is broken
-        procedure_builder = ProcedureBuilder::new(
             name,
             allocate_parameters,
             allocate_returns,
@@ -139,20 +106,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             deallocate_returns,
             assert_postconditions,
         );
-        // println!("lifetimes created:");
-        // dbg!(&introduced_original_lifetimes);
-        // println!("lifetimes derived:");
-        // dbg!(&introduced_derived_lifetimes);
 
-        let rd_perm: u32 = all_lifetimes.len().try_into().unwrap();
-        println!("##### rd_perm:");
-        dbg!(&rd_perm);
-        self.encode_body(
-            &mut procedure_builder,
-            &introduced_original_lifetimes,
-            &introduced_derived_lifetimes,
-            rd_perm,
-        )?;
+        // TODO: fix rd_perm again
+        let rd_perm: u32 = 1000;
+
+        self.encode_body(&mut procedure_builder, rd_perm)?;
         self.encode_implicit_allocations(&mut procedure_builder)?;
         Ok(procedure_builder.build())
     }
@@ -384,43 +342,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    fn extract_lifetimes(
-        &mut self,
-        procedure_builder: &mut ProcedureBuilder,
-        original_lifetimes: &mut BTreeMap<mir::BasicBlock, BTreeSet<String>>,
-        derived_lifetimes: &mut BTreeMap<mir::BasicBlock, BTreeMap<String, BTreeSet<String>>>,
-        all_lifetimes: &mut BTreeSet<String>,
-    ) -> SpannedEncodingResult<()> {
-        let entry_label = vir_high::BasicBlockId::new("label_entry".to_string());
-        let mut block_builder = procedure_builder.create_basic_block_builder(entry_label.clone());
-        if self.mir.basic_blocks().is_empty() {
-            block_builder.set_successor_exit(SuccessorExitKind::Return);
-        } else {
-            block_builder.set_successor_jump(vir_high::Successor::Goto(
-                self.encode_basic_block_label(self.mir.start_node()),
-            ));
-        }
-        block_builder.build();
-        procedure_builder.set_entry(entry_label);
-        for bb in self.mir.basic_blocks().indices() {
-            self.extract_lifetimes_basic_block(
-                bb,
-                original_lifetimes,
-                derived_lifetimes,
-                all_lifetimes,
-            )?;
-        }
-        Ok(())
-    }
-
     fn encode_body(
         &mut self,
         procedure_builder: &mut ProcedureBuilder,
-        introduced_original_lifetimes: &BTreeMap<mir::BasicBlock, BTreeSet<String>>,
-        introduced_derived_lifetimes: &BTreeMap<
-            mir::BasicBlock,
-            BTreeMap<String, BTreeSet<String>>,
-        >,
         rd_perm: u32,
     ) -> SpannedEncodingResult<()> {
         let entry_label = vir_high::BasicBlockId::new("label_entry".to_string());
@@ -434,65 +358,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         }
         block_builder.build();
         procedure_builder.set_entry(entry_label);
-        let mut merge_blocks: BTreeMap<mir::BasicBlock, mir::BasicBlock> = BTreeMap::new();
         for bb in self.mir.basic_blocks().indices() {
-            self.encode_basic_block(
-                procedure_builder,
-                bb,
-                introduced_original_lifetimes,
-                introduced_derived_lifetimes,
-                rd_perm,
-                &mut merge_blocks,
-            )?;
+            self.encode_basic_block(procedure_builder, bb, rd_perm)?;
         }
         Ok(())
-    }
-
-    fn extract_lifetimes_basic_block(
-        &mut self,
-        bb: mir::BasicBlock,
-        bb_introduced_original_lifetimes: &mut BTreeMap<mir::BasicBlock, BTreeSet<String>>,
-        bb_introduced_derived_lifetimes: &mut BTreeMap<
-            mir::BasicBlock,
-            BTreeMap<String, BTreeSet<String>>,
-        >,
-        all_lifetimes: &mut BTreeSet<String>,
-    ) -> SpannedEncodingResult<()> {
-        let mir::BasicBlockData { statements, .. } = &self.mir[bb];
-        let mut location = mir::Location {
-            block: bb,
-            statement_index: 0,
-        };
-        let terminator_index = statements.len();
-        let mut original_lifetimes: BTreeSet<String> = BTreeSet::new();
-        let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        while location.statement_index < terminator_index {
-            self.update_lifetimes(
-                &mut original_lifetimes,
-                &mut derived_lifetimes,
-                Some(all_lifetimes),
-                location,
-            );
-            location.statement_index += 1;
-        }
-        // let mut introduced_original_lifetimes = BTreeSet::new();
-        // introduced_original_lifetimes.insert(String::from("bw0"));
-        bb_introduced_original_lifetimes.insert(location.block, original_lifetimes);
-        bb_introduced_derived_lifetimes.insert(location.block, derived_lifetimes);
-        Ok(()) // TODO: do I need this?
     }
 
     fn encode_basic_block(
         &mut self,
         procedure_builder: &mut ProcedureBuilder,
         bb: mir::BasicBlock,
-        introduced_original_lifetimes: &BTreeMap<mir::BasicBlock, BTreeSet<String>>,
-        introduced_derived_lifetimes: &BTreeMap<
-            mir::BasicBlock,
-            BTreeMap<String, BTreeSet<String>>,
-        >,
         rd_perm: u32,
-        merge_blocks: &mut BTreeMap<mir::BasicBlock, mir::BasicBlock>,
     ) -> SpannedEncodingResult<()> {
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
@@ -523,18 +399,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             )?;
             location.statement_index += 1;
         }
-        // TODO: merging blocks before terminator
-        // for this need to know the state of the else branch
         if let Some(terminator) = terminator {
-            self.encode_terminator(
-                &mut block_builder,
-                location,
-                terminator,
-                introduced_original_lifetimes,
-                introduced_derived_lifetimes,
-                merge_blocks,
-                rd_perm,
-            )?;
+            self.encode_terminator(&mut block_builder, location, terminator, rd_perm)?;
         }
         block_builder.build();
         Ok(())
@@ -1061,75 +927,91 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(kind)
     }
 
-    fn encode_merge_blocks(
+    fn needed_derived_lifetimes_for_block(
         &mut self,
+        bb: &mir::BasicBlock,
+    ) -> BTreeMap<String, BTreeSet<String>> {
+        let first_location = mir::Location {
+            block: *bb,
+            statement_index: 0,
+        };
+        self.lifetimes
+            .get_origin_contains_loan_at_mid(first_location)
+    }
+
+    fn needed_original_lifetimes_for_block(&mut self, bb: &mir::BasicBlock) -> BTreeSet<String> {
+        let first_location = mir::Location {
+            block: *bb,
+            statement_index: 0,
+        };
+        self.lifetimes.get_loan_live_at_start(first_location)
+    }
+
+    fn encode_merge_blocks_new_lft(
+        &mut self,
+        target: mir::BasicBlock,
         location: mir::Location,
         block_builder: &mut BasicBlockBuilder,
-        introduced_original_lifetimes: &BTreeMap<mir::BasicBlock, BTreeSet<String>>,
-        introduced_derived_lifetimes: &BTreeMap<
-            mir::BasicBlock,
-            BTreeMap<String, BTreeSet<String>>,
-        >,
-        merge_blocks: &mut BTreeMap<mir::BasicBlock, mir::BasicBlock>,
+    ) -> SpannedEncodingResult<()> {
+        let needed_original_lifetimes = self.needed_original_lifetimes_for_block(&target);
+        let current_original_lifetimes = self.lifetimes.get_loan_live_at_start(location);
+        let difference_original_lifetimes: BTreeSet<String> = needed_original_lifetimes
+            .difference(&current_original_lifetimes)
+            .cloned()
+            .collect();
+        dbg!(&difference_original_lifetimes);
+        self.encode_new_lft(block_builder, location, difference_original_lifetimes)?;
+        Ok(())
+    }
+
+    fn encode_merge_blocks_shorten_lifetime(
+        &mut self,
+        target: mir::BasicBlock,
+        location: mir::Location,
+        block_builder: &mut BasicBlockBuilder,
         rd_perm: u32,
     ) -> SpannedEncodingResult<()> {
-        let brother_block = merge_blocks.get(&location.block);
-        if let Some(brother_block) = brother_block {
-            let lifetimes = introduced_original_lifetimes
-                .get(brother_block)
-                .unwrap()
-                .clone();
-            self.encode_new_lft(block_builder, location, lifetimes)?;
-
-            // TODO: this is ugly, how do I write this nicely in rust? o.O
-            if introduced_derived_lifetimes.contains_key(brother_block) {
-                let derived_brother_block =
-                    introduced_derived_lifetimes.get(brother_block).unwrap();
-                let derived_block = if introduced_derived_lifetimes.contains_key(&location.block) {
-                    introduced_derived_lifetimes
-                        .get(&location.block)
-                        .unwrap()
-                        .clone()
-                } else {
-                    BTreeMap::new()
-                };
-                for (target, val) in derived_brother_block {
-                    let mut value: BTreeSet<String> = val.clone();
-                    if derived_block.contains_key(target) {
-                        value.append(derived_block.get(target).unwrap().clone().borrow_mut());
-                        self.encode_shorten_lifetime(
-                            block_builder,
-                            location,
-                            target.clone(),
-                            value,
-                            rd_perm,
-                        )?;
-                    } else {
-                        self.encode_ghost_assignment(
-                            block_builder,
-                            location,
-                            target.clone(),
-                            value,
-                        )?;
-                    }
-                }
+        let needed_derived_lifetimes = self.needed_derived_lifetimes_for_block(&target);
+        let current_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
+        for (derived_lifetime, needed_derived_from) in needed_derived_lifetimes {
+            if current_derived_lifetimes.get(&derived_lifetime[..]).is_some() {
+                self.encode_shorten_lifetime(
+                    block_builder,
+                    location,
+                    derived_lifetime,
+                    needed_derived_from,
+                    rd_perm,
+                )?;
+            } else {
+                // TODO: check if/when this case happens
+                self.encode_ghost_assignment(
+                    block_builder,
+                    location,
+                    derived_lifetime,
+                    needed_derived_from,
+                )?;
             }
         }
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    fn encode_merge_blocks(
+        &mut self,
+        target: mir::BasicBlock,
+        location: mir::Location,
+        block_builder: &mut BasicBlockBuilder,
+        rd_perm: u32,
+    ) -> SpannedEncodingResult<()> {
+        self.encode_merge_blocks_new_lft(target, location, block_builder)?;
+        self.encode_merge_blocks_shorten_lifetime(target, location, block_builder, rd_perm)?;
+        Ok(())
+    }
+
     fn encode_terminator(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
         terminator: &mir::Terminator<'tcx>,
-        introduced_original_lifetimes: &BTreeMap<mir::BasicBlock, BTreeSet<String>>,
-        introduced_derived_lifetimes: &BTreeMap<
-            mir::BasicBlock,
-            BTreeMap<String, BTreeSet<String>>,
-        >,
-        merge_blocks: &mut BTreeMap<mir::BasicBlock, mir::BasicBlock>,
         rd_perm: u32,
     ) -> SpannedEncodingResult<()> {
         block_builder.add_comment(format!("{:?} {:?}", location, terminator.kind));
@@ -1137,14 +1019,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         use rustc_middle::mir::TerminatorKind;
         let successor = match &terminator.kind {
             TerminatorKind::Goto { target } => {
-                self.encode_merge_blocks(
-                    location,
-                    block_builder,
-                    introduced_original_lifetimes,
-                    introduced_derived_lifetimes,
-                    merge_blocks,
-                    rd_perm,
-                )?;
+                self.encode_merge_blocks(*target, location, block_builder, rd_perm)?;
                 SuccessorBuilder::jump(vir_high::Successor::Goto(
                     self.encode_basic_block_label(*target),
                 ))
@@ -1153,12 +1028,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 targets,
                 discr,
                 switch_ty,
-            } => {
-                let blocks = targets.all_targets();
-                merge_blocks.insert(blocks[0], blocks[1]);
-                merge_blocks.insert(blocks[1], blocks[0]);
-                self.encode_terminator_switch_int(span, targets, discr, *switch_ty)?
-            }
+            } => self.encode_terminator_switch_int(span, targets, discr, *switch_ty)?,
             TerminatorKind::Resume => SuccessorBuilder::exit_resume_panic(),
             // TerminatorKind::Abort => {
             //     graph.add_exit_edge(bb, "abort");
