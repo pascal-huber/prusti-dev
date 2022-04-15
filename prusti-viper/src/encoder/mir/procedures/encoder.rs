@@ -61,7 +61,6 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     };
     let mir = procedure.get_mir();
     let locals_without_explicit_allocation: BTreeSet<_> = mir.vars_and_temps_iter().collect();
-    // dbg!(&lifetimes.output_facts);
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
         def_id,
@@ -72,7 +71,6 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         locals_without_explicit_allocation,
         fresh_id_generator: 0,
     };
-    // dbg!(lifetimes.facts);
     procedure_encoder.encode()
 }
 
@@ -414,7 +412,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         let (new_lifetimes, ended_lifetimes, introduced_derived_lifetimes) =
-            self.update_lifetimes(original_lifetimes, derived_lifetimes, None, location);
+            self.update_lifetimes(original_lifetimes, derived_lifetimes, location);
         self.encode_end_lft(block_builder, location, ended_lifetimes)?;
         self.encode_new_lft(block_builder, location, new_lifetimes)?;
         self.encode_lft_assignment(block_builder, location, introduced_derived_lifetimes)?;
@@ -511,7 +509,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         &mut self,
         old_original_lifetimes: &mut BTreeSet<String>,
         old_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
-        all_lifetimes: Option<&mut BTreeSet<String>>,
         location: mir::Location,
     ) -> (
         BTreeSet<String>,
@@ -540,17 +537,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             .into_iter()
             .filter(|(k, _)| !old_derived_lifetimes.contains_key(k))
             .collect();
-
-        if let Some(all_lifetimes) = all_lifetimes {
-            all_lifetimes.append(&mut original_lifetimes.clone());
-            all_lifetimes.append(&mut derived_lifetimes.clone().into_keys().collect());
-            // all_lifetimes.append(d.clone());
-            // let mut x: u32 = original_lifetimes.len().try_into().unwrap();
-            // *lifetime_ctr += x;
-            // x = derived_lifetimes.len().try_into().unwrap();
-            // *lifetime_ctr += x;
-            // // TODO: add the others too
-        }
 
         *old_derived_lifetimes = derived_lifetimes;
         original_lifetimes.append(&mut lifetimes_to_create.clone());
@@ -950,7 +936,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let needed_derived_lifetimes = self.needed_derived_lifetimes_for_block(&target);
         let current_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
         for (derived_lifetime, needed_derived_from) in needed_derived_lifetimes {
-            if current_derived_lifetimes.get(&derived_lifetime[..]).is_some() {
+            if current_derived_lifetimes
+                .get(&derived_lifetime[..])
+                .is_some()
+            {
                 self.encode_shorten_lifetime(
                     block_builder,
                     location,
