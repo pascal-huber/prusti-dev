@@ -104,10 +104,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             deallocate_returns,
             assert_postconditions,
         );
-
-        // TODO: fix rd_perm again
-        let rd_perm: u32 = 1000;
-
+        let rd_perm: u32 = self.lifetimes.lifetime_count();
         self.encode_body(&mut procedure_builder, rd_perm)?;
         self.encode_implicit_allocations(&mut procedure_builder)?;
         Ok(procedure_builder.build())
@@ -945,7 +942,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             .difference(&current_original_lifetimes)
             .cloned()
             .collect();
-        dbg!(&difference_original_lifetimes);
         self.encode_new_lft(block_builder, location, difference_original_lifetimes)?;
         Ok(())
     }
