@@ -757,14 +757,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     source,
                     rd_perm,
                 )?;
-                if let mir::Rvalue::Discriminant(_) = source {
-                    let local = target.as_local().expect("unimplemented");
-                    // FIXME: This assert is very likely to fail.
-                    assert!(
-                        self.discriminants.insert(local),
-                        "Duplicate discriminant temporary."
-                    );
-                }
             }
             _ => {
                 block_builder.add_comment("encode_statement: not encoded".to_string());

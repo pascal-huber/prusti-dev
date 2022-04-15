@@ -86,7 +86,7 @@ impl CollectPermissionChanges for vir_high::Statement {
                 statement.collect(encoder, consumed_permissions, produced_permissions)
             }
             vir_high::Statement::ShortenLifetime(statement) => {
-                statement.collect(consumed_permissions, produced_permissions)
+                statement.collect(encoder, consumed_permissions, produced_permissions)
             }
         }
     }
@@ -498,8 +498,9 @@ impl CollectPermissionChanges for vir_high::GhostAssignment {
 }
 
 impl CollectPermissionChanges for vir_high::ShortenLifetime {
-    fn collect(
+    fn collect<'v, 'tcx>(
         &self,
+        _encoder: &mut Encoder<'v, 'tcx>,
         _consumed_permissions: &mut Vec<Permission>,
         _produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {

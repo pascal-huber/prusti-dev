@@ -367,6 +367,9 @@ impl IntoLow for vir_mid::Statement {
                     _ => unimplemented!(),
                 }])
             }
+            Self::ShortenLifetime(_statement) => {
+                unimplemented!();
+            }
         }
     }
 }
