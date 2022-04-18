@@ -519,7 +519,6 @@ impl<'v, 'tcx: 'v> PureFunctionEncoderInterface<'v, 'tcx>
         function_identifier: String,
         constructor: FunctionConstructor<'v, 'tcx>,
     ) -> SpannedEncodingResult<()> {
-        // TODO: this causes a problem when we don't have the lifetime name in the reference (LifetimeConst vs Uniqueness)
         assert!(self
             .pure_function_encoder_state
             .function_constructors
