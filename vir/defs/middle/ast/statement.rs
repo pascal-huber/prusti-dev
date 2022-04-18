@@ -223,7 +223,7 @@ pub struct GhostAssignment {
 #[display(fmt = "{} := shorten_lifetime({:?}, {})", target, value, rd_perm)]
 pub struct ShortenLifetime {
     pub target: VariableDecl,
-    pub value: Vec<String>,
+    pub value: Expression,
     pub rd_perm: u32,
     pub position: Position,
 }

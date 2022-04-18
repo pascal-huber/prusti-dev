@@ -450,45 +450,39 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
+    fn lft_intersection(
+        &mut self,
+        lifetimes: BTreeSet<String>,
+    ) -> SpannedEncodingResult<vir_high::Expression> {
+        let mut iter = lifetimes.into_iter();
+        let mut intersection = self.encode_lft_variable(iter.next().unwrap())?.into();
+        for name in iter {
+            intersection = vir_high::Expression::binary_op_no_pos(
+                vir_high::BinaryOpKind::LifetimeIntersection,
+                intersection,
+                self.encode_lft_variable(name)?.into(),
+            );
+        }
+        Ok(intersection)
+    }
+
     fn encode_shorten_lifetime(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
-        target: String,
-        value: BTreeSet<String>,
+        lifetime: String,
+        constraints: BTreeSet<String>,
         rd_perm: u32,
     ) -> SpannedEncodingResult<()> {
-        let encoded_target = vir_high::VariableDecl::new(target, vir_high::ty::Type::Lifetime {});
+        let encoded_target = self.encode_lft_variable(lifetime)?;
+        let intersection = self.lft_intersection(constraints)?;
         block_builder.add_statement(self.set_statement_error(
             location,
-            ErrorCtxt::ShortenLifetime,
-            vir_high::Statement::shorten_lifetime_no_pos(
-                encoded_target,
-                value.into_iter().collect(),
-                rd_perm,
-            ),
+            ErrorCtxt::LifetimeEncoding,
+            vir_high::Statement::shorten_lifetime_no_pos(encoded_target, intersection, rd_perm),
         )?);
         Ok(())
     }
-
-    // fn encode_ghost_assignment(
-    //     &mut self,
-    //     block_builder: &mut BasicBlockBuilder,
-    //     location: mir::Location,
-    //     target: String,
-    //     value: BTreeSet<String>,
-    // ) -> SpannedEncodingResult<()> {
-    //     let encoded_target = vir_high::VariableDecl::new(target, vir_high::ty::Type::Lifetime {});
-    //     block_builder.add_statement(self.set_statement_error(
-    //         location,
-    //         ErrorCtxt::LifetimeEncoding,
-    //         vir_high::Statement::ghost_assignment_no_pos(
-    //             encoded_target,
-    //             value.into_iter().collect(),
-    //         ),
-    //     )?);
-    //     Ok(())
-    // }
 
     fn encode_lft_assignment(
         &mut self,
@@ -498,15 +492,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         constraints: BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
         let encoded_target = self.encode_lft_variable(lifetime)?;
-        let mut iter = constraints.into_iter();
-        let mut intersection = self.encode_lft_variable(iter.next().unwrap())?.into();
-        for name in iter {
-            intersection = vir_high::Expression::binary_op_no_pos(
-                vir_high::BinaryOpKind::LifetimeIntersection,
-                intersection,
-                self.encode_lft_variable(name)?.into(),
-            );
-        }
+        let intersection = self.lft_intersection(constraints)?;
         block_builder.add_statement(self.set_statement_error(
             location,
             ErrorCtxt::LifetimeEncoding,
@@ -514,7 +500,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         )?);
         Ok(())
     }
-
 
     fn encode_lft_assignments(
         &mut self,
