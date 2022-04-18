@@ -450,7 +450,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    fn lft_intersection(
+    fn encode_lft_intersection(
         &mut self,
         lifetimes: BTreeSet<String>,
     ) -> SpannedEncodingResult<vir_high::Expression> {
@@ -475,7 +475,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         rd_perm: u32,
     ) -> SpannedEncodingResult<()> {
         let encoded_target = self.encode_lft_variable(lifetime)?;
-        let intersection = self.lft_intersection(constraints)?;
+        let intersection = self.encode_lft_intersection(constraints)?;
         block_builder.add_statement(self.set_statement_error(
             location,
             ErrorCtxt::LifetimeEncoding,
@@ -492,7 +492,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         constraints: BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
         let encoded_target = self.encode_lft_variable(lifetime)?;
-        let intersection = self.lft_intersection(constraints)?;
+        let intersection = self.encode_lft_intersection(constraints)?;
         block_builder.add_statement(self.set_statement_error(
             location,
             ErrorCtxt::LifetimeEncoding,
