@@ -412,7 +412,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             self.update_lifetimes(original_lifetimes, derived_lifetimes, location);
         self.encode_end_lft(block_builder, location, ended_lifetimes)?;
         self.encode_new_lft(block_builder, location, new_lifetimes)?;
-        self.encode_lft_assignment(block_builder, location, introduced_derived_lifetimes)?;
+        self.encode_lft_assignments(block_builder, location, introduced_derived_lifetimes)?;
         Ok(())
     }
 
@@ -471,47 +471,59 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    fn encode_ghost_assignment(
+    // fn encode_ghost_assignment(
+    //     &mut self,
+    //     block_builder: &mut BasicBlockBuilder,
+    //     location: mir::Location,
+    //     target: String,
+    //     value: BTreeSet<String>,
+    // ) -> SpannedEncodingResult<()> {
+    //     let encoded_target = vir_high::VariableDecl::new(target, vir_high::ty::Type::Lifetime {});
+    //     block_builder.add_statement(self.set_statement_error(
+    //         location,
+    //         ErrorCtxt::LifetimeEncoding,
+    //         vir_high::Statement::ghost_assignment_no_pos(
+    //             encoded_target,
+    //             value.into_iter().collect(),
+    //         ),
+    //     )?);
+    //     Ok(())
+    // }
+
+    fn encode_lft_assignment(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
-        target: String,
-        value: BTreeSet<String>,
+        lifetime: String,
+        constraints: BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
-        let encoded_target = vir_high::VariableDecl::new(target, vir_high::ty::Type::Lifetime {});
+        let encoded_target = self.encode_lft_variable(lifetime)?;
+        let mut iter = constraints.into_iter();
+        let mut intersection = self.encode_lft_variable(iter.next().unwrap())?.into();
+        for name in iter {
+            intersection = vir_high::Expression::binary_op_no_pos(
+                vir_high::BinaryOpKind::LifetimeIntersection,
+                intersection,
+                self.encode_lft_variable(name)?.into(),
+            );
+        }
         block_builder.add_statement(self.set_statement_error(
             location,
             ErrorCtxt::LifetimeEncoding,
-            vir_high::Statement::ghost_assignment_no_pos(
-                encoded_target,
-                value.into_iter().collect(),
-            ),
+            vir_high::Statement::ghost_assignment_no_pos(encoded_target, intersection),
         )?);
         Ok(())
     }
 
-    fn encode_lft_assignment(
+
+    fn encode_lft_assignments(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
         lifetimes: BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         for (lifetime, constraints) in lifetimes {
-            let encoded_target = self.encode_lft_variable(lifetime)?;
-            let mut iter = constraints.into_iter();
-            let mut intersection = self.encode_lft_variable(iter.next().unwrap())?.into();
-            for name in iter {
-                intersection = vir_high::Expression::binary_op_no_pos(
-                    vir_high::BinaryOpKind::LifetimeIntersection,
-                    intersection,
-                    self.encode_lft_variable(name)?.into(),
-                );
-            }
-            block_builder.add_statement(self.set_statement_error(
-                location,
-                ErrorCtxt::LifetimeEncoding,
-                vir_high::Statement::ghost_assignment_no_pos(encoded_target, intersection),
-            )?);
+            self.encode_lft_assignment(block_builder, location, lifetime, constraints)?;
         }
         Ok(())
     }
@@ -969,7 +981,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 )?;
             } else {
                 // TODO: check if/when this case happens
-                self.encode_ghost_assignment(
+                self.encode_lft_assignment(
                     block_builder,
                     location,
                     derived_lifetime,
