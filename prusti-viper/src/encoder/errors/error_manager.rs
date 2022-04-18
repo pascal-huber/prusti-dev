@@ -125,7 +125,9 @@ pub enum ErrorCtxt {
     /// Failed to call a procedure.
     ProcedureCall,
     /// Failed to encode lifetimes
-    LifetimeEncoding
+    LifetimeEncoding,
+    /// Failed to encode ShortenLifetime
+    ShortenLifetime,
 }
 
 /// The error manager
