@@ -516,16 +516,16 @@ impl<'v, 'tcx: 'v> PureFunctionEncoderInterface<'v, 'tcx>
 
     fn register_function_constructor_mir(
         &self,
-        _function_identifier: String,
-        _constructor: FunctionConstructor<'v, 'tcx>,
+        function_identifier: String,
+        constructor: FunctionConstructor<'v, 'tcx>,
     ) -> SpannedEncodingResult<()> {
         // TODO: this causes a problem when we don't have the lifetime name in the reference (LifetimeConst vs Uniqueness)
-        // assert!(self
-        //     .pure_function_encoder_state
-        //     .function_constructors
-        //     .borrow_mut()
-        //     .insert(function_identifier, constructor)
-        //     .is_none());
+        assert!(self
+            .pure_function_encoder_state
+            .function_constructors
+            .borrow_mut()
+            .insert(function_identifier, constructor)
+            .is_none());
         Ok(())
     }
 }
