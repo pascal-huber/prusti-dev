@@ -398,13 +398,13 @@ impl IntoLow for vir_mid::Statement {
                 )];
                 Ok(statements)
             }
-            Self::LifetimeTake(_statement) => {
-                dbg!(&_statement);
-                unimplemented!("LifetimeTake");
+            Self::LifetimeTake(statement) => {
+                Ok(vec![Statement::comment(format!("{}", statement))])
+                // TODO: add method call for lft_tok_sep_take
             }
-            Self::LifetimeReturn(_statement) => {
-                dbg!(&_statement);
-                unimplemented!("LifetimeReturn");
+            Self::LifetimeReturn(statement) => {
+                Ok(vec![Statement::comment(format!("{}", statement))])
+                // TODO: add method call for lft_tok_sep_return
             }
             Self::OpenMutRef(_statement) => {
                 unimplemented!();
