@@ -434,15 +434,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         original_lifetimes: &mut BTreeSet<String>,
         derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
-        let mut new_original_lifetimes = self.lifetimes.get_loan_live_at_start(location);
-        let new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
+        let mut new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
+        block_builder.add_comment(format!("Prepare lifetimes for statement {:?}", location));
         self.encode_lft(
             block_builder,
             location,
             original_lifetimes,
-            &mut new_original_lifetimes,
             derived_lifetimes,
-            new_derived_lifetimes,
+            &mut new_derived_lifetimes,
         )?;
         Ok(())
     }
@@ -452,71 +451,58 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
         old_original_lifetimes: &mut BTreeSet<String>,
-        new_original_lifetimes: &mut BTreeSet<String>,
         old_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
-        new_derived_lifetimes: BTreeMap<String, BTreeSet<String>>,
+        new_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
-        let (new_lifetimes, ended_lifetimes, derived_lifetimes_take, derived_lifetimes_return) =
-            self.lifetimes_changes(
-                old_original_lifetimes,
-                new_original_lifetimes,
-                old_derived_lifetimes,
-                new_derived_lifetimes,
-            );
+        let lifetimes_to_end =
+            self.lifetimes_to_end(&old_original_lifetimes, &new_derived_lifetimes);
+        self.encode_end_lft(block_builder, location, &lifetimes_to_end)?;
+
+        let mut lifetimes_to_create =
+            self.lifetimes_to_create(&old_original_lifetimes, &new_derived_lifetimes);
+        self.encode_new_lft(block_builder, location, &lifetimes_to_create)?;
 
         // println!("------");
         // dbg!(&location);
-        // dbg!(&new_lifetimes);
-        // dbg!(&ended_lifetimes);
-        // dbg!(&derived_lifetimes_take);
-        // dbg!(&derived_lifetimes_return);
+        // dbg!(&lifetimes_to_end);
+        // dbg!(&lifetimes_to_create);
 
-        self.encode_end_lft(block_builder, location, ended_lifetimes)?;
-        self.encode_new_lft(block_builder, location, new_lifetimes)?;
-        for (lft, derived_from) in derived_lifetimes_return {
+        let lifetimes_to_return =
+            self.lifetimes_to_return(&old_derived_lifetimes, &new_derived_lifetimes);
+        // dbg!(&lifetimes_to_return);
+        for (lft, derived_from) in lifetimes_to_return {
             self.encode_lft_return(block_builder, location, lft, derived_from)?;
         }
-        for (lft, derived_from) in derived_lifetimes_take {
+
+        let lifetimes_to_take =
+            self.lifetimes_to_take(&old_derived_lifetimes, &new_derived_lifetimes);
+        // dbg!(&lifetimes_to_take);
+        for (lft, derived_from) in lifetimes_to_take {
             self.encode_lft_take(block_builder, location, lft, derived_from)?;
         }
+
+        // update collections
+        old_original_lifetimes.append(&mut lifetimes_to_create);
+        for lifetime in lifetimes_to_end {
+            old_original_lifetimes.remove(&lifetime);
+        }
+        // TODO: remove ended lifetiems
+        *old_derived_lifetimes = new_derived_lifetimes.clone();
         Ok(())
     }
 
-    fn lifetimes_changes(
+    fn lifetimes_to_return(
         &mut self,
-        old_original_lifetimes: &mut BTreeSet<String>,
-        original_lifetimes: &mut BTreeSet<String>,
-        old_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
-        derived_lifetimes: BTreeMap<String, BTreeSet<String>>,
-    ) -> (
-        BTreeSet<String>,
-        BTreeSet<String>,
-        BTreeMap<String, BTreeSet<String>>,
-        BTreeMap<String, BTreeSet<String>>,
-    ) {
-        let derived_from: BTreeSet<String> =
-            derived_lifetimes.clone().into_values().flatten().collect();
-
-        let lifetimes_to_create: BTreeSet<String> = derived_from
-            .clone()
-            .into_iter()
-            .filter(|x| !old_original_lifetimes.contains(x))
-            .collect();
-
-        let lifetimes_to_end: BTreeSet<String> = old_original_lifetimes
-            .clone()
-            .into_iter()
-            .filter(|x| !derived_from.contains(x))
-            .collect();
-
-        // derived lifetimes which don't require a lifetime anymore
+        old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+    ) -> BTreeMap<String, BTreeSet<String>> {
         let mut derived_lifetimes_return: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for (lft, old_values) in old_derived_lifetimes.clone() {
-            if !derived_lifetimes.contains_key(&lft) {
+            if !new_derived_lifetimes.contains_key(&lft) {
                 // if lifetime is not present anymore, we can return them all
                 derived_lifetimes_return.insert(lft.clone(), old_values.clone());
             } else {
-                let values = derived_lifetimes.get(&lft).unwrap();
+                let values = new_derived_lifetimes.get(&lft).unwrap();
                 // lifetimes which are in old_values but not in values
                 let diff: BTreeSet<String> = old_values.difference(&values).cloned().collect();
                 if !diff.is_empty() {
@@ -526,14 +512,21 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 }
             }
         }
+        derived_lifetimes_return
+    }
 
+    fn lifetimes_to_take(
+        &mut self,
+        old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+    ) -> BTreeMap<String, BTreeSet<String>> {
         let mut derived_lifetimes_take: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        for (lft, new_values) in derived_lifetimes.clone() {
+        for (lft, new_values) in new_derived_lifetimes.clone() {
             if !old_derived_lifetimes.contains_key(&lft) {
                 // if the lifetime was not present, we want to take it too
                 derived_lifetimes_take.insert(lft.clone(), new_values.clone());
             } else {
-                let old_values = derived_lifetimes.get(&lft).unwrap();
+                let old_values = old_derived_lifetimes.get(&lft).unwrap();
                 // we want to check if there are any new lifetimes
                 // i.e. lifetimes which are in new_values but not in old_values
                 let diff: BTreeSet<String> = new_values.difference(&old_values).cloned().collect();
@@ -543,26 +536,50 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 }
             }
         }
+        derived_lifetimes_take
+    }
 
-        *old_derived_lifetimes = derived_lifetimes;
-        original_lifetimes.append(&mut lifetimes_to_create.clone());
-        *old_original_lifetimes = original_lifetimes.clone();
+    fn lifetimes_to_end(
+        &mut self,
+        old_original_lifetimes: &BTreeSet<String>,
+        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+    ) -> BTreeSet<String> {
+        let derived_from: BTreeSet<String> = new_derived_lifetimes
+            .clone()
+            .into_values()
+            .flatten()
+            .collect();
+        old_original_lifetimes
+            .clone()
+            .into_iter()
+            .filter(|x| !derived_from.contains(x))
+            .collect()
+    }
 
-        (
-            lifetimes_to_create,
-            lifetimes_to_end,
-            derived_lifetimes_take,
-            derived_lifetimes_return,
-        )
+    fn lifetimes_to_create(
+        &mut self,
+        old_original_lifetimes: &BTreeSet<String>,
+        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+    ) -> BTreeSet<String> {
+        let derived_from: BTreeSet<String> = new_derived_lifetimes
+            .clone()
+            .into_values()
+            .flatten()
+            .collect();
+        derived_from
+            .clone()
+            .into_iter()
+            .filter(|x| !old_original_lifetimes.contains(x))
+            .collect()
     }
 
     fn encode_end_lft(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
-        lifetimes: BTreeSet<String>,
+        lifetimes_to_end: &BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
-        for lifetime in lifetimes {
+        for lifetime in lifetimes_to_end {
             let lifetime_var = vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
             block_builder.add_statement(self.set_statement_error(
                 location,
@@ -577,9 +594,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
-        lifetimes: BTreeSet<String>,
+        lifetimes_to_create: &BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
-        for lifetime in lifetimes {
+        for lifetime in lifetimes_to_create {
             let lifetime_var = vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
             block_builder.add_statement(self.set_statement_error(
                 location,
@@ -615,10 +632,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         constraints: BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
         let encoded_target = self.encode_lft_variable(lifetime)?;
-        let lifetimes: Vec<vir_high::ty::LifetimeConst> = constraints
-            .into_iter()
-            .map(|name| vir_high::ty::LifetimeConst { name })
-            .collect();
+        let mut lifetimes: Vec<vir_high::VariableDecl> = Vec::new();
+        for lifetime_name in constraints {
+            lifetimes.push(self.encode_lft_variable(lifetime_name)?);
+        }
         block_builder.add_statement(self.set_statement_error(
             location,
             ErrorCtxt::LifetimeEncoding,
@@ -635,10 +652,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         constraints: BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
         let encoded_target = self.encode_lft_variable(lifetime)?;
-        let lifetimes: Vec<vir_high::ty::LifetimeConst> = constraints
-            .into_iter()
-            .map(|name| vir_high::ty::LifetimeConst { name })
-            .collect();
+        let mut lifetimes: Vec<vir_high::VariableDecl> = Vec::new();
+        for lifetime_name in constraints {
+            lifetimes.push(self.encode_lft_variable(lifetime_name)?);
+        }
         block_builder.add_statement(self.set_statement_error(
             location,
             ErrorCtxt::LifetimeEncoding,
@@ -1087,13 +1104,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             .get_origin_contains_loan_at_mid(first_location)
     }
 
-    fn needed_original_lifetimes_for_block(&mut self, bb: &mir::BasicBlock) -> BTreeSet<String> {
-        let first_location = mir::Location {
-            block: *bb,
-            statement_index: 0,
-        };
-        self.lifetimes.get_loan_live_at_start(first_location)
-    }
+    // fn needed_original_lifetimes_for_block(&mut self, bb: &mir::BasicBlock) -> BTreeSet<String> {
+    //     let first_location = mir::Location {
+    //         block: *bb,
+    //         statement_index: 0,
+    //     };
+    //     self.lifetimes.get_loan_live_at_start(first_location)
+    // }
 
     fn encode_lft_for_block(
         &mut self,
@@ -1101,18 +1118,18 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         location: mir::Location,
         block_builder: &mut BasicBlockBuilder,
     ) -> SpannedEncodingResult<()> {
-        let needed_derived_lifetimes = self.needed_derived_lifetimes_for_block(&target);
+        let mut needed_derived_lifetimes = self.needed_derived_lifetimes_for_block(&target);
         let mut current_derived_lifetimes =
             self.lifetimes.get_origin_contains_loan_at_mid(location);
-        let mut needed_original_lifetimes = self.needed_original_lifetimes_for_block(&target);
+        // let mut needed_original_lifetimes = self.needed_original_lifetimes_for_block(&target);
         let mut current_original_lifetimes = self.lifetimes.get_loan_live_at_start(location);
+        block_builder.add_comment(format!("Prepare lifetimes for block {:?}", target));
         self.encode_lft(
             block_builder,
             location,
             &mut current_original_lifetimes,
-            &mut needed_original_lifetimes,
             &mut current_derived_lifetimes,
-            needed_derived_lifetimes,
+            &mut needed_derived_lifetimes,
         )?;
         Ok(())
     }

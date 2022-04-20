@@ -203,7 +203,7 @@ pub struct GhostAssignment {
 #[display(fmt = "{} := lifetime_take({:?}, {})", target, value, rd_perm)]
 pub struct LifetimeTake {
     pub target: VariableDecl,
-    pub value: Vec<LifetimeConst>,
+    pub value: Vec<VariableDecl>,
     pub rd_perm: u32,
     pub position: Position,
 }
@@ -211,7 +211,7 @@ pub struct LifetimeTake {
 #[display(fmt = "{} := lifetime_return({:?}, {})", target, value, rd_perm)]
 pub struct LifetimeReturn {
     pub target: VariableDecl,
-    pub value: Vec<LifetimeConst>,
+    pub value: Vec<VariableDecl>,
     pub rd_perm: u32,
     pub position: Position,
 }

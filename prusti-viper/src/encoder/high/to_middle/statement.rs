@@ -69,12 +69,24 @@ impl<'v, 'tcx> ToMiddleStatementLowerer for crate::encoder::Encoder<'v, 'tcx> {
         variable_decl.to_middle_expression(self)
     }
 
-    fn to_middle_statement_lifetime_const(
-        &self,
-        lifetime_const: vir_high::ty::LifetimeConst,
-    ) -> Result<vir_mid::ty::LifetimeConst, <Self as ToMiddleStatementLowerer>::Error> {
-        Ok(vir_mid::ty::LifetimeConst {
-            name: lifetime_const.name,
-        })
-    }
+    // fn to_middle_statement_lifetime_return(
+    //     &self,
+    //     lifetime_return: vir_high::LifetimeReturn,
+    // ) -> Result<
+    //     vir_mid::ast::statement::LifetimeReturn,
+    //     <Self as ToMiddleStatementLowerer>::Error,
+    // > {
+    //     Ok(vir_mid::ty::LifetimeConst {
+    //         name: lifetime_const.name,
+    //     })
+    // }
+    //
+    // fn to_middle_statement_lifetime_const(
+    //     &self,
+    //     lifetime_const: vir_high::ty::LifetimeConst,
+    // ) -> Result<vir_mid::ty::LifetimeConst, <Self as ToMiddleStatementLowerer>::Error> {
+    //     Ok(vir_mid::ty::LifetimeConst {
+    //         name: lifetime_const.name,
+    //     })
+    // }
 }
