@@ -22,6 +22,7 @@ impl Positioned for Statement {
             Self::EndLft(statement) => statement.position(),
             Self::GhostAssignment(statement) => statement.position(),
             Self::LifetimeTake(statement) => statement.position(),
+            Self::LifetimeReturn(statement) => statement.position(),
         }
     }
 }
@@ -129,6 +130,12 @@ impl Positioned for GhostAssignment {
 }
 
 impl Positioned for LifetimeTake {
+    fn position(&self) -> Position {
+        self.position
+    }
+}
+
+impl Positioned for LifetimeReturn {
     fn position(&self) -> Position {
         self.position
     }

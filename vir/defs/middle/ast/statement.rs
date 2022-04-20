@@ -34,6 +34,7 @@ pub enum Statement {
     EndLft(EndLft),
     GhostAssignment(GhostAssignment),
     LifetimeTake(LifetimeTake),
+    LifetimeReturn(LifetimeReturn),
 }
 
 #[display(fmt = "// {}", comment)]
@@ -222,6 +223,14 @@ pub struct GhostAssignment {
 
 #[display(fmt = "{} := shorten_lifetime({:?}, {})", target, value, rd_perm)]
 pub struct LifetimeTake {
+    pub target: VariableDecl,
+    pub value: Vec<LifetimeConst>,
+    pub rd_perm: u32,
+    pub position: Position,
+}
+
+#[display(fmt = "{} := lifetime_return({:?}, {})", target, value, rd_perm)]
+pub struct LifetimeReturn {
     pub target: VariableDecl,
     pub value: Vec<LifetimeConst>,
     pub rd_perm: u32,

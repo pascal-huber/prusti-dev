@@ -130,6 +130,8 @@ pub enum ErrorCtxt {
     LifetimeEncoding,
     /// Failed to encode LifetimeTake
     LifetimeTake,
+    /// Failed to encode LifetimeReturn
+    LifetimeReturn,
     /// Failed to set an active variant of an union.
     SetEnumVariant,
 }
