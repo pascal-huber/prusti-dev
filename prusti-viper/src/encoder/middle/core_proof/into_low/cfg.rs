@@ -399,7 +399,12 @@ impl IntoLow for vir_mid::Statement {
                 Ok(statements)
             }
             Self::LifetimeTake(_statement) => {
-                unimplemented!();
+                dbg!(&_statement);
+                unimplemented!("LifetimeTake");
+            }
+            Self::LifetimeReturn(_statement) => {
+                dbg!(&_statement);
+                unimplemented!("LifetimeReturn");
             }
             Self::OpenMutRef(_statement) => {
                 unimplemented!();
