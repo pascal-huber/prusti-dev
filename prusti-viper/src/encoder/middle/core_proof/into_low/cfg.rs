@@ -390,6 +390,7 @@ impl IntoLow for vir_mid::Statement {
                     statement.position,
                 )])
             }
+            // TODO: remove GhostAssignment
             Self::GhostAssignment(statement) => {
                 let statements = vec![Statement::assign(
                     statement.target.to_procedure_snapshot(lowerer)?,
@@ -399,8 +400,36 @@ impl IntoLow for vir_mid::Statement {
                 Ok(statements)
             }
             Self::LifetimeTake(statement) => {
-                Ok(vec![Statement::comment(format!("{}", statement))])
                 // TODO: add method call for lft_tok_sep_take
+                if statement.value.len() == 1 {
+                    // TODO remove this fake ghost-assignment
+                    let expr = vir_low::Expression::local_no_pos(
+                        statement.value.first().unwrap().to_procedure_snapshot(lowerer)?,
+                    );
+                    Ok(vec![Statement::assign(
+                        statement.target.to_procedure_snapshot(lowerer)?,
+                        expr,
+                        statement.position,
+                    )])
+                } else {
+                    let mut arguments: Vec<vir_low::Expression> = vec![];
+                    for lifetime in &statement.value {
+                        arguments.push(vir_low::Expression::local_no_pos(
+                            lifetime.to_procedure_snapshot(lowerer)?,
+                        ));
+                    }
+                    let target = vec![vir_low::Expression::local_no_pos(
+                        statement.target.to_procedure_snapshot(lowerer)?,
+                    )];
+                    Ok(vec![Statement::comment(format!("{}", statement)),
+                    // TODO: add rd_perm
+                    Statement::method_call(
+                        String::from("lft_tok_sep_take"),
+                        arguments,
+                        target,
+                        statement.position,
+                    )])
+                }
             }
             Self::LifetimeReturn(statement) => {
                 Ok(vec![Statement::comment(format!("{}", statement))])
