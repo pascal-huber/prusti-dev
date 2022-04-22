@@ -576,3 +576,4 @@ impl CollectPermissionChanges for vir_high::CloseMutRef {
     ) -> SpannedEncodingResult<()> {
         Ok(())
     }
+}
