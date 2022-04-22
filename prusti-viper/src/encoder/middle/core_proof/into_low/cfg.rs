@@ -404,7 +404,11 @@ impl IntoLow for vir_mid::Statement {
                 if statement.value.len() == 1 {
                     // TODO remove this fake ghost-assignment
                     let expr = vir_low::Expression::local_no_pos(
-                        statement.value.first().unwrap().to_procedure_snapshot(lowerer)?,
+                        statement
+                            .value
+                            .first()
+                            .unwrap()
+                            .to_procedure_snapshot(lowerer)?,
                     );
                     Ok(vec![Statement::assign(
                         statement.target.to_procedure_snapshot(lowerer)?,
@@ -421,14 +425,16 @@ impl IntoLow for vir_mid::Statement {
                     let target = vec![vir_low::Expression::local_no_pos(
                         statement.target.to_procedure_snapshot(lowerer)?,
                     )];
-                    Ok(vec![Statement::comment(format!("{}", statement)),
-                    // TODO: add rd_perm
-                    Statement::method_call(
-                        String::from("lft_tok_sep_take"),
-                        arguments,
-                        target,
-                        statement.position,
-                    )])
+                    Ok(vec![
+                        Statement::comment(format!("{}", statement)),
+                        // TODO: add rd_perm
+                        Statement::method_call(
+                            String::from("lft_tok_sep_take"),
+                            arguments,
+                            target,
+                            statement.position,
+                        ),
+                    ])
                 }
             }
             Self::LifetimeReturn(statement) => {
