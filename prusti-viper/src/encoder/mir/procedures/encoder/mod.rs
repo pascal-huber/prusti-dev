@@ -454,12 +454,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         old_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
         new_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
-        let lifetimes_to_end =
-            self.lifetimes_to_end(&old_original_lifetimes, &new_derived_lifetimes);
+        let lifetimes_to_end = self.lifetimes_to_end(old_original_lifetimes, new_derived_lifetimes);
         self.encode_end_lft(block_builder, location, &lifetimes_to_end)?;
 
         let mut lifetimes_to_create =
-            self.lifetimes_to_create(&old_original_lifetimes, &new_derived_lifetimes);
+            self.lifetimes_to_create(old_original_lifetimes, new_derived_lifetimes);
         self.encode_new_lft(block_builder, location, &lifetimes_to_create)?;
 
         // println!("------");
@@ -468,14 +467,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         // dbg!(&lifetimes_to_create);
 
         let lifetimes_to_return =
-            self.lifetimes_to_return(&old_derived_lifetimes, &new_derived_lifetimes);
+            self.lifetimes_to_return(old_derived_lifetimes, new_derived_lifetimes);
         // dbg!(&lifetimes_to_return);
         for (lft, derived_from) in lifetimes_to_return {
             self.encode_lft_return(block_builder, location, lft, derived_from)?;
         }
 
         let lifetimes_to_take =
-            self.lifetimes_to_take(&old_derived_lifetimes, &new_derived_lifetimes);
+            self.lifetimes_to_take(old_derived_lifetimes, new_derived_lifetimes);
         // dbg!(&lifetimes_to_take);
         for (lft, derived_from) in lifetimes_to_take {
             self.encode_lft_take(block_builder, location, lft, derived_from)?;
@@ -504,7 +503,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             } else {
                 let values = new_derived_lifetimes.get(&lft).unwrap();
                 // lifetimes which are in old_values but not in values
-                let diff: BTreeSet<String> = old_values.difference(&values).cloned().collect();
+                let diff: BTreeSet<String> = old_values.difference(values).cloned().collect();
                 if !diff.is_empty() {
                     // if the lifetime does not depend on another anymore,  we still return them all
                     // (and re-add them later)
@@ -529,7 +528,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let old_values = old_derived_lifetimes.get(&lft).unwrap();
                 // we want to check if there are any new lifetimes
                 // i.e. lifetimes which are in new_values but not in old_values
-                let diff: BTreeSet<String> = new_values.difference(&old_values).cloned().collect();
+                let diff: BTreeSet<String> = new_values.difference(old_values).cloned().collect();
                 // println!("lft: {:?} diff {:?}", lft, diff);
                 if !diff.is_empty() {
                     derived_lifetimes_take.insert(lft.clone(), new_values.clone());
@@ -567,7 +566,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             .flatten()
             .collect();
         derived_from
-            .clone()
             .into_iter()
             .filter(|x| !old_original_lifetimes.contains(x))
             .collect()
