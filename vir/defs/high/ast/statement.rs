@@ -30,7 +30,7 @@ pub enum Statement {
     SetUnionVariant(SetUnionVariant),
     NewLft(NewLft),
     EndLft(EndLft),
-    GhostAssignment(GhostAssignment),
+    Dead(Dead),
     LifetimeTake(LifetimeTake),
     LifetimeReturn(LifetimeReturn),
     OpenMutRef(OpenMutRef),
@@ -193,10 +193,9 @@ pub struct EndLft {
     pub position: Position,
 }
 
-#[display(fmt = "ghost-assign {} := {}", target, value)]
-pub struct GhostAssignment {
+#[display(fmt = "dead({})", target)]
+pub struct Dead {
     pub target: VariableDecl,
-    pub value: Expression,
     pub position: Position,
 }
 

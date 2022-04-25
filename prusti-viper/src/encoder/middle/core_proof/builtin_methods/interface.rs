@@ -2120,7 +2120,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             // NOTE: this block is slightly different
             pres.push(vir_low::Expression::predicate_access_predicate_no_pos(
                 stringify!(LifetimeToken).to_string(),
-                vec![lft.clone().into()],
+                vec![lft.into()],
                 rd_perm.clone().into(),
             ));
 
@@ -2128,16 +2128,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             for i in 1..(lft_count + 1) {
                 posts.push(vir_low::Expression::predicate_access_predicate_no_pos(
                     stringify!(LifetimeToken).to_string(),
-                    vec![
-                        vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                            format!("lft_{}", i),
-                            ty!(Lifetime),
-                        )),
-                    ],
+                    vec![vir_low::Expression::local_no_pos(
+                        vir_low::VariableDecl::new(format!("lft_{}", i), ty!(Lifetime)),
+                    )],
                     rd_perm.clone().into(),
                 ));
             }
-
 
             // TODO: this seems not the right place for some of those computations, also redundant
             let arguments: Vec<vir_low::Expression> = self.encode_lifetimes(lft_count)?;
@@ -2164,14 +2160,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 ),
             ));
 
-            let method = vir_low::MethodDecl::new(
-                method_name,
-                parameters,
-                vec![],
-                pres,
-                posts,
-                None,
-            );
+            let method =
+                vir_low::MethodDecl::new(method_name, parameters, vec![], pres, posts, None);
             self.declare_method(method)?;
 
             self.builtin_methods_state

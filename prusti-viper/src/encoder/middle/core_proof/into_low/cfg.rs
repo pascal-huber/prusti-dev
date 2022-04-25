@@ -390,14 +390,8 @@ impl IntoLow for vir_mid::Statement {
                     statement.position,
                 )])
             }
-            // TODO: remove GhostAssignment
-            Self::GhostAssignment(statement) => {
-                let statements = vec![Statement::assign(
-                    statement.target.to_procedure_snapshot(lowerer)?,
-                    statement.value.to_procedure_snapshot(lowerer)?,
-                    statement.position,
-                )];
-                Ok(statements)
+            Self::Dead(_statement) => {
+                unimplemented!();
             }
             Self::LifetimeTake(statement) => {
                 if statement.value.len() == 1 {
@@ -440,7 +434,7 @@ impl IntoLow for vir_mid::Statement {
             Self::LifetimeReturn(statement) => {
                 if statement.value.len() > 1 {
                     lowerer.encode_lft_tok_sep_return_method(statement.value.len())?;
-                    return Ok(vec![Statement::comment(format!("{}", statement))])
+                    return Ok(vec![Statement::comment(format!("{}", statement))]);
                 }
                 Ok(vec![])
                 // TODO: add method call for lft_tok_sep_return
