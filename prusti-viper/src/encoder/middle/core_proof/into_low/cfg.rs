@@ -400,16 +400,6 @@ impl IntoLow for vir_mid::Statement {
                 Ok(statements)
             }
             Self::LifetimeTake(statement) => {
-                println!("---------------------");
-                dbg!(&statement);
-                // lowerer.encode_lifetime_included()?;
-                // lowerer.encode_lifetime_intersect(2)?;
-                // lowerer.encode_lifetime_included_intersect_axiom(2)?;
-                // lowerer.encode_lifetime_intersect(3)?;
-                // lowerer.encode_lifetime_included_intersect_axiom(3)?;
-                lowerer.encode_lft_tok_sep_take_method(2)?;
-                lowerer.encode_lft_tok_sep_take_method(3)?;
-
                 if statement.value.len() == 1 {
                     // TODO: also use lft_tok_sep_take for one lifetime?
                     let expr = vir_low::Expression::local_no_pos(
