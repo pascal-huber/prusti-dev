@@ -400,10 +400,8 @@ impl IntoLow for vir_mid::Statement {
                 Ok(statements)
             }
             Self::LifetimeTake(statement) => {
-                // TODO: add method call for lft_tok_sep_take
-                lowerer.encode_lft_tok_sep_take_method(statement.value.len())?;
                 if statement.value.len() == 1 {
-                    // TODO remove this fake ghost-assignment
+                    // TODO: also use lft_tok_sep_take for one lifetime?
                     let expr = vir_low::Expression::local_no_pos(
                         statement
                             .value
@@ -417,6 +415,7 @@ impl IntoLow for vir_mid::Statement {
                         statement.position,
                     )])
                 } else {
+                    lowerer.encode_lft_tok_sep_take_method(statement.value.len())?;
                     let mut arguments: Vec<vir_low::Expression> = vec![];
                     for lifetime in &statement.value {
                         arguments.push(vir_low::Expression::local_no_pos(

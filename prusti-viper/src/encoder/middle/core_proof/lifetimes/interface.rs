@@ -5,6 +5,8 @@ use crate::encoder::{
         snapshots::IntoProcedureSnapshot,
     },
 };
+use rustc_hash::FxHashSet;
+use std::collections::VecDeque;
 use vir_crate::{
     common::expression::{BinaryOperationHelpers, QuantifierHelpers},
     low as vir_low, middle as vir_mid,
@@ -13,14 +15,31 @@ use vir_crate::{
 #[derive(Default)]
 pub(in super::super) struct LifetimesState {
     is_lifetime_token_encoded: bool,
+    is_lifetime_included_encoded: bool,
+    encoded_lifetime_intersect: FxHashSet<usize>,
+    encoded_lifetime_included_intersect_axiom: FxHashSet<usize>,
+}
+
+trait Private {
+    fn encode_lifetimes(
+        &mut self,
+        lft_count: usize,
+    ) -> SpannedEncodingResult<Vec<vir_low::Expression>>;
+    fn encode_lifetime_included_intersect_axiom_body(
+        &mut self,
+        expressions: &mut VecDeque<vir_low::Expression>,
+    ) -> vir_low::Expression;
 }
 
 pub(in super::super) trait LifetimesInterface {
     fn lifetime_domain_name(&self) -> SpannedEncodingResult<String>;
     fn lifetime_type(&mut self) -> SpannedEncodingResult<vir_low::Type>;
-    fn encode_lifetime_intersect(&mut self) -> SpannedEncodingResult<vir_low::Expression>;
-    fn encode_lifetime_included(&mut self) -> SpannedEncodingResult<vir_low::Expression>;
-    fn encode_lifetime_included_intersect_axiom(&mut self) -> SpannedEncodingResult<()>;
+    fn encode_lifetime_intersect(&mut self, lft_count: usize) -> SpannedEncodingResult<()>;
+    fn encode_lifetime_included(&mut self) -> SpannedEncodingResult<()>;
+    fn encode_lifetime_included_intersect_axiom(
+        &mut self,
+        lft_count: usize,
+    ) -> SpannedEncodingResult<()>;
     fn encode_lifetime_token_predicate(&mut self) -> SpannedEncodingResult<()>;
     fn encode_lifetime_const_into_variable(
         &mut self,
@@ -36,6 +55,36 @@ pub(in super::super) trait LifetimesInterface {
     ) -> SpannedEncodingResult<Vec<vir_low::Expression>>;
 }
 
+impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
+    fn encode_lifetimes(
+        &mut self,
+        lft_count: usize,
+    ) -> SpannedEncodingResult<Vec<vir_low::Expression>> {
+        let ty = self.domain_type("Lifetime")?;
+        let mut arguments: Vec<vir_low::Expression> = vec![];
+        for i in 1..(lft_count + 1) {
+            arguments.push(vir_low::Expression::local_no_pos(
+                vir_low::VariableDecl::new(format!("lft_{}", i), ty.clone()),
+            ));
+        }
+        Ok(arguments)
+    }
+
+    fn encode_lifetime_included_intersect_axiom_body(
+        &mut self,
+        expressions: &mut VecDeque<vir_low::Expression>,
+    ) -> vir_low::Expression {
+        if expressions.len() == 1 {
+            return expressions.pop_front().unwrap();
+        }
+        let first = expressions.pop_front().unwrap();
+        BinaryOperationHelpers::and(
+            first,
+            self.encode_lifetime_included_intersect_axiom_body(expressions),
+        )
+    }
+}
+
 impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
     fn lifetime_domain_name(&self) -> SpannedEncodingResult<String> {
         Ok("Lifetime".to_string())
@@ -45,124 +94,122 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
         self.domain_type(self.lifetime_domain_name()?)
     }
 
-    fn encode_lifetime_intersect(&mut self) -> SpannedEncodingResult<vir_low::Expression> {
-        let ty = self.domain_type("Lifetime")?;
-        // TODO: why VariableDecl if name is ignored anyways??
-        let arguments: Vec<vir_low::Expression> = vec![
-            vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                "lft_1".to_string(),
-                ty.clone(),
-            )),
-            vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                "lft_2".to_string(),
-                ty.clone(),
-            )),
-        ];
-        self.create_domain_func_app("Lifetime", "intersect$", arguments, ty, Default::default())
-    }
+    fn encode_lifetime_intersect(&mut self, lft_count: usize) -> SpannedEncodingResult<()> {
+        if !self
+            .lifetimes_state
+            .encoded_lifetime_intersect
+            .contains(&lft_count)
+        {
+            self.lifetimes_state
+                .encoded_lifetime_intersect
+                .insert(lft_count);
 
-    fn encode_lifetime_included(&mut self) -> SpannedEncodingResult<vir_low::Expression> {
-        let ty = self.domain_type("Lifetime")?;
-        // TODO: why VariableDecl if name is ignored anyways??
-        let arguments: Vec<vir_low::Expression> = vec![
-            vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                "lft_1".to_string(),
-                ty.clone(),
-            )),
-            vir_low::Expression::local_no_pos(vir_low::VariableDecl::new("lft_2".to_string(), ty)),
-        ];
-        self.create_domain_func_app(
-            "Lifetime",
-            "included$",
-            arguments,
-            vir_low::ty::Type::Bool,
-            Default::default(),
-        )
-    }
-
-    fn encode_lifetime_included_intersect_axiom(&mut self) -> SpannedEncodingResult<()> {
-        let ty = self.domain_type("Lifetime")?;
-        use vir_low::macros::*;
-        let variables = vars! { lft_1 : Lifetime, lft_2 : Lifetime };
-        let mut trigger_expressions = vec![];
-
-        // Arguments for Triggers and Body
-        let arguments_all_lifetimes = vec![
-            vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                "lft_1".to_string(),
-                ty.clone(),
-            )),
-            vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                "lft_2".to_string(),
-                ty.clone(),
-            )),
-        ];
-
-        let arguments_1: Vec<vir_low::Expression> = vec![
+            let ty = self.domain_type("Lifetime")?;
+            let arguments = self.encode_lifetimes(lft_count).unwrap();
             self.create_domain_func_app(
                 "Lifetime",
-                "itersect$",
-                arguments_all_lifetimes.clone(),
-                ty.clone(),
+                format!("intersect${lft_count}"),
+                arguments,
+                ty,
                 Default::default(),
-            )?,
-            vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                "lft_1".to_string(),
-                ty.clone(),
-            )),
-        ];
-        let arguments_2: Vec<vir_low::Expression> = vec![
-            self.create_domain_func_app(
-                "Lifetime",
-                "itersect$",
-                arguments_all_lifetimes,
-                ty.clone(),
-                Default::default(),
-            )?,
-            vir_low::Expression::local_no_pos(vir_low::VariableDecl::new("lft_2".to_string(), ty)),
-        ];
+            )?;
+        }
+        Ok(())
+    }
 
-        // Triggers
-        trigger_expressions.push(self.create_domain_func_app(
-            "Lifetime",
-            "included$",
-            arguments_1.clone(),
-            vir_low::ty::Type::Bool,
-            Default::default(),
-        )?);
-        trigger_expressions.push(self.create_domain_func_app(
-            "Lifetime",
-            "included$",
-            arguments_2.clone(),
-            vir_low::ty::Type::Bool,
-            Default::default(),
-        )?);
-        let triggers = vec![vir_low::Trigger {
-            terms: trigger_expressions,
-        }];
-
-        let quantifier_body = BinaryOperationHelpers::and(
+    fn encode_lifetime_included(&mut self) -> SpannedEncodingResult<()> {
+        if !self.lifetimes_state.is_lifetime_included_encoded {
+            self.lifetimes_state.is_lifetime_included_encoded = true;
+            let ty = self.domain_type("Lifetime")?;
+            // TODO: why VariableDecl if name is ignored anyways??
+            let arguments: Vec<vir_low::Expression> = vec![
+                vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
+                    "lft_1".to_string(),
+                    ty.clone(),
+                )),
+                vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
+                    "lft_2".to_string(),
+                    ty,
+                )),
+            ];
             self.create_domain_func_app(
                 "Lifetime",
                 "included$",
-                arguments_1,
+                arguments,
                 vir_low::ty::Type::Bool,
                 Default::default(),
-            )?,
-            self.create_domain_func_app(
-                "Lifetime",
-                "included$",
-                arguments_2,
-                vir_low::ty::Type::Bool,
-                Default::default(),
-            )?,
-        );
+            )?;
+        }
+        Ok(())
+    }
 
-        let axiom = vir_low::DomainAxiomDecl {
-            name: String::from("included_intersect"),
-            body: QuantifierHelpers::forall(variables, triggers, quantifier_body),
-        };
-        self.declare_axiom("Lifetime", axiom)?;
+    fn encode_lifetime_included_intersect_axiom(
+        &mut self,
+        lft_count: usize,
+    ) -> SpannedEncodingResult<()> {
+        if !self
+            .lifetimes_state
+            .encoded_lifetime_included_intersect_axiom
+            .contains(&lft_count)
+        {
+            self.lifetimes_state
+                .encoded_lifetime_included_intersect_axiom
+                .insert(lft_count);
+
+            let ty = self.domain_type("Lifetime")?;
+
+            // Variables
+            let mut variables = vec![];
+            for i in 1..(lft_count + 1) {
+                variables.push(vir_low::VariableDecl::new(format!("lft_{i}"), ty.clone()))
+            }
+
+            // Arguments for Triggers and Body
+            let arguments_all_lifetimes = self.encode_lifetimes(lft_count).unwrap();
+
+            // Expression arguments
+            let mut arguments: Vec<Vec<vir_low::Expression>> = vec![];
+            for i in 1..(lft_count + 1) {
+                arguments.push(vec![
+                    vir_low::Expression::domain_function_call(
+                        "Lifetime",
+                        format!("intersect${lft_count}"),
+                        arguments_all_lifetimes.clone(),
+                        ty.clone(),
+                    ),
+                    vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
+                        format!("lft_{i}"),
+                        ty.clone(),
+                    )),
+                ]);
+            }
+
+            // Triggers
+            let mut trigger_expressions = vec![];
+            for i in 1..(lft_count + 1) {
+                trigger_expressions.push(self.create_domain_func_app(
+                    "Lifetime",
+                    "included$",
+                    arguments.get_mut(i - 1).unwrap().clone(),
+                    vir_low::ty::Type::Bool,
+                    Default::default(),
+                )?);
+            }
+            let triggers = vec![vir_low::Trigger {
+                terms: trigger_expressions.clone(),
+            }];
+
+            // Body
+            let quantifier_body = self.encode_lifetime_included_intersect_axiom_body(
+                &mut trigger_expressions.clone().into(),
+            );
+
+            let axiom = vir_low::DomainAxiomDecl {
+                name: format!("included_intersect${lft_count}"),
+                body: QuantifierHelpers::forall(variables, triggers, quantifier_body),
+            };
+            self.declare_axiom("Lifetime", axiom)?;
+        }
         Ok(())
     }
 

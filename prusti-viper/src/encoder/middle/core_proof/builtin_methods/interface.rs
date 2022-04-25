@@ -1994,12 +1994,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             .encoded_lft_tok_sep_take_methods
             .contains(&lft_count)
         {
+            assert!(lft_count > 1);
             let method_name = self.encode_lft_tok_sep_take_method_name(lft_count)?;
-            // TODO:  make one call for all?
             self.encode_lifetime_token_predicate()?;
-            self.encode_lifetime_intersect()?;
             self.encode_lifetime_included()?;
-            self.encode_lifetime_included_intersect_axiom()?;
+            self.encode_lifetime_intersect(lft_count)?;
+            self.encode_lifetime_included_intersect_axiom(lft_count)?;
             use vir_low::macros::*;
 
             // TODO: add intersect postcondigion: lft == intersect(lft1, lft2)
