@@ -438,7 +438,11 @@ impl IntoLow for vir_mid::Statement {
                 }
             }
             Self::LifetimeReturn(statement) => {
-                Ok(vec![Statement::comment(format!("{}", statement))])
+                if statement.value.len() > 1 {
+                    lowerer.encode_lft_tok_sep_return_method(statement.value.len())?;
+                    return Ok(vec![Statement::comment(format!("{}", statement))])
+                }
+                Ok(vec![])
                 // TODO: add method call for lft_tok_sep_return
             }
             Self::OpenMutRef(_statement) => {
