@@ -390,10 +390,22 @@ impl IntoLow for vir_mid::Statement {
                     statement.position,
                 )])
             }
-            Self::Dead(_statement) => {
-                unimplemented!();
+            Self::Dead(statement) => {
+                // TODO: implement Dead() in vir_low
+                Ok(vec![
+                    Statement::comment(format!("DeadVar {}", statement))
+                ])
             }
             Self::LifetimeTake(statement) => {
+
+                // TODO: remove this
+                // println!("---------------------");
+                // dbg!(&statement);
+                lowerer.encode_lft_tok_sep_take_method(2)?;
+                lowerer.encode_lft_tok_sep_take_method(3)?;
+                lowerer.encode_lft_tok_sep_return_method(2)?;
+                lowerer.encode_lft_tok_sep_return_method(3)?;
+
                 if statement.value.len() == 1 {
                     // TODO: also use lft_tok_sep_take for one lifetime?
                     let expr = vir_low::Expression::local_no_pos(

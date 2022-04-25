@@ -18,6 +18,7 @@ use rustc_middle::mir::StatementKind;
 use rustc_hir::def_id;
 
 use crate::environment::mir_utils::RealEdges;
+use crate::environment::mir_dump::graphviz::to_text::ToText;
 use crate::environment::Environment;
 
 /// Index of a Basic Block
@@ -76,6 +77,20 @@ impl<'tcx> Procedure<'tcx> {
         // types.into_iter().collect()
         unimplemented!();
 
+    }
+
+    // TODO: this is nasty
+    pub fn get_var_of_lifetime(&self, lft: &str) -> Option<String>{
+        let mir = self.get_mir();
+        for local in mir.vars_and_temps_iter() {
+            let local_name = format!("{:?}", local);
+            if let rustc_middle::ty::TyKind::Ref(region, _, _) = &mir.local_decls[local].ty.kind() {
+                if region.to_text() == lft {
+                    return Some(local_name);
+                }
+            }
+        }
+        None
     }
 
     /// Get definition ID of the procedure.
