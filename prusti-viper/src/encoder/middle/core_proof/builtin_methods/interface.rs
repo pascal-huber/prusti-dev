@@ -218,10 +218,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         &self,
         lft_count: usize,
     ) -> SpannedEncodingResult<String> {
-        Ok(format!(
-            "lft_tok_sep_take${}",
-            lft_count
-        ))
+        Ok(format!("lft_tok_sep_take${}", lft_count))
     }
     fn encode_assign_method_name(
         &self,
@@ -2015,34 +2012,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             pres.push(expr! {
                 [vir_low::Expression::no_permission()] < rd_perm
             });
-            for i in 1..(lft_count+1) {
-                let var_decl = vir_low::VariableDecl::new(
-                        format!("lft_{i}"),
-                        ty!(Lifetime),
-                    );
-                parameters.push(var_decl.clone().into() );
-                pres.push(
-                    vir_low::Expression::predicate_access_predicate_no_pos(
+            for i in 1..(lft_count + 1) {
+                let var_decl = vir_low::VariableDecl::new(format!("lft_{i}"), ty!(Lifetime));
+                parameters.push(var_decl.clone());
+                pres.push(vir_low::Expression::predicate_access_predicate_no_pos(
                     stringify!(LifetimeToken).to_string(),
                     vec![var_decl.into()],
-                    rd_perm.clone().into()
-                    )
-                );
+                    rd_perm.clone().into(),
+                ));
             }
-            parameters.push(rd_perm.clone().into());
-            posts.push(
-                vir_low::Expression::predicate_access_predicate_no_pos(
-                    stringify!(LifetimeToken).to_string(),
-                    vec![lft.clone().into()],
-                    rd_perm.clone().into()
-                )
-            );
-
+            parameters.push(rd_perm.clone());
+            posts.push(vir_low::Expression::predicate_access_predicate_no_pos(
+                stringify!(LifetimeToken).to_string(),
+                vec![lft.clone().into()],
+                rd_perm.into(),
+            ));
 
             let method = vir_low::MethodDecl::new(
                 method_name,
                 parameters,
-                vec![lft.clone()], // targets
+                vec![lft], // targets
                 pres,
                 posts,
                 None,
