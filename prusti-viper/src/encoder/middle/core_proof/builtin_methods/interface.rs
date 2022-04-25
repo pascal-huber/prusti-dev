@@ -2002,8 +2002,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.encode_lifetime_included_intersect_axiom(lft_count)?;
             use vir_low::macros::*;
 
-            // TODO: add intersect postcondigion: lft == intersect(lft1, lft2)
-
             var_decls!(lft: Lifetime); // target
             let mut pres = vec![];
             let mut posts = vec![];
@@ -2026,6 +2024,31 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 stringify!(LifetimeToken).to_string(),
                 vec![lft.clone().into()],
                 rd_perm.into(),
+            ));
+
+            // TODO: this seems not the right place for some of those computations, also redundant
+            let arguments: Vec<vir_low::Expression> = self.encode_lifetimes(lft_count)?;
+            // let parameters = self.create_parameters(&arguments);
+            let parameters_post: Vec<vir_low::VariableDecl> = arguments
+                .iter()
+                .enumerate()
+                .map(|(index, _arg)| {
+                    vir_low::VariableDecl::new(format!("_{}", index), ty!(Lifetime))
+                })
+                .collect();
+            posts.push(vir_low::Expression::binary_op_no_pos(
+                vir_low::BinaryOpKind::EqCmp,
+                vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
+                    "lft".to_string(),
+                    ty!(Lifetime),
+                )),
+                vir_low::Expression::domain_func_app_no_pos(
+                    "Lifetime".to_string(),
+                    format!("intersect${}", lft_count),
+                    arguments,
+                    parameters_post,
+                    ty!(Lifetime),
+                ),
             ));
 
             let method = vir_low::MethodDecl::new(

@@ -21,10 +21,6 @@ pub(in super::super) struct LifetimesState {
 }
 
 trait Private {
-    fn encode_lifetimes(
-        &mut self,
-        lft_count: usize,
-    ) -> SpannedEncodingResult<Vec<vir_low::Expression>>;
     fn encode_lifetime_included_intersect_axiom_body(
         &mut self,
         expressions: &mut VecDeque<vir_low::Expression>,
@@ -34,6 +30,10 @@ trait Private {
 pub(in super::super) trait LifetimesInterface {
     fn lifetime_domain_name(&self) -> SpannedEncodingResult<String>;
     fn lifetime_type(&mut self) -> SpannedEncodingResult<vir_low::Type>;
+    fn encode_lifetimes(
+        &mut self,
+        lft_count: usize,
+    ) -> SpannedEncodingResult<Vec<vir_low::Expression>>;
     fn encode_lifetime_intersect(&mut self, lft_count: usize) -> SpannedEncodingResult<()>;
     fn encode_lifetime_included(&mut self) -> SpannedEncodingResult<()>;
     fn encode_lifetime_included_intersect_axiom(
@@ -56,20 +56,6 @@ pub(in super::super) trait LifetimesInterface {
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
-    fn encode_lifetimes(
-        &mut self,
-        lft_count: usize,
-    ) -> SpannedEncodingResult<Vec<vir_low::Expression>> {
-        let ty = self.domain_type("Lifetime")?;
-        let mut arguments: Vec<vir_low::Expression> = vec![];
-        for i in 1..(lft_count + 1) {
-            arguments.push(vir_low::Expression::local_no_pos(
-                vir_low::VariableDecl::new(format!("lft_{}", i), ty.clone()),
-            ));
-        }
-        Ok(arguments)
-    }
-
     fn encode_lifetime_included_intersect_axiom_body(
         &mut self,
         expressions: &mut VecDeque<vir_low::Expression>,
@@ -92,6 +78,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
 
     fn lifetime_type(&mut self) -> SpannedEncodingResult<vir_low::Type> {
         self.domain_type(self.lifetime_domain_name()?)
+    }
+
+    fn encode_lifetimes(
+        &mut self,
+        lft_count: usize,
+    ) -> SpannedEncodingResult<Vec<vir_low::Expression>> {
+        let ty = self.domain_type("Lifetime")?;
+        let mut arguments: Vec<vir_low::Expression> = vec![];
+        for i in 1..(lft_count + 1) {
+            arguments.push(vir_low::Expression::local_no_pos(
+                vir_low::VariableDecl::new(format!("lft_{}", i), ty.clone()),
+            ));
+        }
+        Ok(arguments)
     }
 
     fn encode_lifetime_intersect(&mut self, lft_count: usize) -> SpannedEncodingResult<()> {
