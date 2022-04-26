@@ -222,7 +222,7 @@ pub struct Dead {
     pub position: Position,
 }
 
-#[display(fmt = "{} := lifetime_take({:?}, {})", target, value, rd_perm)]
+#[display(fmt = "{} := lifetime_take({}, {})", target, "display::cjoin(value)", rd_perm)]
 pub struct LifetimeTake {
     pub target: VariableDecl,
     pub value: Vec<VariableDecl>,
@@ -230,7 +230,7 @@ pub struct LifetimeTake {
     pub position: Position,
 }
 
-#[display(fmt = "{} := lifetime_return({:?}, {})", target, value, rd_perm)]
+#[display(fmt = "lifetime_return({}, {}, {})", target, "display::cjoin(value)", rd_perm)]
 pub struct LifetimeReturn {
     pub target: VariableDecl,
     pub value: Vec<VariableDecl>,

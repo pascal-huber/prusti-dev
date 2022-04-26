@@ -207,7 +207,7 @@ pub struct LifetimeTake {
     pub position: Position,
 }
 
-#[display(fmt = "lifetime_return({}, {:?}, {})", target, value, rd_perm)]
+#[display(fmt = "lifetime_return({}, {}, {})", target, "display::cjoin(value)", rd_perm)]
 pub struct LifetimeReturn {
     pub target: VariableDecl,
     pub value: Vec<VariableDecl>,
