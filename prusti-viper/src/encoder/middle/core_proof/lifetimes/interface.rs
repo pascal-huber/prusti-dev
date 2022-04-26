@@ -182,7 +182,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
                         ty.clone(),
                     )),
                 ]);
-
             }
 
             // Triggers

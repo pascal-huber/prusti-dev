@@ -265,10 +265,12 @@ impl IntoLow for vir_mid::Statement {
                 // TODO: Remove code duplication with Self::CopyPlace
                 let target_ty = statement.target.get_type();
                 let source_ty = statement.source.get_type();
-                assert_eq!(
-                    target_ty.clone().erase_lifetime(),
-                    source_ty.clone().erase_lifetime()
-                );
+                // TODO: make erase_lifetime() return self?
+                let mut target_ty_without_lifetime = target_ty.clone();
+                target_ty_without_lifetime.erase_lifetime();
+                let mut source_ty_without_lifetime = source_ty.clone();
+                source_ty_without_lifetime.erase_lifetime();
+                assert_eq!(target_ty_without_lifetime, source_ty_without_lifetime);
                 lowerer.encode_move_place_method(target_ty)?;
                 let target_place = lowerer.encode_expression_as_place(&statement.target)?;
                 let target_address = lowerer.extract_root_address(&statement.target)?;
