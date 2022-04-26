@@ -2000,82 +2000,69 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         ));
         Ok(())
     }
+
     fn encode_lft_tok_sep_take_method(&mut self, lft_count: usize) -> SpannedEncodingResult<()> {
         if !self
             .builtin_methods_state
             .encoded_lft_tok_sep_take_methods
             .contains(&lft_count)
         {
-            assert!(lft_count > 1);
-            let method_name = self.encode_lft_tok_sep_take_method_name(lft_count)?;
+            self.builtin_methods_state
+                .encoded_lft_tok_sep_take_methods
+                .insert(lft_count);
+
             self.encode_lifetime_token_predicate()?;
             self.encode_lifetime_included()?;
             self.encode_lifetime_intersect(lft_count)?;
             self.encode_lifetime_included_intersect_axiom(lft_count)?;
             use vir_low::macros::*;
 
-            var_decls!(lft: Lifetime); // target
-            let mut pres = vec![];
-            let mut posts = vec![];
-            let mut parameters = vec![];
+            let method_name = self.encode_lft_tok_sep_take_method_name(lft_count)?;
             var_decls!(rd_perm: Perm);
-            pres.push(expr! {
-                [vir_low::Expression::no_permission()] < rd_perm
-            });
 
-            for i in 1..(lft_count + 1) {
-                let var_decl = vir_low::VariableDecl::new(format!("lft_{i}"), ty!(Lifetime));
-                parameters.push(var_decl.clone());
+            // Parameters
+            let mut parameters: Vec<vir_low::VariableDecl> =
+                self.encode_lifetimes_variable_decl(lft_count)?;
+
+            // Preconditions
+            let mut pres = vec![expr! {
+                [vir_low::Expression::no_permission()] < rd_perm
+            }];
+            for lifetime in &parameters {
+                // TODO: should I use "self.acc_owned_non_aliased(...)" here?
                 pres.push(vir_low::Expression::predicate_access_predicate_no_pos(
                     stringify!(LifetimeToken).to_string(),
-                    vec![var_decl.into()],
+                    vec![lifetime.clone().into()],
                     rd_perm.clone().into(),
                 ));
             }
             parameters.push(rd_perm.clone());
-            posts.push(vir_low::Expression::predicate_access_predicate_no_pos(
-                stringify!(LifetimeToken).to_string(),
-                vec![lft.clone().into()],
-                rd_perm.into(),
-            ));
 
-            // TODO: this seems not the right place for some of those computations, also redundant
-            let arguments: Vec<vir_low::Expression> = self.encode_lifetimes(lft_count)?;
-            // let parameters = self.create_parameters(&arguments);
-            let parameters_post: Vec<vir_low::VariableDecl> = arguments
-                .iter()
-                .enumerate()
-                .map(|(index, _arg)| {
-                    vir_low::VariableDecl::new(format!("_{}", index), ty!(Lifetime))
-                })
-                .collect();
-            posts.push(vir_low::Expression::binary_op_no_pos(
-                vir_low::BinaryOpKind::EqCmp,
-                vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                    "lft".to_string(),
-                    ty!(Lifetime),
-                )),
-                vir_low::Expression::domain_func_app_no_pos(
-                    "Lifetime".to_string(),
-                    format!("intersect${}", lft_count),
-                    arguments,
-                    parameters_post,
-                    ty!(Lifetime),
+            // Postconditions
+            var_decls!(lft: Lifetime);
+            let lifetimes_expr: Vec<vir_low::Expression> = self.encode_lifetimes(lft_count)?;
+            let posts = vec![
+                vir_low::Expression::predicate_access_predicate_no_pos(
+                    stringify!(LifetimeToken).to_string(),
+                    vec![lft.clone().into()],
+                    rd_perm.into(),
                 ),
-            ));
+                vir_low::Expression::binary_op_no_pos(
+                    vir_low::BinaryOpKind::EqCmp,
+                    expr! { lft },
+                    vir_low::Expression::domain_function_call(
+                        "Lifetime",
+                        format!("intersect${}", lft_count),
+                        lifetimes_expr,
+                        ty!(Lifetime),
+                    ),
+                ),
+            ];
 
-            let method = vir_low::MethodDecl::new(
-                method_name,
-                parameters,
-                vec![lft], // targets
-                pres,
-                posts,
-                None,
-            );
+            // Create Method
+            let method =
+                vir_low::MethodDecl::new(method_name, parameters, vec![lft], pres, posts, None);
             self.declare_method(method)?;
-            self.builtin_methods_state
-                .encoded_lft_tok_sep_take_methods
-                .insert(lft_count);
         }
         Ok(())
     }
@@ -2085,8 +2072,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             .encoded_lft_tok_sep_return_methods
             .contains(&lft_count)
         {
-            // NOTE: this line is different to lft_tok_sep_take
-            let method_name = self.encode_lft_tok_sep_return_method_name(lft_count)?;
+            self.builtin_methods_state
+                .encoded_lft_tok_sep_return_methods
+                .insert(lft_count);
 
             self.encode_lifetime_token_predicate()?;
             self.encode_lifetime_included()?;
@@ -2094,79 +2082,56 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.encode_lifetime_included_intersect_axiom(lft_count)?;
             use vir_low::macros::*;
 
+            let method_name = self.encode_lft_tok_sep_return_method_name(lft_count)?;
             var_decls!(lft: Lifetime); // target
-            let mut pres = vec![];
-            let mut posts = vec![];
-            let mut parameters = vec![];
             var_decls!(rd_perm: Perm);
-            pres.push(expr! {
-                [vir_low::Expression::no_permission()] < rd_perm
-            });
+            let lifetimes_var: Vec<vir_low::VariableDecl> =
+                self.encode_lifetimes_variable_decl(lft_count)?;
+            let lifetimes_expr: Vec<vir_low::Expression> = self.encode_lifetimes(lft_count)?;
 
-            // NOTE: this line is different to lft_tok_sep_take
-            parameters.push(lft.clone());
-
-            for i in 1..(lft_count + 1) {
-                let var_decl = vir_low::VariableDecl::new(format!("lft_{i}"), ty!(Lifetime));
-                parameters.push(var_decl.clone());
-                // pres.push(vir_low::Expression::predicate_access_predicate_no_pos(
-                //     stringify!(LifetimeToken).to_string(),
-                //     vec![var_decl.into()],
-                //     rd_perm.clone().into(),
-                // ));
-            }
+            // Parameters
+            let mut parameters = vec![lft.clone()];
+            parameters.append(lifetimes_var.clone().as_mut());
             parameters.push(rd_perm.clone());
 
-            // NOTE: this block is slightly different
-            pres.push(vir_low::Expression::predicate_access_predicate_no_pos(
-                stringify!(LifetimeToken).to_string(),
-                vec![lft.into()],
-                rd_perm.clone().into(),
-            ));
-
-            // NOTE: this block is slightly different
-            for i in 1..(lft_count + 1) {
-                posts.push(vir_low::Expression::predicate_access_predicate_no_pos(
+            // Preconditions
+            let pres = vec![
+                expr! {
+                    [vir_low::Expression::no_permission()] < rd_perm
+                },
+                vir_low::Expression::predicate_access_predicate_no_pos(
                     stringify!(LifetimeToken).to_string(),
-                    vec![vir_low::Expression::local_no_pos(
-                        vir_low::VariableDecl::new(format!("lft_{}", i), ty!(Lifetime)),
-                    )],
+                    vec![lft.clone().into()],
                     rd_perm.clone().into(),
-                ));
-            }
+                ),
+                vir_low::Expression::binary_op_no_pos(
+                    vir_low::BinaryOpKind::EqCmp,
+                    expr! { lft },
+                    vir_low::Expression::domain_function_call(
+                        "Lifetime",
+                        format!("intersect${}", lft_count),
+                        lifetimes_expr,
+                        ty!(Lifetime),
+                    ),
+                ),
+            ];
 
-            // TODO: this seems not the right place for some of those computations, also redundant
-            let arguments: Vec<vir_low::Expression> = self.encode_lifetimes(lft_count)?;
-            // let parameters = self.create_parameters(&arguments);
-            let parameters_post: Vec<vir_low::VariableDecl> = arguments
-                .iter()
-                .enumerate()
-                .map(|(index, _arg)| {
-                    vir_low::VariableDecl::new(format!("_{}", index), ty!(Lifetime))
+            // Postconditions
+            let posts: Vec<vir_low::Expression> = lifetimes_var
+                .into_iter()
+                .map(|lifetime| {
+                    vir_low::Expression::predicate_access_predicate_no_pos(
+                        stringify!(LifetimeToken).to_string(),
+                        vec![lifetime.into()],
+                        rd_perm.clone().into(),
+                    )
                 })
                 .collect();
-            pres.push(vir_low::Expression::binary_op_no_pos(
-                vir_low::BinaryOpKind::EqCmp,
-                vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                    "lft".to_string(),
-                    ty!(Lifetime),
-                )),
-                vir_low::Expression::domain_func_app_no_pos(
-                    "Lifetime".to_string(),
-                    format!("intersect${}", lft_count),
-                    arguments,
-                    parameters_post,
-                    ty!(Lifetime),
-                ),
-            ));
 
+            // Create Method
             let method =
                 vir_low::MethodDecl::new(method_name, parameters, vec![], pres, posts, None);
             self.declare_method(method)?;
-
-            self.builtin_methods_state
-                .encoded_lft_tok_sep_return_methods
-                .insert(lft_count);
         }
         Ok(())
     }
