@@ -430,12 +430,13 @@ impl IntoLow for vir_mid::Statement {
                             lifetime.to_procedure_snapshot(lowerer)?,
                         ));
                     }
+                    arguments.push(vir_low::Expression::fractional_permission(
+                        statement.rd_perm,
+                    ));
                     let target = vec![vir_low::Expression::local_no_pos(
                         statement.target.to_procedure_snapshot(lowerer)?,
                     )];
                     Ok(vec![
-                        Statement::comment(format!("{}", statement)),
-                        // TODO: add rd_perm
                         Statement::method_call(
                             String::from("lft_tok_sep_take"),
                             arguments,
@@ -448,10 +449,27 @@ impl IntoLow for vir_mid::Statement {
             Self::LifetimeReturn(statement) => {
                 if statement.value.len() > 1 {
                     lowerer.encode_lft_tok_sep_return_method(statement.value.len())?;
-                    return Ok(vec![Statement::comment(format!("{}", statement))]);
+                    let mut arguments: Vec<vir_low::Expression> = vec![];
+                    arguments.push(vir_low::Expression::local_no_pos(
+                        statement.target.to_procedure_snapshot(lowerer)?,
+                    ));
+                    for lifetime in &statement.value {
+                        arguments.push(vir_low::Expression::local_no_pos(
+                            lifetime.to_procedure_snapshot(lowerer)?,
+                        ));
+                    }
+                    arguments.push(vir_low::Expression::fractional_permission(
+                        statement.rd_perm,
+                    ));
+                    Ok(vec![Statement::method_call(
+                        String::from("lft_tok_sep_take"),
+                        arguments,
+                        vec![],
+                        statement.position,
+                    )])
+                } else {
+                    Ok(vec![])
                 }
-                Ok(vec![])
-                // TODO: add method call for lft_tok_sep_return
             }
             Self::OpenMutRef(_statement) => {
                 unimplemented!();
