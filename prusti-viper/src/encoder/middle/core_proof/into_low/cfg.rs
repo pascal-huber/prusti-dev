@@ -265,7 +265,10 @@ impl IntoLow for vir_mid::Statement {
                 // TODO: Remove code duplication with Self::CopyPlace
                 let target_ty = statement.target.get_type();
                 let source_ty = statement.source.get_type();
-                assert_eq!(target_ty.clone().erase_lifetime(), source_ty.clone().erase_lifetime());
+                assert_eq!(
+                    target_ty.clone().erase_lifetime(),
+                    source_ty.clone().erase_lifetime()
+                );
                 lowerer.encode_move_place_method(target_ty)?;
                 let target_place = lowerer.encode_expression_as_place(&statement.target)?;
                 let target_address = lowerer.extract_root_address(&statement.target)?;
@@ -392,12 +395,9 @@ impl IntoLow for vir_mid::Statement {
             }
             Self::Dead(statement) => {
                 // TODO: implement Dead() in vir_low
-                Ok(vec![
-                    Statement::comment(format!("DeadVar {}", statement))
-                ])
+                Ok(vec![Statement::comment(format!("Dead({})", statement))])
             }
             Self::LifetimeTake(statement) => {
-
                 // TODO: remove this
                 // println!("---------------------");
                 // dbg!(&statement);
