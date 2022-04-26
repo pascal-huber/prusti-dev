@@ -182,6 +182,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
                         ty.clone(),
                     )),
                 ]);
+
             }
 
             // Triggers
@@ -195,9 +196,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
                     Default::default(),
                 )?);
             }
-            let triggers = vec![vir_low::Trigger {
-                terms: trigger_expressions.clone(),
-            }];
+            let triggers: Vec<vir_low::Trigger> = trigger_expressions
+                .clone()
+                .into_iter()
+                .map(|e| vir_low::Trigger { terms: vec![e] })
+                .collect();
 
             // Body
             let quantifier_body = self.encode_lifetime_included_intersect_axiom_body(
