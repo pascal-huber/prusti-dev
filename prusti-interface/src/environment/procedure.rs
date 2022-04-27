@@ -79,7 +79,6 @@ impl<'tcx> Procedure<'tcx> {
 
     }
 
-    // TODO: this is very nasty
     pub fn get_var_of_lifetime(&self, lft: &str) -> Option<(String, Ty<'tcx>)>{
         let mir = self.get_mir();
         for local in mir.vars_and_temps_iter() {
