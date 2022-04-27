@@ -394,7 +394,7 @@ impl IntoLow for vir_mid::Statement {
                     statement.position,
                 )])
             }
-            Self::Dead(statement) => {
+            Self::Dead(_statement) => {
                 unimplemented!()
             }
             Self::LifetimeTake(statement) => {

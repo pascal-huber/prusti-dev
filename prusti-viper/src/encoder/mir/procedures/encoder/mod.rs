@@ -434,14 +434,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         original_lifetimes: &mut BTreeSet<String>,
         derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
-        let mut new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
+        let new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
         block_builder.add_comment(format!("Prepare lifetimes for statement {:?}", location));
         self.encode_lft(
             block_builder,
             location,
             original_lifetimes,
             derived_lifetimes,
-            &mut new_derived_lifetimes,
+            &new_derived_lifetimes,
         )?;
         Ok(())
     }
@@ -1156,7 +1156,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         location: mir::Location,
         block_builder: &mut BasicBlockBuilder,
     ) -> SpannedEncodingResult<()> {
-        let mut needed_derived_lifetimes = self.needed_derived_lifetimes_for_block(&target);
+        let needed_derived_lifetimes = self.needed_derived_lifetimes_for_block(&target);
         let mut current_derived_lifetimes =
             self.lifetimes.get_origin_contains_loan_at_mid(location);
         let mut current_original_lifetimes = self.lifetimes.get_loan_live_at_start(location);
@@ -1166,7 +1166,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             location,
             &mut current_original_lifetimes,
             &mut current_derived_lifetimes,
-            &mut needed_derived_lifetimes,
+            &needed_derived_lifetimes,
         )?;
         Ok(())
     }
