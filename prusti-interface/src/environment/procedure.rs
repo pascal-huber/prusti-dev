@@ -79,14 +79,14 @@ impl<'tcx> Procedure<'tcx> {
 
     }
 
-    // TODO: this is nasty
-    pub fn get_var_of_lifetime(&self, lft: &str) -> Option<String>{
+    // TODO: this is very nasty
+    pub fn get_var_of_lifetime(&self, lft: &str) -> Option<(String, Ty<'tcx>)>{
         let mir = self.get_mir();
         for local in mir.vars_and_temps_iter() {
             let local_name = format!("{:?}", local);
-            if let rustc_middle::ty::TyKind::Ref(region, _, _) = &mir.local_decls[local].ty.kind() {
+            if let rustc_middle::ty::TyKind::Ref(region, ty, _z) = &mir.local_decls[local].ty.kind() {
                 if region.to_text() == lft {
-                    return Some(local_name);
+                    return Some((local_name, *ty));
                 }
             }
         }
