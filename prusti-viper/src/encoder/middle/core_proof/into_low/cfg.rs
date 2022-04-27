@@ -265,7 +265,6 @@ impl IntoLow for vir_mid::Statement {
                 // TODO: Remove code duplication with Self::CopyPlace
                 let target_ty = statement.target.get_type();
                 let source_ty = statement.source.get_type();
-                // TODO: make erase_lifetime() return self?
                 let mut target_ty_without_lifetime = target_ty.clone();
                 target_ty_without_lifetime.erase_lifetime();
                 let mut source_ty_without_lifetime = source_ty.clone();
@@ -396,8 +395,7 @@ impl IntoLow for vir_mid::Statement {
                 )])
             }
             Self::Dead(statement) => {
-                // TODO: implement Dead() in vir_low
-                unimplemented!("{}", statement);
+                unimplemented!()
             }
             Self::LifetimeTake(statement) => {
                 if statement.value.len() == 1 {

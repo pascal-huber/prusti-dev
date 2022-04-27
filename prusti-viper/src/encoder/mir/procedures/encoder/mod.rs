@@ -496,10 +496,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    /// Returns all variable names which are dead.
-    /// That is, the variables associated with a lifetime derived from
-    /// an original lifetime to be deleted. And the lifetime is not
-    /// present in the new derived lifetimes.
+    /// A variable can be killed if its lifetime was previously derived from lifetimes
+    /// but isn't anymore now.
     fn variables_to_kill(
         &mut self,
         old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
@@ -525,9 +523,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(variables_to_kill)
     }
 
-    /// Returns a map of lifetimes which can be returned
-    /// A lifetime has to be returned if:
-    ///  - it is not needed anymore
+    /// A lifetime can be returned if:
+    ///  - it is not present anymore
     ///  - the lifetimes it depends on have changed
     fn lifetimes_to_return(
         &mut self,
@@ -548,8 +545,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         derived_lifetimes_return
     }
 
-    /// Returns a map of lifetimes to take
-    /// A lifetime has to be taken if:
+    /// A lifetime can be taken if:
     ///  - it was newly introduced
     ///  - the lifetimes it depends on have changed
     fn lifetimes_to_take(
