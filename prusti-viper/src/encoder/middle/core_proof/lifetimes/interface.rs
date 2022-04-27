@@ -30,11 +30,11 @@ trait Private {
 pub(in super::super) trait LifetimesInterface {
     fn lifetime_domain_name(&self) -> SpannedEncodingResult<String>;
     fn lifetime_type(&mut self) -> SpannedEncodingResult<vir_low::Type>;
-    fn encode_lifetimes_variable_decl(
+    fn create_lifetime_var_decls(
         &mut self,
         lft_count: usize,
     ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>>;
-    fn encode_lifetimes(
+    fn create_lifetime_expressions(
         &mut self,
         lft_count: usize,
     ) -> SpannedEncodingResult<Vec<vir_low::Expression>>;
@@ -84,7 +84,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
         self.domain_type(self.lifetime_domain_name()?)
     }
 
-    fn encode_lifetimes_variable_decl(
+    fn create_lifetime_var_decls(
         &mut self,
         lft_count: usize,
     ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>> {
@@ -96,17 +96,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
         Ok(lifetimes)
     }
 
-    fn encode_lifetimes(
+    fn create_lifetime_expressions(
         &mut self,
         lft_count: usize,
     ) -> SpannedEncodingResult<Vec<vir_low::Expression>> {
-        let lifetimes: Vec<vir_low::Expression> = self
-            .encode_lifetimes_variable_decl(lft_count)
-            .unwrap()
+        Ok(self
+            .create_lifetime_var_decls(lft_count)?
             .into_iter()
             .map(vir_low::Expression::local_no_pos)
-            .collect();
-        Ok(lifetimes)
+            .collect())
     }
 
     fn encode_lifetime_intersect(&mut self, lft_count: usize) -> SpannedEncodingResult<()> {
@@ -119,13 +117,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
                 .encoded_lifetime_intersect
                 .insert(lft_count);
 
-            let ty = self.domain_type("Lifetime")?;
-            let arguments = self.encode_lifetimes(lft_count).unwrap();
+            let return_type = self.domain_type("Lifetime")?;
+            let arguments = self.create_lifetime_expressions(lft_count).unwrap();
             self.create_domain_func_app(
                 "Lifetime",
                 format!("intersect${lft_count}"),
                 arguments,
-                ty,
+                return_type,
                 Default::default(),
             )?;
         }
@@ -135,18 +133,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
     fn encode_lifetime_included(&mut self) -> SpannedEncodingResult<()> {
         if !self.lifetimes_state.is_lifetime_included_encoded {
             self.lifetimes_state.is_lifetime_included_encoded = true;
-            let ty = self.domain_type("Lifetime")?;
-            // TODO: why VariableDecl if name is ignored anyways??
-            let arguments: Vec<vir_low::Expression> = vec![
-                vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                    "lft_1".to_string(),
-                    ty.clone(),
-                )),
-                vir_low::Expression::local_no_pos(vir_low::VariableDecl::new(
-                    "lft_2".to_string(),
-                    ty,
-                )),
-            ];
+            use vir_low::macros::*;
+            var_decls!(lft_1: Lifetime);
+            var_decls!(lft_2: Lifetime);
+            let arguments: Vec<vir_low::Expression> = vec![lft_1.into(), lft_2.into()];
             self.create_domain_func_app(
                 "Lifetime",
                 "included$",
@@ -180,7 +170,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
             }
 
             // Arguments for Triggers and Body
-            let arguments_all_lifetimes = self.encode_lifetimes(lft_count).unwrap();
+            let arguments_all_lifetimes = self.create_lifetime_expressions(lft_count).unwrap();
 
             // Expression arguments
             let mut arguments: Vec<Vec<vir_low::Expression>> = vec![];

@@ -2022,14 +2022,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
             // Parameters
             let mut parameters: Vec<vir_low::VariableDecl> =
-                self.encode_lifetimes_variable_decl(lft_count)?;
+                self.create_lifetime_var_decls(lft_count)?;
 
             // Preconditions
             let mut pres = vec![expr! {
                 [vir_low::Expression::no_permission()] < rd_perm
             }];
             for lifetime in &parameters {
-                // TODO: should I use "self.acc_owned_non_aliased(...)" here?
                 pres.push(vir_low::Expression::predicate_access_predicate_no_pos(
                     stringify!(LifetimeToken).to_string(),
                     vec![lifetime.clone().into()],
@@ -2040,7 +2039,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
             // Postconditions
             var_decls!(lft: Lifetime);
-            let lifetimes_expr: Vec<vir_low::Expression> = self.encode_lifetimes(lft_count)?;
+            let lifetimes_expr: Vec<vir_low::Expression> =
+                self.create_lifetime_expressions(lft_count)?;
             let posts = vec![
                 vir_low::Expression::predicate_access_predicate_no_pos(
                     stringify!(LifetimeToken).to_string(),
@@ -2086,8 +2086,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             var_decls!(lft: Lifetime); // target
             var_decls!(rd_perm: Perm);
             let lifetimes_var: Vec<vir_low::VariableDecl> =
-                self.encode_lifetimes_variable_decl(lft_count)?;
-            let lifetimes_expr: Vec<vir_low::Expression> = self.encode_lifetimes(lft_count)?;
+                self.create_lifetime_var_decls(lft_count)?;
+            let lifetimes_expr: Vec<vir_low::Expression> =
+                self.create_lifetime_expressions(lft_count)?;
 
             // Parameters
             let mut parameters = vec![lft.clone()];
