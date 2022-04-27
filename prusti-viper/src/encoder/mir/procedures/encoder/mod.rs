@@ -14,8 +14,8 @@ use crate::encoder::{
         pure::{PureFunctionEncoderInterface, SpecificationEncoderInterface},
         spans::SpanInterface,
         specifications::SpecificationsInterface,
-        types::MirTypeEncoderInterface,
         type_layouts::MirTypeLayoutsEncoderInterface,
+        types::MirTypeEncoderInterface,
     },
     mir_encoder::PRECONDITION_LABEL,
     Encoder,
@@ -471,24 +471,25 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         // dbg!(&new_original_lifetimes);
         // dbg!(&old_original_lifetimes);
 
-        let variables_to_kill = self.variables_to_kill(old_derived_lifetimes, &new_derived_lifetimes, &lifetimes_to_end)?;
-        self.encode_dead_variables(block_builder, location, &variables_to_kill)?;
-        // dbg!(&variables_to_kill);
-
-        self.encode_end_lft(block_builder, location, &lifetimes_to_end)?;
-        // dbg!(&lifetimes_to_end);
-
-        let lifetimes_to_create =
-            self.lifetimes_to_create(old_original_lifetimes, new_original_lifetimes.clone());
-        self.encode_new_lft(block_builder, location, &lifetimes_to_create)?;
-        // dbg!(&lifetimes_to_create);
-
         let lifetimes_to_return =
             self.lifetimes_to_return(old_derived_lifetimes, new_derived_lifetimes);
         // dbg!(&lifetimes_to_return);
         for (lft, derived_from) in lifetimes_to_return {
             self.encode_lft_return(block_builder, location, lft, derived_from)?;
         }
+
+        self.encode_end_lft(block_builder, location, &lifetimes_to_end)?;
+        // dbg!(&lifetimes_to_end);
+
+        let variables_to_kill =
+            self.variables_to_kill(old_derived_lifetimes, new_derived_lifetimes)?;
+        self.encode_dead_variables(block_builder, location, &variables_to_kill)?;
+        // dbg!(&variables_to_kill);
+
+        let lifetimes_to_create =
+            self.lifetimes_to_create(old_original_lifetimes, new_original_lifetimes.clone());
+        self.encode_new_lft(block_builder, location, &lifetimes_to_create)?;
+        // dbg!(&lifetimes_to_create);
 
         let lifetimes_to_take =
             self.lifetimes_to_take(old_derived_lifetimes, new_derived_lifetimes);
@@ -511,23 +512,21 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         &mut self,
         old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
         new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
-        original_lifetimes_to_delete: &BTreeSet<String>,
     ) -> SpannedEncodingResult<BTreeSet<vir_high::VariableDecl>> {
         let mut variables_to_kill = BTreeSet::new();
-        for original_lifetime in original_lifetimes_to_delete {
-            for (derived_lifetime, derived_from) in old_derived_lifetimes {
-                if derived_from.contains(original_lifetime) {
-                    if !new_derived_lifetimes.contains_key(derived_lifetime) {
-                        if let Some((var, ty)) = self._procedure.get_var_of_lifetime(&derived_lifetime[..]) {
-                            let reference = vir_high::Type::reference(
-                                vir_high::ty::LifetimeConst { name: derived_lifetime.to_string() },
-                                vir_high::ty::Uniqueness::Unique,
-                                self.encoder.encode_type_high(ty)?
-                            );
-                            let lifetime_var = vir_high::VariableDecl::new(var.clone(), reference);
-                            variables_to_kill.insert(lifetime_var);
-                        }
-                    }
+        for derived_lifetime in old_derived_lifetimes.keys() {
+            if !new_derived_lifetimes.contains_key(derived_lifetime) {
+                if let Some((var, ty)) = self._procedure.get_var_of_lifetime(&derived_lifetime[..])
+                {
+                    let reference = vir_high::Type::reference(
+                        vir_high::ty::LifetimeConst {
+                            name: derived_lifetime.to_string(),
+                        },
+                        vir_high::ty::Uniqueness::Unique,
+                        self.encoder.encode_type_high(ty)?,
+                    );
+                    let lifetime_var = vir_high::VariableDecl::new(var.clone(), reference);
+                    variables_to_kill.insert(lifetime_var);
                 }
             }
         }
