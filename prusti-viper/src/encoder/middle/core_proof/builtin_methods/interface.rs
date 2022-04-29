@@ -1959,7 +1959,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         ));
         self.encode_snapshot_update(statements, &target, result_value.clone().into(), position)?;
         if let vir_mid::Rvalue::Ref(value) = value {
-            assert!(value.is_mut, "unimplemented!()");
+            // TODO: why this assert?
+            // assert!(value.is_mut, "unimplemented!()");
             let final_snapshot = self.reference_target_final_snapshot(
                 target.get_type(),
                 result_value.into(),
