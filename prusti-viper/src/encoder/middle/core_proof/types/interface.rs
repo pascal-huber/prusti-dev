@@ -165,6 +165,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 self.register_struct_constructor(&domain_name, parameters.clone())?;
                 self.encode_validity_axioms_struct(&domain_name, parameters, true.into())?;
             }
+            vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_shared() => {
+                self.ensure_type_definition(&reference.target_type)?;
+                let target_type = reference.target_type.to_snapshot(self)?;
+                let parameters = vars! {
+                    address: Address,
+                    target_current: {target_type.clone()},
+                    target_final: {target_type}
+                };
+                self.register_struct_constructor(&domain_name, parameters.clone())?;
+                self.encode_validity_axioms_struct(&domain_name, parameters, true.into())?;
+            }
             _ => unimplemented!("type: {:?}", type_decl),
         };
         Ok(())
