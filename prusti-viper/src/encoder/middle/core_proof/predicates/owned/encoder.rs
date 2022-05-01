@@ -306,6 +306,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     )}
                 }
                 // TODO: add only rd_perm amount of access?
+                // wtf? why are there only 3 arguments in OwnedNonAliased<ty> ???
                 // predicate! {
                 //     OwnedNonAliased<ty>(place: Place, root_address: Address, snapshot: {snapshot_type})
                 //     {(
@@ -507,7 +508,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
         };
         self.predicates.push(predicate);
         Ok(())
-
     }
 
     fn encode_unique_ref(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {

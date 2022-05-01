@@ -45,6 +45,7 @@ pub(in super::super) struct BuiltinMethodsState {
     encoded_consume_operand_methods: FxHashSet<String>,
     encoded_newlft_method: bool,
     encoded_endlft_method: bool,
+    encoded_bor_fracture_methods: FxHashSet<vir_mid::Type>,
     encoded_lft_tok_sep_take_methods: FxHashSet<usize>,
     encoded_lft_tok_sep_return_methods: FxHashSet<usize>,
     encoded_open_close_mut_ref_methods: FxHashSet<vir_mid::Type>,
@@ -66,6 +67,10 @@ trait Private {
         arguments: &mut Vec<vir_low::Expression>,
         expression: &vir_mid::Expression,
     ) -> SpannedEncodingResult<()>;
+    fn encode_bor_fracture_method_name(
+        &self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<String>;
     fn encode_lft_tok_sep_take_method_name(
         &self,
         lft_count: usize,
@@ -218,6 +223,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         arguments.push(self.extract_root_address(expression)?);
         arguments.push(expression.to_procedure_snapshot(self)?);
         Ok(())
+    }
+    fn encode_bor_fracture_method_name(
+        &self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<String> {
+        Ok(format!("bor_fracture${}",
+        ty.get_identifier()
+        ))
     }
     fn encode_lft_tok_sep_take_method_name(
         &self,
@@ -800,6 +813,7 @@ pub(in super::super) trait BuiltinMethodsInterface {
         operand: vir_mid::Operand,
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()>;
+    fn encode_bor_fracture_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
     fn encode_lft_tok_sep_take_method(&mut self, lft_count: usize) -> SpannedEncodingResult<()>;
     fn encode_lft_tok_sep_return_method(&mut self, lft_count: usize) -> SpannedEncodingResult<()>;
     fn encode_newlft_method(&mut self) -> SpannedEncodingResult<()>;
@@ -1959,14 +1973,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         ));
         self.encode_snapshot_update(statements, &target, result_value.clone().into(), position)?;
         if let vir_mid::Rvalue::Ref(value) = value {
-            // TODO: why this assert?
-            // assert!(value.is_mut, "unimplemented!()");
-            let final_snapshot = self.reference_target_final_snapshot(
-                target.get_type(),
-                result_value.into(),
-                position,
-            )?;
-            self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
+            if value.is_mut {
+                assert!(value.is_mut, "unimplemented!()"); // TODO: remove assert?
+                let final_snapshot = self.reference_target_final_snapshot(
+                    target.get_type(),
+                    result_value.into(),
+                    position,
+                )?;
+                self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
+            } else {
+                // TODO: what to do here?
+                self.encode_bor_fracture_method(target.get_type())?;
+
+
+                let final_snapshot = self.reference_target_final_snapshot(
+                    target.get_type(),
+                    result_value.into(),
+                    position,
+                )?;
+                self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
+            }
         }
         Ok(())
     }
@@ -1986,6 +2012,118 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             Vec::new(),
             position,
         ));
+        Ok(())
+    }
+
+    fn encode_bor_fracture_method(
+        &mut self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<()> {
+        // TODO make bor_fracture per type
+
+        if let vir_mid::Type::Reference(vir_mid::ty::Reference{lifetime: _, uniqueness: _, target_type: box target_ty}) = ty {
+            if !self
+            .builtin_methods_state
+            .encoded_bor_fracture_methods
+            .contains(target_ty) {
+
+            // TODO: is it correct to use the target_type?
+                use vir_low::macros::*;
+                // TODO: make sure Mutref, LifetimeToken and FracRef are defined.
+                let method_name = self.encode_bor_fracture_method_name(target_ty)?;
+                var_decls! {
+                    lft: Lifetime,
+                    rd_perm: Perm,
+                    object_place: Place,
+                    object_addr: Address
+                };
+                let object = vir_low::VariableDecl{
+                    name: "object".to_string(),
+                    ty: ty.to_snapshot(self)?,
+                };
+
+
+                // Parameters
+                let parameters = vec![
+                    lft.clone(),
+                    rd_perm.clone(),
+                    object_place.clone(),
+                    object_addr.clone(),
+                ];
+
+
+                // Preconditions
+                let lifetime_access =
+                    vir_low::Expression::predicate_access_predicate_no_pos(
+                        stringify!(LifetimeToken).to_string(),
+                        vec![lft.clone().into()],
+                        rd_perm.clone().into(),
+                    );
+                let pres = vec![
+                    // TODO: requires acc(MutRef$T(lft, object))
+                    expr! {
+                        [vir_low::Expression::no_permission()] < rd_perm
+                    },
+                    lifetime_access.clone(),
+                ];
+
+                // I am not sure what this all is about
+                let compute_address = ty!(Address);
+                var_decls! {
+                    place: Place,
+                    root_address: Address,
+                    value: {target_ty.to_snapshot(self)?}
+                };
+
+                // Postoconditions
+                let posts = vec![
+                    lifetime_access,
+                    // TODO: use macro for this
+                    vir_low::Expression::predicate_access_predicate_no_pos(
+                        format!(
+                            "{}${}",
+                            "FracRef".to_string(),
+                            target_ty.get_identifier()
+                        ),
+                        vec![
+                            lft.clone().into(),
+                            object_place.into(),
+                            object_addr.into(),
+                            value.into(),
+                        ],
+                        vir_low::Expression::full_permission(),
+                )];
+
+                // let method = vir_low::MethodDecl::new(
+                //     method_name! { write_place<ty> },
+                //     vec![place.clone(), root_address.clone(), value.clone()],
+                //     Vec::new(),
+                //     vec![expr! { (acc(MemoryBlock([address], [size_of]))) }, validity],
+                //     vec![expr! { (acc(OwnedNonAliased<ty>(place, root_address, value))) }],
+                //     Some(statements),
+
+                // predicate FracRef$I32(lifetime: Lifetime, place: Place, root_address: Address, current_snapshot: Snap$I32, final_snapshot: Snap$I32)
+                // predicate OwnedNonAliased$ref$lft_6$I32(place: Place, root_address: Address, snapshot: Snap$ref$lft_6$I32, lifetime: Lifetime) {
+
+
+                let method =
+                    vir_low::MethodDecl::new(method_name, parameters, vec![], pres, posts, None);
+                self.declare_method(method)?;
+
+                self.builtin_methods_state
+                    .encoded_bor_fracture_methods
+                    .insert(target_ty.clone());
+
+                // method bor_fracture(lft: Lifetime, rd: Perm, object: Ref)
+                // requires rd > none DONE
+                // requires acc(LifetimeToken(lft), rd) DONE
+                // requires acc(MutRef$T(lft, object))
+                // ensures acc(LifetimeToken(lft), rd) DONE
+                // ensures acc(FracRef$T(lft, object))
+            }
+        }else {
+            unreachable!()
+        }
         Ok(())
     }
 
