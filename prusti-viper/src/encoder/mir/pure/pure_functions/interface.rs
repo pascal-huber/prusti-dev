@@ -532,6 +532,8 @@ impl<'v, 'tcx: 'v> PureFunctionEncoderInterface<'v, 'tcx>
         function_identifier: String,
         constructor: FunctionConstructor<'v, 'tcx>,
     ) -> SpannedEncodingResult<()> {
+        println!("register_function_constructor_mir:");
+        dbg!(&function_identifier);
         assert!(self
             .pure_function_encoder_state
             .function_constructors

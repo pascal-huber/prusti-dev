@@ -826,19 +826,22 @@ pub(in super::super) trait BuiltinMethodsInterface {
 
 impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     fn encode_write_address_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        let mut ty_clone = ty.clone();
+        ty_clone.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_write_address_methods
-            .contains(ty)
+            .contains(&ty_clone)
         {
             self.encode_snapshot_to_bytes_function(ty)?;
             self.encode_memory_block_predicate()?;
             use vir_low::macros::*;
-            let size_of = self.encode_type_size_expression(ty)?;
+            let size_of = self.encode_type_size_expression(&ty_clone)?;
             let to_bytes = ty! { Bytes };
             let method = method! {
                 write_address<ty>(
                     address: Address,
+                    // TODO: is this the right ty?
                     value: {ty.to_snapshot(self)?}
                 ) returns ()
                     raw_code {
@@ -854,7 +857,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.declare_method(method)?;
             self.builtin_methods_state
                 .encoded_write_address_methods
-                .insert(ty.clone());
+                .insert(ty_clone.clone());
         }
         Ok(())
     }
@@ -1057,7 +1060,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     unimplemented!()
                 }
                 vir_mid::TypeDecl::Reference(_) => {
-                    unimplemented!()
+                    // TODO: is this right?
+                    self.encode_write_address_method(ty)?;
+                    statements.push(stmtp! { position =>
+                        // TODO: Replace with memcopy.
+                        call write_address<ty>([target_address], source_value)
+                    });
                 }
                 vir_mid::TypeDecl::Never => {
                     unimplemented!()

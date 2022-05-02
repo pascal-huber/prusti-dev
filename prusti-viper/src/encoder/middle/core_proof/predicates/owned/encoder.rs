@@ -283,14 +283,15 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     snapshot.clone().into(),
                     position,
                 )?;
-                let final_snapshot =
-                    self.lowerer
-                        .reference_target_final_snapshot(ty, snapshot.into(), position)?;
+                // let final_snapshot =
+                //     self.lowerer
+                //         .reference_target_final_snapshot(ty, snapshot.into(), position)?;
                 let target_type = &reference.target_type;
                 let deref_place = self.lowerer.reference_deref_place(place.into(), position)?;
                 self.encode_shared_ref(target_type)?;
+                // TODO: is this right?
                 predicate! {
-                    OwnedNonAliased<ty>(
+                    Shared<ty>(
                         place: Place,
                         root_address: Address,
                         snapshot: {snapshot_type},
@@ -301,20 +302,10 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         (acc(MemoryBlock([compute_address], [size_of]))) &&
                         (([bytes]) == (Snap<ty>::to_bytes(snapshot))) &&
                         (acc(FracRef<target_type>(
-                            lifetime, [deref_place], [address_snapshot], [current_snapshot], [final_snapshot]
+                            lifetime, [deref_place], [address_snapshot], [current_snapshot]
                         )))
                     )}
                 }
-                // TODO: add only rd_perm amount of access?
-                // wtf? why are there only 3 arguments in OwnedNonAliased<ty> ???
-                // predicate! {
-                //     OwnedNonAliased<ty>(place: Place, root_address: Address, snapshot: {snapshot_type})
-                //     {(
-                //         ([validity]) &&
-                //         (acc(MemoryBlock([compute_address], [size_of]))) &&
-                //         (([bytes]) == (Snap<ty>::to_bytes(snapshot)))
-                //     )}
-                // }
             }
             // vir_mid::TypeDecl::Never => {},
             // vir_mid::TypeDecl::Closure(Closure) => {},
@@ -405,17 +396,16 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             lifetime: Lifetime,
             place: Place,
             root_address: Address,
-            current_snapshot: {snapshot_type.clone()},
-            final_snapshot: {snapshot_type}
+            snapshot: {snapshot_type}
         }
         // let compute_address = ty!(Address);
         // let to_bytes = ty! { Bytes };
         let current_validity = self
             .lowerer
-            .encode_snapshot_valid_call_for_type(current_snapshot.clone().into(), ty)?;
-        let final_validity = self
-            .lowerer
-            .encode_snapshot_valid_call_for_type(final_snapshot.clone().into(), ty)?;
+            .encode_snapshot_valid_call_for_type(snapshot.clone().into(), ty)?;
+        // let final_validity = self
+        //     .lowerer
+        //     .encode_snapshot_valid_call_for_type(final_snapshot.clone().into(), ty)?;
         // let size_of = self.lowerer.encode_type_size_expression(ty)?;
         // let compute_address = expr! { ComputeAddress::compute_address(place, root_address) };
         // let bytes = self
@@ -431,8 +421,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     lifetime,
                     place,
                     root_address,
-                    current_snapshot,
-                    final_snapshot,
+                    snapshot
                 ],
                 None,
             ),
@@ -447,18 +436,18 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         place.clone().into(),
                         Default::default(),
                     )?;
-                    let current_field_snapshot = self.lowerer.obtain_struct_field_snapshot(
+                    let field_snapshot = self.lowerer.obtain_struct_field_snapshot(
                         ty,
                         field,
-                        current_snapshot.clone().into(),
+                        snapshot.clone().into(),
                         Default::default(),
                     )?;
-                    let final_field_snapshot = self.lowerer.obtain_struct_field_snapshot(
-                        ty,
-                        field,
-                        final_snapshot.clone().into(),
-                        Default::default(),
-                    )?;
+                    // let final_field_snapshot = self.lowerer.obtain_struct_field_snapshot(
+                    //     ty,
+                    //     field,
+                    //     final_snapshot.clone().into(),
+                    //     Default::default(),
+                    // )?;
                     let field_ty = &field.ty;
                     self.encode_unique_ref(field_ty)?;
                     let acc = expr! {
@@ -466,8 +455,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                             lifetime,
                             [field_place],
                             root_address,
-                            [current_field_snapshot],
-                            [final_field_snapshot]
+                            [field_snapshot]
                         ))
                     };
                     field_predicates.push(acc);
@@ -481,12 +469,10 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         lifetime,
                         place,
                         root_address,
-                        current_snapshot,
-                        final_snapshot,
+                        snapshot,
                     ],
                     Some(expr! {
                         [current_validity] &&
-                        [final_validity] &&
                         [field_predicates.into_iter().conjoin()]
                     }),
                 )
