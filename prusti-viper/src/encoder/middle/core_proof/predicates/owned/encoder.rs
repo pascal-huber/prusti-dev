@@ -427,12 +427,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             | vir_mid::TypeDecl::Float(_)
             | vir_mid::TypeDecl::Pointer(_) => vir_low::PredicateDecl::new(
                 predicate_name! {FracRef<ty>},
-                vec![
-                    lifetime,
-                    place,
-                    root_address,
-                    snapshot
-                ],
+                vec![lifetime, place, root_address, snapshot],
                 None,
             ),
             // vir_mid::TypeDecl::TypeVar(TypeVar) => {},
@@ -476,12 +471,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 }
                 vir_low::PredicateDecl::new(
                     predicate_name! {FracRef<ty>},
-                    vec![
-                        lifetime,
-                        place,
-                        root_address,
-                        snapshot,
-                    ],
+                    vec![lifetime, place, root_address, snapshot],
                     Some(expr! {
                         [current_validity] &&
                         [field_predicates.into_iter().conjoin()]
