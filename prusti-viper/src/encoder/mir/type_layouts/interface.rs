@@ -40,7 +40,6 @@ impl<'v, 'tcx: 'v> MirTypeLayoutsEncoderInterface<'tcx> for super::super::super:
             .contains(&encoded_ty)
         {
             let encoded_ty_clone = encoded_ty.clone();
-            dbg!(&encoded_ty_clone);
             self.register_function_constructor_mir(
                 function_call.get_identifier(),
                 Box::new(move |_encoder| {

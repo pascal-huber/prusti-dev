@@ -55,13 +55,14 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
         &mut self,
         ty_x: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
+        // TODO: is this necessary here or redundant?
         let ty: &mut vir_mid::Type = &mut ty_x.clone();
         ty.erase_lifetime();
-        // println!("encode_owned_non_aliased");
-        // dbg!(&ty);
         if self.encoded_owned_predicates.contains(ty) {
             return Ok(());
         }
+        // println!("encode_owned_non_aliased");
+        // dbg!(&ty);
         self.encoded_owned_predicates.insert(ty.clone());
         self.lowerer.encode_compute_address(ty)?;
         use vir_low::macros::*;

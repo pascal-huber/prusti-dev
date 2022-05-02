@@ -2037,21 +2037,33 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             .encoded_bor_fracture_methods
             .contains(target_ty) {
 
+                // TODO: make sure Mutref, LifetimeToken, FracRef, UniqueRef are defined.
             // TODO: is it correct to use the target_type?
+
                 use vir_low::macros::*;
-                // TODO: make sure Mutref, LifetimeToken and FracRef are defined.
+                let type_decl = self.encoder.get_type_decl_mid(ty)?;
+                let target_type = &type_decl.unwrap_reference().target_type;
                 let method_name = self.encode_bor_fracture_method_name(target_ty)?;
                 var_decls! {
                     lft: Lifetime,
                     rd_perm: Perm,
                     object_place: Place,
-                    object_addr: Address
+                    object_addr: Address,
+                    snapshot: {ty.to_snapshot(self)?}
                 };
                 let object = vir_low::VariableDecl{
                     name: "object".to_string(),
                     ty: ty.to_snapshot(self)?,
                 };
 
+                let position = vir_low::Position::default();
+                let deref_place = self.reference_deref_place(object_place.clone().into(), position)?;
+                let address_snapshot =
+                    self.reference_address_snapshot(ty, snapshot.clone().into(), position)?;
+                let current_snapshot =
+                    self.reference_target_current_snapshot(ty, snapshot.clone().into(), position)?;
+                let final_snapshot =
+                    self.reference_target_final_snapshot(ty, snapshot.clone().into(), position)?;
 
                 // Parameters
                 let parameters = vec![
@@ -2070,7 +2082,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         rd_perm.clone().into(),
                     );
                 let pres = vec![
-                    // TODO: requires acc(MutRef$T(lft, object))
+                    // TODO: requires acc(UniqueRef$T(lft, object))
+                    expr! {
+                        acc(UniqueRef<target_type>(
+                            lft,
+                            [deref_place.clone()],
+                            [address_snapshot.clone()],
+                            [current_snapshot.clone()],
+                            [final_snapshot.clone()]
+                        ))
+                    },
                     expr! {
                         [vir_low::Expression::no_permission()] < rd_perm
                     },
@@ -2099,7 +2120,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                             lft.clone().into(),
                             object_place.into(),
                             object_addr.into(),
-                            value.into(),
+                            final_snapshot,
                         ],
                         vir_low::Expression::full_permission(),
                 )];
