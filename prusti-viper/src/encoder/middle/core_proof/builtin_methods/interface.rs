@@ -1781,7 +1781,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     }
     // FIXME: This method has to be inlined if the converted type has a resource
     // invariant in it. Otherwise, that resource would be leaked.
-    fn encode_into_memory_block_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+    fn encode_into_memory_block_method(&mut self, ty_x: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        ty.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_into_memory_block_methods

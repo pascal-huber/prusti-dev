@@ -53,8 +53,12 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
 
     pub(super) fn encode_owned_non_aliased(
         &mut self,
-        ty: &vir_mid::Type,
+        ty_x: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
+        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        ty.erase_lifetime();
+        // println!("encode_owned_non_aliased");
+        // dbg!(&ty);
         if self.encoded_owned_predicates.contains(ty) {
             return Ok(());
         }
