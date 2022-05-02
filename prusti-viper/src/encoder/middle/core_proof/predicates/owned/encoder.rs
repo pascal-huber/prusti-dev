@@ -287,7 +287,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 )?;
                 let current_snapshot = self.lowerer.reference_target_current_snapshot(
                     ty,
-                    snapshot.clone().into(),
+                    snapshot.into(),
                     position,
                 )?;
                 // let final_snapshot =
