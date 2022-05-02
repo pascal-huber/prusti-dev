@@ -1984,7 +1984,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         self.encode_snapshot_update(statements, &target, result_value.clone().into(), position)?;
         if let vir_mid::Rvalue::Ref(value) = value {
             if value.is_mut {
-                assert!(value.is_mut, "unimplemented!()"); // TODO: remove assert?
                 let final_snapshot = self.reference_target_final_snapshot(
                     target.get_type(),
                     result_value.into(),
@@ -1992,10 +1991,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 )?;
                 self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
             } else {
-                // TODO: what to do here?
-                self.encode_bor_fracture_method(target.get_type())?;
-
-
+                // TODO: check this
+                let ty = target.get_type();
+                self.encode_bor_fracture_method(ty)?;
                 let final_snapshot = self.reference_target_final_snapshot(
                     target.get_type(),
                     result_value.into(),
@@ -2041,23 +2039,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             // TODO: is it correct to use the target_type?
 
                 use vir_low::macros::*;
-                let type_decl = self.encoder.get_type_decl_mid(ty)?;
-                let target_type = &type_decl.unwrap_reference().target_type;
                 let method_name = self.encode_bor_fracture_method_name(target_ty)?;
                 var_decls! {
-                    lft: Lifetime,
-                    rd_perm: Perm,
-                    object_place: Place,
-                    object_addr: Address,
+                    lifetime: Lifetime,
+                    lifetime_perm: Perm,
+                    place: Place,
                     snapshot: {ty.to_snapshot(self)?}
                 };
-                let object = vir_low::VariableDecl{
-                    name: "object".to_string(),
-                    ty: ty.to_snapshot(self)?,
-                };
-
+                let type_decl = self.encoder.get_type_decl_mid(ty)?;
+                let target_type = &type_decl.unwrap_reference().target_type;
                 let position = vir_low::Position::default();
-                let deref_place = self.reference_deref_place(object_place.clone().into(), position)?;
+                let deref_place = self.reference_deref_place(place.clone().into(), position)?;
                 let address_snapshot =
                     self.reference_address_snapshot(ty, snapshot.clone().into(), position)?;
                 let current_snapshot =
@@ -2067,25 +2059,23 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
                 // Parameters
                 let parameters = vec![
-                    lft.clone(),
-                    rd_perm.clone(),
-                    object_place.clone(),
-                    object_addr.clone(),
+                    lifetime.clone(),
+                    lifetime_perm.clone(),
+                    place.clone(),
+                    snapshot
                 ];
-
 
                 // Preconditions
                 let lifetime_access =
                     vir_low::Expression::predicate_access_predicate_no_pos(
                         stringify!(LifetimeToken).to_string(),
-                        vec![lft.clone().into()],
-                        rd_perm.clone().into(),
+                        vec![lifetime.clone().into()],
+                        lifetime_perm.clone().into(),
                     );
                 let pres = vec![
-                    // TODO: requires acc(UniqueRef$T(lft, object))
                     expr! {
                         acc(UniqueRef<target_type>(
-                            lft,
+                            lifetime,
                             [deref_place.clone()],
                             [address_snapshot.clone()],
                             [current_snapshot.clone()],
@@ -2093,20 +2083,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         ))
                     },
                     expr! {
-                        [vir_low::Expression::no_permission()] < rd_perm
+                        [vir_low::Expression::no_permission()] < lifetime_perm
                     },
                     lifetime_access.clone(),
                 ];
 
-                // I am not sure what this all is about
-                let compute_address = ty!(Address);
-                var_decls! {
-                    place: Place,
-                    root_address: Address,
-                    value: {target_ty.to_snapshot(self)?}
-                };
-
-                // Postoconditions
+                // Postconditions
                 let posts = vec![
                     lifetime_access,
                     // TODO: use macro for this
@@ -2117,25 +2099,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                             target_ty.get_identifier()
                         ),
                         vec![
-                            lft.clone().into(),
-                            object_place.into(),
-                            object_addr.into(),
-                            final_snapshot,
+                            lifetime.clone().into(),
+                            place.into(),
+                            address_snapshot.into(),
+                            current_snapshot,
                         ],
                         vir_low::Expression::full_permission(),
                 )];
-
-                // let method = vir_low::MethodDecl::new(
-                //     method_name! { write_place<ty> },
-                //     vec![place.clone(), root_address.clone(), value.clone()],
-                //     Vec::new(),
-                //     vec![expr! { (acc(MemoryBlock([address], [size_of]))) }, validity],
-                //     vec![expr! { (acc(OwnedNonAliased<ty>(place, root_address, value))) }],
-                //     Some(statements),
-
-                // predicate FracRef$I32(lifetime: Lifetime, place: Place, root_address: Address, current_snapshot: Snap$I32, final_snapshot: Snap$I32)
-                // predicate OwnedNonAliased$ref$lft_6$I32(place: Place, root_address: Address, snapshot: Snap$ref$lft_6$I32, lifetime: Lifetime) {
-
 
                 let method =
                     vir_low::MethodDecl::new(method_name, parameters, vec![], pres, posts, None);
@@ -2144,13 +2114,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 self.builtin_methods_state
                     .encoded_bor_fracture_methods
                     .insert(target_ty.clone());
-
-                // method bor_fracture(lft: Lifetime, rd: Perm, object: Ref)
-                // requires rd > none DONE
-                // requires acc(LifetimeToken(lft), rd) DONE
-                // requires acc(MutRef$T(lft, object))
-                // ensures acc(LifetimeToken(lft), rd) DONE
-                // ensures acc(FracRef$T(lft, object))
             }
         }else {
             unreachable!()

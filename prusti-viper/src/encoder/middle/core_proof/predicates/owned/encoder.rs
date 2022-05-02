@@ -293,10 +293,13 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 //         .reference_target_final_snapshot(ty, snapshot.into(), position)?;
                 let target_type = &reference.target_type;
                 let deref_place = self.lowerer.reference_deref_place(place.into(), position)?;
-                self.encode_shared_ref(target_type)?;
-                // TODO: is this right?
+                // TODO: why does this not work?
+                self.encode_frac_ref(target_type)?;
+                // TODO: is this encode_unique_ref right here?
+                self.encode_unique_ref(target_type)?;
+                // TODO: is this right? should it be "Shared" instead of "OwnedNonAliased"?
                 predicate! {
-                    Shared<ty>(
+                    OwnedNonAliased<ty>(
                         place: Place,
                         root_address: Address,
                         snapshot: {snapshot_type},
@@ -386,7 +389,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
         Ok(predicate_decl)
     }
 
-    fn encode_shared_ref(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+    fn encode_frac_ref(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
         if self.encoded_mut_borrow_predicates.contains(ty) {
             return Ok(());
         }
@@ -490,6 +493,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             }
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_unique() => {
+                // TODO: what to put here?
                 unimplemented!();
             }
             // vir_mid::TypeDecl::Never => {},
@@ -610,6 +614,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             }
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_unique() => {
+                // TODO: what to put here?
                 unimplemented!();
             }
             // vir_mid::TypeDecl::Never => {},
