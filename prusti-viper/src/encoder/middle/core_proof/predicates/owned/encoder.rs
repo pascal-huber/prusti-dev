@@ -28,6 +28,7 @@ pub(super) struct PredicateEncoder<'l, 'p, 'v, 'tcx> {
     unfolded_owned_non_aliased_predicates: &'l FxHashSet<vir_mid::Type>,
     encoded_owned_predicates: FxHashSet<vir_mid::Type>,
     encoded_mut_borrow_predicates: FxHashSet<vir_mid::Type>,
+    encoded_frac_borrow_predicates: FxHashSet<vir_mid::Type>,
     // encoded_shared_borrow_predicates: FxHashSet<vir_mid::Type>,
     predicates: Vec<vir_low::PredicateDecl>,
 }
@@ -42,6 +43,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             unfolded_owned_non_aliased_predicates,
             encoded_owned_predicates: Default::default(),
             encoded_mut_borrow_predicates: Default::default(),
+            encoded_frac_borrow_predicates: Default::default(),
             // encoded_shared_borrow_predicates: Default::default(),
             predicates: Default::default(),
         }
@@ -390,10 +392,10 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
     }
 
     fn encode_frac_ref(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
-        if self.encoded_mut_borrow_predicates.contains(ty) {
+        if self.encoded_frac_borrow_predicates.contains(ty) {
             return Ok(());
         }
-        self.encoded_mut_borrow_predicates.insert(ty.clone());
+        self.encoded_frac_borrow_predicates.insert(ty.clone());
         self.lowerer.encode_compute_address(ty)?;
         use vir_low::macros::*;
         // let position = Default::default();
@@ -436,6 +438,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             // vir_mid::TypeDecl::TypeVar(TypeVar) => {},
             vir_mid::TypeDecl::Tuple(_decl) => unimplemented!(),
             vir_mid::TypeDecl::Struct(decl) => {
+                // TODO: test or add unimplemented!
                 let mut field_predicates = Vec::new();
                 for field in &decl.fields {
                     let field_place = self.lowerer.encode_field_place(
