@@ -45,6 +45,9 @@ pub(in super::super) struct BuiltinMethodsState {
     encoded_consume_operand_methods: FxHashSet<String>,
     encoded_newlft_method: bool,
     encoded_endlft_method: bool,
+    encoded_frac_bor_atomic_acc_methods: FxHashSet<vir_mid::Type>,
+    encoded_duplicate_frac_ref_methods: FxHashSet<vir_mid::Type>,
+    encoded_bor_fracture_methods: FxHashSet<vir_mid::Type>,
     encoded_lft_tok_sep_take_methods: FxHashSet<usize>,
     encoded_lft_tok_sep_return_methods: FxHashSet<usize>,
     encoded_open_close_mut_ref_methods: FxHashSet<vir_mid::Type>,
@@ -66,6 +69,15 @@ trait Private {
         arguments: &mut Vec<vir_low::Expression>,
         expression: &vir_mid::Expression,
     ) -> SpannedEncodingResult<()>;
+    fn encode_frac_bor_atomic_acc_method_name(
+        &self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<String>;
+    fn encode_duplicate_frac_ref_method_name(
+        &self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<String>;
+    fn encode_bor_fracture_method_name(&self, ty: &vir_mid::Type) -> SpannedEncodingResult<String>;
     fn encode_lft_tok_sep_take_method_name(
         &self,
         lft_count: usize,
@@ -218,6 +230,21 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         arguments.push(self.extract_root_address(expression)?);
         arguments.push(expression.to_procedure_snapshot(self)?);
         Ok(())
+    }
+    fn encode_frac_bor_atomic_acc_method_name(
+        &self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<String> {
+        Ok(format!("frac_bor_atomic_acc${}", ty.get_identifier()))
+    }
+    fn encode_duplicate_frac_ref_method_name(
+        &self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<String> {
+        Ok(format!("duplicate_frac_ref${}", ty.get_identifier()))
+    }
+    fn encode_bor_fracture_method_name(&self, ty: &vir_mid::Type) -> SpannedEncodingResult<String> {
+        Ok(format!("bor_fracture${}", ty.get_identifier()))
     }
     fn encode_lft_tok_sep_take_method_name(
         &self,
@@ -800,6 +827,13 @@ pub(in super::super) trait BuiltinMethodsInterface {
         operand: vir_mid::Operand,
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()>;
+    fn encode_frac_bor_atomic_acc_method(
+        &mut self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<()>;
+    fn encode_duplicate_frac_ref_method(&mut self, ty: &vir_mid::Type)
+        -> SpannedEncodingResult<()>;
+    fn encode_bor_fracture_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
     fn encode_lft_tok_sep_take_method(&mut self, lft_count: usize) -> SpannedEncodingResult<()>;
     fn encode_lft_tok_sep_return_method(&mut self, lft_count: usize) -> SpannedEncodingResult<()>;
     fn encode_newlft_method(&mut self) -> SpannedEncodingResult<()>;
@@ -812,19 +846,22 @@ pub(in super::super) trait BuiltinMethodsInterface {
 
 impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     fn encode_write_address_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        let mut ty_clone = ty.clone();
+        ty_clone.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_write_address_methods
-            .contains(ty)
+            .contains(&ty_clone)
         {
             self.encode_snapshot_to_bytes_function(ty)?;
             self.encode_memory_block_predicate()?;
             use vir_low::macros::*;
-            let size_of = self.encode_type_size_expression(ty)?;
+            let size_of = self.encode_type_size_expression(&ty_clone)?;
             let to_bytes = ty! { Bytes };
             let method = method! {
                 write_address<ty>(
                     address: Address,
+                    // TODO: is this the right ty?
                     value: {ty.to_snapshot(self)?}
                 ) returns ()
                     raw_code {
@@ -840,7 +877,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.declare_method(method)?;
             self.builtin_methods_state
                 .encoded_write_address_methods
-                .insert(ty.clone());
+                .insert(ty_clone.clone());
         }
         Ok(())
     }
@@ -1043,7 +1080,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     unimplemented!()
                 }
                 vir_mid::TypeDecl::Reference(_) => {
-                    unimplemented!()
+                    // TODO: is this right?
+                    self.encode_write_address_method(ty)?;
+                    statements.push(stmtp! { position =>
+                        // TODO: Replace with memcopy.
+                        call write_address<ty>([target_address], source_value)
+                    });
                 }
                 vir_mid::TypeDecl::Never => {
                     unimplemented!()
@@ -1759,7 +1801,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     }
     // FIXME: This method has to be inlined if the converted type has a resource
     // invariant in it. Otherwise, that resource would be leaked.
-    fn encode_into_memory_block_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+    fn encode_into_memory_block_method(
+        &mut self,
+        ty_x: &vir_mid::Type,
+    ) -> SpannedEncodingResult<()> {
+        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        ty.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_into_memory_block_methods
@@ -1959,13 +2006,27 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         ));
         self.encode_snapshot_update(statements, &target, result_value.clone().into(), position)?;
         if let vir_mid::Rvalue::Ref(value) = value {
-            assert!(value.is_mut, "unimplemented!()");
-            let final_snapshot = self.reference_target_final_snapshot(
-                target.get_type(),
-                result_value.into(),
-                position,
-            )?;
-            self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
+            if value.is_mut {
+                let final_snapshot = self.reference_target_final_snapshot(
+                    target.get_type(),
+                    result_value.into(),
+                    position,
+                )?;
+                self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
+            } else {
+                // TODO: check this, is this the right place?
+                let ty = target.get_type();
+                self.encode_bor_fracture_method(ty)?;
+                self.encode_duplicate_frac_ref_method(ty)?;
+                self.encode_frac_bor_atomic_acc_method(ty)?;
+
+                let final_snapshot = self.reference_target_final_snapshot(
+                    target.get_type(),
+                    result_value.into(),
+                    position,
+                )?;
+                self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
+            }
         }
         Ok(())
     }
@@ -1985,6 +2046,267 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             Vec::new(),
             position,
         ));
+        Ok(())
+    }
+
+    fn encode_frac_bor_atomic_acc_method(
+        &mut self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<()> {
+        // method frac_bor_atomic_acc(lft: Lifetime, rd: Perm, object: Ref) returns (q: Perm)
+        // requires rd > none DONE
+        // requires acc(LifetimeToken(lft), rd) DONE
+        // requires acc(FracRef$T(lft, object)) DONE
+        // ensures none < q && q < write DONE
+        // ensures acc(Owned$T(object), q)
+        // ensures (acc(Owned$T(object), q) --* acc(LifetimeToken(lft), rd))
+
+        if let vir_mid::Type::Reference(vir_mid::ty::Reference {
+            lifetime: _,
+            uniqueness: _,
+            target_type: box target_ty,
+        }) = ty
+        {
+            if !self
+                .builtin_methods_state
+                .encoded_frac_bor_atomic_acc_methods
+                .contains(target_ty)
+            {
+                use vir_low::macros::*;
+                let method_name = self.encode_frac_bor_atomic_acc_method_name(target_ty)?;
+
+                var_decls! {
+                    lifetime: Lifetime,
+                    lifetime_perm: Perm,
+                    owned_perm: Perm,
+                    place: Place,
+                    snapshot: {ty.to_snapshot(self)?}
+                };
+                let type_decl = self.encoder.get_type_decl_mid(ty)?;
+                let target_type = &type_decl.unwrap_reference().target_type;
+                let position = vir_low::Position::default();
+                let deref_place = self.reference_deref_place(place.clone().into(), position)?;
+                let address_snapshot =
+                    self.reference_address_snapshot(ty, snapshot.clone().into(), position)?;
+                let current_snapshot =
+                    self.reference_target_current_snapshot(ty, snapshot.clone().into(), position)?;
+
+                let parameters = vec![
+                    lifetime.clone(),
+                    lifetime_perm.clone(),
+                    place.clone(),
+                    snapshot,
+                ];
+
+                let lifetime_access = vir_low::Expression::predicate_access_predicate_no_pos(
+                    stringify!(LifetimeToken).to_string(),
+                    vec![lifetime.clone().into()],
+                    lifetime_perm.clone().into(),
+                );
+                let frac_ref_access = vir_low::Expression::predicate_access_predicate_no_pos(
+                    format!("{}${}", "FracRef", target_ty.get_identifier()),
+                    vec![
+                        lifetime.into(),
+                        place.into(),
+                        address_snapshot.clone(),
+                        current_snapshot.clone(),
+                    ],
+                    vir_low::Expression::full_permission(),
+                );
+                let pres = vec![
+                    expr! {
+                        [vir_low::Expression::no_permission()] < lifetime_perm
+                    },
+                    lifetime_access.clone(),
+                    frac_ref_access,
+                ];
+
+                // TODO: check difference between target_ty and target_type. Which one to use where?
+                // TODO: use macro or function?
+                let owned_access = vir_low::Expression::predicate_access_predicate_no_pos(
+                    format!("{}${}", "OwnedNonAliased", target_type.get_identifier()),
+                    vec![deref_place, address_snapshot, current_snapshot],
+                    owned_perm.clone().into(),
+                );
+
+                let posts = vec![
+                    expr! {
+                        owned_perm < [vir_low::Expression::full_permission()]
+                    },
+                    expr! {
+                        [vir_low::Expression::no_permission()] < owned_perm
+                    },
+                    // TODO: use macro
+                    owned_access.clone(),
+                    vir_low::Expression::magic_wand_no_pos(owned_access, lifetime_access),
+                ];
+                let targets = vec![owned_perm];
+
+                let method =
+                    vir_low::MethodDecl::new(method_name, parameters, targets, pres, posts, None);
+                self.declare_method(method)?;
+                self.builtin_methods_state
+                    .encoded_frac_bor_atomic_acc_methods
+                    .insert(target_ty.clone());
+            }
+        }
+        Ok(())
+    }
+
+    fn encode_duplicate_frac_ref_method(
+        &mut self,
+        ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<()> {
+        // TODO: check if using this ty is correct?
+        if let vir_mid::Type::Reference(vir_mid::ty::Reference {
+            lifetime: _,
+            uniqueness: _,
+            target_type: box target_ty,
+        }) = ty
+        {
+            if !self
+                .builtin_methods_state
+                .encoded_duplicate_frac_ref_methods
+                .contains(target_ty)
+            {
+                use vir_low::macros::*;
+                let method_name = self.encode_duplicate_frac_ref_method_name(target_ty)?;
+
+                var_decls! {
+                    lifetime: Lifetime,
+                    place: Place,
+                    snapshot: {ty.to_snapshot(self)?}
+                };
+                let position = vir_low::Position::default();
+                let address_snapshot =
+                    self.reference_address_snapshot(ty, snapshot.clone().into(), position)?;
+                let current_snapshot =
+                    self.reference_target_current_snapshot(ty, snapshot.clone().into(), position)?;
+
+                let parameters = vec![lifetime.clone(), place.clone(), snapshot];
+
+                let expr = vir_low::Expression::predicate_access_predicate_no_pos(
+                    format!("{}${}", "FracRef", target_ty.get_identifier()),
+                    vec![
+                        lifetime.into(),
+                        place.into(),
+                        address_snapshot,
+                        current_snapshot,
+                    ],
+                    vir_low::Expression::full_permission(),
+                );
+
+                let pres = vec![expr.clone()];
+                let posts = vec![expr.clone(), expr];
+
+                let method =
+                    vir_low::MethodDecl::new(method_name, parameters, vec![], pres, posts, None);
+                self.declare_method(method)?;
+                self.builtin_methods_state
+                    .encoded_duplicate_frac_ref_methods
+                    .insert(target_ty.clone());
+            }
+        }
+        Ok(())
+    }
+
+    fn encode_bor_fracture_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        // TODO make bor_fracture per type
+
+        if let vir_mid::Type::Reference(vir_mid::ty::Reference {
+            lifetime: _,
+            uniqueness: _,
+            target_type: box target_ty,
+        }) = ty
+        {
+            if !self
+                .builtin_methods_state
+                .encoded_bor_fracture_methods
+                .contains(target_ty)
+            {
+                // TODO: make sure Mutref, LifetimeToken, FracRef, UniqueRef are defined.
+
+                // TODO: ??? no
+                // self.encoder.encode_snapshot_destructor(target_ty.clone(), vec![]);
+
+                // TODO: is it correct to use the target_type?
+
+                use vir_low::macros::*;
+                let method_name = self.encode_bor_fracture_method_name(target_ty)?;
+                var_decls! {
+                    lifetime: Lifetime,
+                    lifetime_perm: Perm,
+                    place: Place,
+                    snapshot: {ty.to_snapshot(self)?}
+                };
+                let type_decl = self.encoder.get_type_decl_mid(ty)?;
+                let target_type = &type_decl.unwrap_reference().target_type;
+                let position = vir_low::Position::default();
+                let deref_place = self.reference_deref_place(place.clone().into(), position)?;
+                let address_snapshot =
+                    self.reference_address_snapshot(ty, snapshot.clone().into(), position)?;
+                let current_snapshot =
+                    self.reference_target_current_snapshot(ty, snapshot.clone().into(), position)?;
+                let final_snapshot =
+                    self.reference_target_final_snapshot(ty, snapshot.clone().into(), position)?;
+
+                // Parameters
+                let parameters = vec![
+                    lifetime.clone(),
+                    lifetime_perm.clone(),
+                    place.clone(),
+                    snapshot,
+                ];
+
+                // Preconditions
+                let lifetime_access = vir_low::Expression::predicate_access_predicate_no_pos(
+                    stringify!(LifetimeToken).to_string(),
+                    vec![lifetime.clone().into()],
+                    lifetime_perm.clone().into(),
+                );
+                let pres = vec![
+                    expr! {
+                        acc(UniqueRef<target_type>(
+                            lifetime,
+                            [deref_place],
+                            [address_snapshot.clone()],
+                            [current_snapshot.clone()],
+                            [final_snapshot]
+                        ))
+                    },
+                    expr! {
+                        [vir_low::Expression::no_permission()] < lifetime_perm
+                    },
+                    lifetime_access.clone(),
+                ];
+
+                // Postconditions
+                let posts = vec![
+                    lifetime_access,
+                    // TODO: use macro for this
+                    vir_low::Expression::predicate_access_predicate_no_pos(
+                        format!("{}${}", "FracRef", target_ty.get_identifier()),
+                        vec![
+                            lifetime.into(),
+                            place.into(),
+                            address_snapshot,
+                            current_snapshot,
+                        ],
+                        vir_low::Expression::full_permission(),
+                    ),
+                ];
+
+                let method =
+                    vir_low::MethodDecl::new(method_name, parameters, vec![], pres, posts, None);
+                self.declare_method(method)?;
+
+                self.builtin_methods_state
+                    .encoded_bor_fracture_methods
+                    .insert(target_ty.clone());
+            }
+        } else {
+            unreachable!()
+        }
         Ok(())
     }
 

@@ -124,7 +124,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Lowerer<'p, 'v, 'tcx> {
                 successor,
             });
         }
-        let mut predicates = self.collect_owned_predicate_decls()?;
+        let mut predicates = self.collect_owned_predicate_decls()?; // TODO: does the FracRef belong in here?
         let mut domains = self.domains_state.destruct();
         domains.extend(self.compute_address_state.destruct());
         predicates.extend(self.predicates_state.destruct());
