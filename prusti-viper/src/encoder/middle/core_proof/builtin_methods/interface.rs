@@ -2051,33 +2051,33 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
     fn encode_frac_bor_atomic_acc_method(
         &mut self,
-        ty: &vir_mid::Type,
+        ty_x: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        // TODO: where do I use ty and where target_type?
-        let type_decl = self.encoder.get_type_decl_mid(ty)?;
-        let target_type = &type_decl.unwrap_reference().target_type;
+        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        ty.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_frac_bor_atomic_acc_methods
-            .contains(target_type)
+            .contains(ty)
         // TODO: ty or target_type?
         {
             use vir_low::macros::*;
-            let method_name = self.encode_frac_bor_atomic_acc_method_name(target_type)?; // TODO: ty or target_type?
-
+            let method_name = self.encode_frac_bor_atomic_acc_method_name(ty)?; // TODO: ty or target_type?
+            let type_decl = self.encoder.get_type_decl_mid(ty)?;
+            let target_type = &type_decl.unwrap_reference().target_type;
             var_decls! {
                 lifetime: Lifetime,
                 lifetime_perm: Perm,
                 owned_perm: Perm,
                 place: Place,
-                snapshot: {ty.to_snapshot(self)?} // TODO: ty or target_type?
+                snapshot: {ty.to_snapshot(self)?}
             };
             let position = vir_low::Position::default();
             let deref_place = self.reference_deref_place(place.clone().into(), position)?;
             let address_snapshot =
-                self.reference_address_snapshot(ty, snapshot.clone().into(), position)?; // TODO: ty or target_type?
+                self.reference_address_snapshot(ty, snapshot.clone().into(), position)?;
             let current_snapshot =
-                self.reference_target_current_snapshot(ty, snapshot.clone().into(), position)?; // TODO: ty or target_type?
+                self.reference_target_current_snapshot(ty, snapshot.clone().into(), position)?;
 
             let parameters = vec![
                 lifetime.clone(),
@@ -2092,7 +2092,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 lifetime_perm.clone().into(),
             );
             let frac_ref_access = vir_low::Expression::predicate_access_predicate_no_pos(
-                format!("{}${}", "FracRef", target_type.get_identifier()), // TODO: ty or target_type?
+                format!("{}${}", "FracRef", target_type.get_identifier()), // TODO: right ty?
                 vec![
                     lifetime.into(),
                     place.into(),
@@ -2111,7 +2111,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
             // TODO: use macro or function?
             let owned_access = vir_low::Expression::predicate_access_predicate_no_pos(
-                format!("{}${}", "OwnedNonAliased", target_type.get_identifier()), // TODO: ty or target_type?
+                format!("{}${}", "OwnedNonAliased", target_type.get_identifier()),
                 vec![deref_place, address_snapshot, current_snapshot],
                 owned_perm.clone().into(),
             );
@@ -2134,25 +2134,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.declare_method(method)?;
             self.builtin_methods_state
                 .encoded_frac_bor_atomic_acc_methods
-                .insert(target_type.clone()); // TODO: ty or target_type?
+                .insert(ty.clone());
         }
         Ok(())
     }
 
     fn encode_duplicate_frac_ref_method(
         &mut self,
-        ty: &vir_mid::Type,
+        ty_x: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        // TODO: where do I use ty and where target_type?
-        let type_decl = self.encoder.get_type_decl_mid(ty)?;
-        let target_type = &type_decl.unwrap_reference().target_type;
+        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        ty.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_duplicate_frac_ref_methods
-            .contains(target_type)
+            .contains(ty)
         {
             use vir_low::macros::*;
-            let method_name = self.encode_duplicate_frac_ref_method_name(target_type)?;
+            let method_name = self.encode_duplicate_frac_ref_method_name(ty)?;
+            let type_decl = self.encoder.get_type_decl_mid(ty)?;
+            let target_type = &type_decl.unwrap_reference().target_type;
             var_decls! {
                 lifetime: Lifetime,
                 place: Place,
@@ -2167,7 +2168,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let parameters = vec![lifetime.clone(), place.clone(), snapshot];
 
             let expr = vir_low::Expression::predicate_access_predicate_no_pos(
-                format!("{}${}", "FracRef", target_type.get_identifier()),
+                format!("{}${}", "FracRef", target_type.get_identifier()), // TODO: right ty?
                 vec![
                     lifetime.into(),
                     place.into(),
@@ -2185,29 +2186,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.declare_method(method)?;
             self.builtin_methods_state
                 .encoded_duplicate_frac_ref_methods
-                .insert(target_type.clone());
+                .insert(ty.clone());
         }
         Ok(())
     }
 
-    fn encode_bor_fracture_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
-        // TODO: where do I use ty and where target_type?
-        let type_decl = self.encoder.get_type_decl_mid(ty)?;
-        let target_type = &type_decl.unwrap_reference().target_type;
+    fn encode_bor_fracture_method(&mut self, ty_x: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        ty.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_bor_fracture_methods
-            .contains(target_type)
+            .contains(ty)
         {
-            // TODO: make sure Mutref, LifetimeToken, FracRef, UniqueRef are defined.
-
             // TODO: ??? no
             // self.encoder.encode_snapshot_destructor(target_ty.clone(), vec![]);
 
-            // TODO: is it correct to use the target_type?
-
             use vir_low::macros::*;
-            let method_name = self.encode_bor_fracture_method_name(target_type)?;
+            let method_name = self.encode_bor_fracture_method_name(ty)?;
+            let type_decl = self.encoder.get_type_decl_mid(ty)?;
+            let target_type = &type_decl.unwrap_reference().target_type;
             var_decls! {
                 lifetime: Lifetime,
                 lifetime_perm: Perm,
@@ -2258,7 +2256,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 lifetime_access,
                 // TODO: use macro for this
                 vir_low::Expression::predicate_access_predicate_no_pos(
-                    format!("{}${}", "FracRef", target_type.get_identifier()),
+                    format!("{}${}", "FracRef", target_type.get_identifier()), // TODO: right ty?
                     vec![
                         lifetime.into(),
                         place.into(),
@@ -2275,7 +2273,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
             self.builtin_methods_state
                 .encoded_bor_fracture_methods
-                .insert(target_type.clone());
+                .insert(ty.clone());
         }
         Ok(())
     }
