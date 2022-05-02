@@ -811,7 +811,9 @@ pub(in super::super) trait BuiltinMethodsInterface {
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
-    fn encode_write_address_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+    fn encode_write_address_method(&mut self, ty_x: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        ty.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_write_address_methods
@@ -1043,6 +1045,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     unimplemented!()
                 }
                 vir_mid::TypeDecl::Reference(_) => {
+                    // TODO: assign a reference
                     unimplemented!()
                 }
                 vir_mid::TypeDecl::Never => {
@@ -1759,7 +1762,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     }
     // FIXME: This method has to be inlined if the converted type has a resource
     // invariant in it. Otherwise, that resource would be leaked.
-    fn encode_into_memory_block_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+    fn encode_into_memory_block_method(&mut self, ty_x: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        ty.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_into_memory_block_methods

@@ -451,6 +451,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             }
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_unique() => {
+                // TODO: start here
                 unimplemented!();
             }
             // vir_mid::TypeDecl::Never => {},
