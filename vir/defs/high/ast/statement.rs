@@ -34,7 +34,10 @@ pub enum Statement {
     LifetimeTake(LifetimeTake),
     LifetimeReturn(LifetimeReturn),
     OpenMutRef(OpenMutRef),
+    OpenFracRef(OpenFracRef),
     CloseMutRef(CloseMutRef),
+    CloseFracRef(CloseFracRef),
+    SetRdPerm(SetRdPerm),
 }
 
 #[display(fmt = "// {}", comment)]
@@ -233,6 +236,14 @@ pub struct OpenMutRef {
     pub position: Position,
 }
 
+#[display(fmt = "open_frac_ref({}, rd({}), {})", lifetime, rd_perm, place)]
+pub struct OpenFracRef {
+    pub lifetime: LifetimeConst,
+    pub rd_perm: u32,
+    pub place: Expression,
+    pub position: Position,
+}
+
 #[display(fmt = "close_mut_ref({}, rd({}), {})", lifetime, rd_perm, place)]
 pub struct CloseMutRef {
     pub lifetime: LifetimeConst,
@@ -240,3 +251,17 @@ pub struct CloseMutRef {
     pub place: Expression,
     pub position: Position,
 }
+
+#[display(fmt = "close_frac_ref({}, rd({}), {})", lifetime, rd_perm, place)]
+pub struct CloseFracRef {
+    pub lifetime: LifetimeConst,
+    pub rd_perm: u32,
+    pub place: Expression,
+    pub position: Position,
+}
+
+#[display(fmt = "lifetime_perm := write/{}", rd_perm)]
+pub struct SetRdPerm {
+    pub rd_perm: u32,
+}
+

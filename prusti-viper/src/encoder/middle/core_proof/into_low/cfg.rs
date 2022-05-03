@@ -468,6 +468,58 @@ impl IntoLow for vir_mid::Statement {
                     Ok(vec![])
                 }
             }
+            Self::OpenFracRef(statement) => {
+                // TODO: call frac_bor_atomic_acc
+                // var tmp_q: Perm
+                // tmp_q := frac_bor_atomic_acc(lft4, q, _2.ref)
+
+                let place = statement.place.get_parent_ref().unwrap();
+                let ty = place.get_type();
+                lowerer.encode_frac_bor_atomic_acc_method(ty)?;
+                // lowerer.encode_open_close_mut_ref_methods(ty)?;
+                let lifetime = lowerer.encode_lifetime_const_into_variable(statement.lifetime)?;
+                let perm_amount = vir_low::Expression::fractional_permission(statement.rd_perm);
+                let reference_place = lowerer.encode_expression_as_place(place)?;
+                let reference_value = place.to_procedure_snapshot(lowerer)?;
+
+                // TODO: create lifetime_perm at the right place
+                lowerer.create_variable("lifetime_perm".to_string(), vir_low::Type::Perm)?;
+
+                // TODO: create a unique variable name for temporary variable
+                // TODO: use fn create_new_temporary_variable instead of create_variable
+                lowerer.create_variable("tmp_x".to_string(), vir_low::Type::Perm)?;
+                var_decls!{
+                    tmp_x: Perm
+                }
+                let targets = vec![vir_low::Expression::local_no_pos(
+                    tmp_x,
+                )];
+                lowerer.encode_newlft_method()?;
+                Ok(vec![Statement::method_call(
+                    method_name!(frac_bor_atomic_acc<ty>),
+                    vec![
+                        lifetime.into(),
+                        perm_amount,
+                        reference_place,
+                        reference_value,
+                    ],
+                    targets,
+                    statement.position,
+                )])
+
+
+                // let statements = vec![
+                //     stmtp! { statement.position =>
+                //         call frac_bor_atomic_acc<ty>(
+                //             lifetime,
+                //             [perm_amount],
+                //             [reference_place],
+                //             [reference_value]
+                //         )
+                //     },
+                // ];
+                // Ok(statements)
+            }
             Self::OpenMutRef(statement) => {
                 let place = statement.place.get_parent_ref().unwrap();
                 let ty = place.get_type();
@@ -522,6 +574,15 @@ impl IntoLow for vir_mid::Statement {
                     )
                 }];
                 Ok(statements)
+            }
+            Self::CloseFracRef(statement) => {
+                // unimplemented!();
+                Ok(vec![])
+            }
+            Self::SetRdPerm(statement) => {
+                // TODO: implement here
+                // unimplemented!();
+                Ok(vec![])
             }
         }
     }

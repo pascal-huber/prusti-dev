@@ -142,6 +142,9 @@ impl<'a> BasicBlockBuilder<'a> {
             .insert(self.id, block)
             .is_none());
     }
+    pub fn set_rd_perm(&mut self, rd_perm: u32) {
+        self.statements.push(vir_high::Statement::set_rd_perm(rd_perm));
+    }
     pub fn add_comment(&mut self, comment: String) {
         self.statements.push(vir_high::Statement::comment(comment));
     }

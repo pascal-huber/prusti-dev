@@ -31,6 +31,7 @@ use vir_crate::{
     low::{self as vir_low},
     middle::{self as vir_mid, operations::ty::Typed},
 };
+use vir_crate::low::macros::method_name;
 
 #[derive(Default)]
 pub(in super::super) struct BuiltinMethodsState {
@@ -1999,13 +2000,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         value: vir_mid::Rvalue,
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()> {
+        println!("-----hello");
         let method_name = self.encode_assign_method_name(target.get_type(), &value)?;
         self.encode_assign_method(&method_name, target.get_type(), &value)?;
         let target_place = self.encode_expression_as_place(&target)?;
         let target_address = self.extract_root_address(&target)?;
         let mut arguments = vec![target_place, target_address];
+        dbg!(&value);
         self.encode_rvalue_arguments(&mut arguments, &value)?;
         let target_value_type = target.get_type().to_snapshot(self)?;
+        dbg!(&target_value_type);
         let result_value = self.create_new_temporary_variable(target_value_type)?;
         statements.push(vir_low::Statement::method_call(
             method_name,
@@ -2028,13 +2032,40 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 self.encode_bor_fracture_method(ty)?;
                 self.encode_duplicate_frac_ref_method(ty)?;
                 self.encode_frac_bor_atomic_acc_method(ty)?;
-
+                dbg!(&ty);
+                dbg!(&result_value);
+                // let lifetimes = self.extract_lifetime_variables(ty)?;
+                // let lifetime : vir_low::VariableDecl = lifetimes.first().unwrap().clone();
+                // dbg!(&lifetime);
                 let final_snapshot = self.reference_target_final_snapshot(
                     target.get_type(),
                     result_value.into(),
                     position,
                 )?;
                 self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
+
+                // create FracRef from UniqueRef
+                // TODO: bor_fracture is probably at the wrong place here
+                let lifetime = self.encode_lifetime_const_into_variable(value.lifetime.clone())?;
+                use vir_low::macros::*;
+                var_decls! {
+                    lifetime_perm: Perm
+                }
+                statements.push(
+                    vir_low::Statement::method_call_no_pos(
+                        method_name!(bor_fracture<ty>),
+                        vec![
+                            lifetime.into(),
+                            lifetime_perm.into(),
+                            // place,
+                            // final_snapshot,
+                        ],
+                        vec![],
+                    )
+                    // vir_low::Statement::comment(
+                    //     "call here....".to_string(),
+                    // )
+                )
             }
         }
         Ok(())
