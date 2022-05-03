@@ -921,6 +921,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 vir_mid::TypeDecl::Bool
                 | vir_mid::TypeDecl::Int(_)
                 | vir_mid::TypeDecl::Float(_)
+                | vir_mid::TypeDecl::Reference(_)
                 | vir_mid::TypeDecl::Pointer(_) => {
                     self.encode_write_address_method(ty)?;
                     statements.push(stmtp! { position =>
@@ -1079,14 +1080,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 vir_mid::TypeDecl::Array(_) => {
                     unimplemented!()
                 }
-                vir_mid::TypeDecl::Reference(_) => {
-                    // TODO: is this right?
-                    self.encode_write_address_method(ty)?;
-                    statements.push(stmtp! { position =>
-                        // TODO: Replace with memcopy.
-                        call write_address<ty>([target_address], source_value)
-                    });
-                }
                 vir_mid::TypeDecl::Never => {
                     unimplemented!()
                 }
@@ -1098,6 +1091,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 }
             }
             statements.push(stmtp! { position =>
+                // TODO: fix this
                 fold OwnedNonAliased<ty>(target_place, target_root_address, source_value)
             });
             let body = if ty.is_type_var() {
@@ -1113,6 +1107,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     source_place.clone(),
                     source_root_address.clone(),
                     source_value.clone(),
+                    // TODO: add lifetime
                 ],
                 Vec::new(),
                 vec![
@@ -1151,6 +1146,19 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let size_of = self.encode_type_size_expression(ty)?;
             let compute_address = ty!(Address);
             let mut statements = Vec::new();
+            // TODO: fix/implement the method without the body if reference
+            // if ty.is_reference() {
+            // let mut method = method! {
+            // copy_place<ty>(
+            //     target_place: Place,
+            //     target_address: Address,
+            //     source_place: Place,
+            //     source_address: Address,
+            //     source_value: {ty.to_snapshot(self)?}
+            // )}
+            // and register...
+            //     return Ok(())
+            // }
             let mut method = method! {
                 copy_place<ty>(
                     target_place: Place,
@@ -1974,6 +1982,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                             vir_mid::TypeDecl::Unsupported(_) => unimplemented!("ty: {}", ty),
                         };
                     }
+                    // This is also needed for move_place
                     requires ([ self.acc_owned_non_aliased(ty, place, root_address, value.clone(), lifetimes_copy)? ]);
                     ensures (acc(MemoryBlock([address], [size_of])));
                     ensures (([bytes]) == (Snap<ty>::to_bytes(value)));

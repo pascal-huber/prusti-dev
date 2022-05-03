@@ -295,11 +295,8 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 //         .reference_target_final_snapshot(ty, snapshot.into(), position)?;
                 let target_type = &reference.target_type;
                 let deref_place = self.lowerer.reference_deref_place(place.into(), position)?;
-                // TODO: why does this not work?
-                self.encode_frac_ref(target_type)?;
-                // TODO: is this encode_unique_ref right here?
                 self.encode_unique_ref(target_type)?;
-                // TODO: is this right? should it be "Shared" instead of "OwnedNonAliased"?
+                self.encode_frac_ref(target_type)?;
                 predicate! {
                     OwnedNonAliased<ty>(
                         place: Place,

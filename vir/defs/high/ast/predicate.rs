@@ -12,6 +12,7 @@ pub enum Predicate {
     MemoryBlockHeap(MemoryBlockHeap),
     MemoryBlockHeapDrop(MemoryBlockHeapDrop),
     OwnedNonAliased(OwnedNonAliased),
+    // add LifetimeToken, to inhale q amount of permission
 }
 
 /// A memory block on the stack allocated with `StorageLive`.

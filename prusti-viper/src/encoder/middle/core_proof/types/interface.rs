@@ -51,6 +51,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         ty: &vir_mid::Type,
         type_decl: &vir_mid::TypeDecl,
     ) -> SpannedEncodingResult<()> {
+        // TODO:
         use vir_low::macros::*;
         let domain_name = self.encode_snapshot_domain_name(ty)?;
         match type_decl {
@@ -170,9 +171,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     self.register_struct_constructor(&domain_name, parameters.clone())?;
                     self.encode_validity_axioms_struct(&domain_name, parameters, true.into())?;
                 } else {
+                    // TODO: this should create the deconstructor
+                    // NOTE: I added target_final because I think its needed even for shared references
                     let parameters = vars! {
                         address: Address,
-                        target_current: {target_type.clone()}
+                        target_current: {target_type.clone()},
+                        target_final: {target_type.clone()}
                     };
                     self.register_struct_constructor(&domain_name, parameters.clone())?;
                     self.encode_validity_axioms_struct(&domain_name, parameters, true.into())?;
