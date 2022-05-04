@@ -264,4 +264,3 @@ pub struct CloseFracRef {
 pub struct SetRdPerm {
     pub rd_perm: u32,
 }
-

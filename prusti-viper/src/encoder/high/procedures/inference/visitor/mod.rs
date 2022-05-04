@@ -162,7 +162,10 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
         state: &mut FoldUnfoldState,
     ) -> SpannedEncodingResult<()> {
         assert!(
-            statement.is_comment() || statement.is_leak_all() || !statement.position().is_default(),
+            statement.is_comment()
+                || statement.is_leak_all()
+                || !statement.position().is_default()
+                || statement.is_set_rd_perm(),
             "Statement has default position: {}",
             statement
         );

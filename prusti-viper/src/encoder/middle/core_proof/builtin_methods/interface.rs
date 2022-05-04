@@ -28,10 +28,9 @@ use vir_crate::{
         expression::{ExpressionIterator, UnaryOperationHelpers},
         identifier::WithIdentifier,
     },
-    low::{self as vir_low},
+    low::{self as vir_low, macros::method_name},
     middle::{self as vir_mid, operations::ty::Typed},
 };
-use vir_crate::low::macros::method_name;
 
 #[derive(Default)]
 pub(in super::super) struct BuiltinMethodsState {
@@ -2062,9 +2061,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         ],
                         vec![],
                     )
-                    // vir_low::Statement::comment(
-                    //     "call here....".to_string(),
-                    // )
                 )
             }
         }

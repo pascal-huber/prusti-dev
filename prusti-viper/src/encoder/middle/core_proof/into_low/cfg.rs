@@ -488,12 +488,10 @@ impl IntoLow for vir_mid::Statement {
                 // TODO: create a unique variable name for temporary variable
                 // TODO: use fn create_new_temporary_variable instead of create_variable
                 lowerer.create_variable("tmp_x".to_string(), vir_low::Type::Perm)?;
-                var_decls!{
+                var_decls! {
                     tmp_x: Perm
                 }
-                let targets = vec![vir_low::Expression::local_no_pos(
-                    tmp_x,
-                )];
+                let targets = vec![vir_low::Expression::local_no_pos(tmp_x)];
                 lowerer.encode_newlft_method()?;
                 Ok(vec![Statement::method_call(
                     method_name!(frac_bor_atomic_acc<ty>),
@@ -506,7 +504,6 @@ impl IntoLow for vir_mid::Statement {
                     targets,
                     statement.position,
                 )])
-
 
                 // let statements = vec![
                 //     stmtp! { statement.position =>
@@ -575,14 +572,18 @@ impl IntoLow for vir_mid::Statement {
                 }];
                 Ok(statements)
             }
-            Self::CloseFracRef(statement) => {
-                // unimplemented!();
+            Self::CloseFracRef(_statement) => {
+                // TODO: is this needed?
                 Ok(vec![])
             }
             Self::SetRdPerm(statement) => {
-                // TODO: implement here
-                // unimplemented!();
-                Ok(vec![])
+                var_decls! {
+                    lifetime_perm: Perm
+                }
+                Ok(vec![Statement::assign_no_pos(
+                    lifetime_perm,
+                    vir_low::Expression::fractional_permission(statement.rd_perm),
+                )])
             }
         }
     }

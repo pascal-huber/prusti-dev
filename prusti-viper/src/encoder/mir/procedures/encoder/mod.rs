@@ -680,8 +680,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         object: vir_high::Expression,
     ) -> SpannedEncodingResult<()> {
         if let Some(base) = deref_base {
-            if let vir_high::ty::Type::Reference(vir_high::ty::Reference { lifetime, uniqueness, .. }) =
-                base.get_type()
+            if let vir_high::ty::Type::Reference(vir_high::ty::Reference {
+                lifetime,
+                uniqueness,
+                ..
+            }) = base.get_type()
             {
                 if *uniqueness == vir_high::ty::Uniqueness::Unique {
                     block_builder.add_statement(self.set_statement_error(
@@ -719,8 +722,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         object: vir_high::Expression,
     ) -> SpannedEncodingResult<()> {
         if let Some(base) = deref_base {
-            if let vir_high::ty::Type::Reference(vir_high::ty::Reference { lifetime, uniqueness, .. }) =
-                base.get_type()
+            if let vir_high::ty::Type::Reference(vir_high::ty::Reference {
+                lifetime,
+                uniqueness,
+                ..
+            }) = base.get_type()
             {
                 if *uniqueness == vir_high::ty::Uniqueness::Unique {
                     block_builder.add_statement(self.set_statement_error(

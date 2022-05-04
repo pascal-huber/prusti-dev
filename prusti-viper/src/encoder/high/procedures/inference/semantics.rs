@@ -623,8 +623,8 @@ impl CollectPermissionChanges for vir_high::SetRdPerm {
     fn collect<'v, 'tcx>(
         &self,
         _encoder: &mut Encoder<'v, 'tcx>,
-        consumed_permissions: &mut Vec<Permission>,
-        produced_permissions: &mut Vec<Permission>,
+        _consumed_permissions: &mut Vec<Permission>,
+        _produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
         Ok(())
     }
