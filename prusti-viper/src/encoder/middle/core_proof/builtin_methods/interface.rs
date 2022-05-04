@@ -1146,19 +1146,28 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let size_of = self.encode_type_size_expression(ty)?;
             let compute_address = ty!(Address);
             let mut statements = Vec::new();
-            // TODO: fix/implement the method without the body if reference
-            // if ty.is_reference() {
-            // let mut method = method! {
-            // copy_place<ty>(
-            //     target_place: Place,
-            //     target_address: Address,
-            //     source_place: Place,
-            //     source_address: Address,
-            //     source_value: {ty.to_snapshot(self)?}
-            // )}
-            // and register...
-            //     return Ok(())
-            // }
+            if ty.is_reference() {
+                // TODO: is this right?
+                let mut method = method! {
+                    copy_place<ty>(
+                        target_place: Place,
+                        target_address: Address,
+                        source_place: Place,
+                        source_address: Address,
+                        source_value: {ty.to_snapshot(self)?}
+                    ) returns ()
+                    requires (acc(MemoryBlock((ComputeAddress::compute_address(target_place, target_address)), [size_of])));
+                    requires (acc(OwnedNonAliased<ty>(source_place, source_address, source_value)));
+                    ensures (acc(OwnedNonAliased<ty>(target_place, target_address, source_value)));
+                    ensures (acc(OwnedNonAliased<ty>(source_place, source_address, source_value)));
+                };
+                method.body = None;
+                self.declare_method(method)?;
+                self.builtin_methods_state
+                    .encoded_copy_place_methods
+                    .insert(ty.clone());
+                return Ok(())
+            }
             let mut method = method! {
                 copy_place<ty>(
                     target_place: Place,
@@ -2026,42 +2035,48 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 )?;
                 self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
             } else {
+
                 // TODO: check this, is this the right place?
+                println!("------ bor_fracture call");
                 let ty = target.get_type();
-                self.encode_bor_fracture_method(ty)?;
+                dbg!(&target);
+                dbg!(&ty);
                 self.encode_duplicate_frac_ref_method(ty)?;
                 self.encode_frac_bor_atomic_acc_method(ty)?;
-                dbg!(&ty);
-                dbg!(&result_value);
-                // let lifetimes = self.extract_lifetime_variables(ty)?;
-                // let lifetime : vir_low::VariableDecl = lifetimes.first().unwrap().clone();
-                // dbg!(&lifetime);
+
                 let final_snapshot = self.reference_target_final_snapshot(
                     target.get_type(),
                     result_value.into(),
                     position,
                 )?;
-                self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
+                dbg!(&final_snapshot);
+                self.encode_snapshot_update(
+                    statements,
+                    &value.place,
+                    final_snapshot.clone(),
+                    position,
+                )?;
+                dbg!(&value);
 
                 // create FracRef from UniqueRef
                 // TODO: bor_fracture is probably at the wrong place here
+                self.encode_bor_fracture_method(ty)?;
                 let lifetime = self.encode_lifetime_const_into_variable(value.lifetime.clone())?;
                 use vir_low::macros::*;
                 var_decls! {
                     lifetime_perm: Perm
                 }
-                statements.push(
-                    vir_low::Statement::method_call_no_pos(
-                        method_name!(bor_fracture<ty>),
-                        vec![
-                            lifetime.into(),
-                            lifetime_perm.into(),
-                            // place,
-                            // final_snapshot,
-                        ],
-                        vec![],
-                    )
-                )
+                let target_low = target.to_procedure_snapshot(self)?;
+                statements.push(vir_low::Statement::method_call_no_pos(
+                    method_name!(bor_fracture<ty>),
+                    vec![
+                        lifetime.into(),
+                        lifetime_perm.into(),
+                        target_low,
+                        // final_snapshot,
+                    ],
+                    vec![],
+                ))
             }
         }
         Ok(())
@@ -2131,7 +2146,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 format!("{}${}", "FracRef", target_type.get_identifier()), // TODO: right ty?
                 vec![
                     lifetime.into(),
-                    place.into(),
+                    deref_place.clone(),
                     address_snapshot.clone(),
                     current_snapshot.clone(),
                 ],

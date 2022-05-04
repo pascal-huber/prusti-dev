@@ -487,11 +487,10 @@ impl IntoLow for vir_mid::Statement {
 
                 // TODO: create a unique variable name for temporary variable
                 // TODO: use fn create_new_temporary_variable instead of create_variable
-                lowerer.create_variable("tmp_x".to_string(), vir_low::Type::Perm)?;
-                var_decls! {
-                    tmp_x: Perm
-                }
-                let targets = vec![vir_low::Expression::local_no_pos(tmp_x)];
+                let tmp_var_name = format!("tmp_frac_ref_perm${}", statement.id);
+                lowerer.create_variable(tmp_var_name.clone(), vir_low::Type::Perm)?;
+                let tmp_frac_ref_perm = vir_low::VariableDecl::new(tmp_var_name, vir_low::Type::Perm);
+                let targets = vec![vir_low::Expression::local_no_pos(tmp_frac_ref_perm)];
                 lowerer.encode_newlft_method()?;
                 Ok(vec![Statement::method_call(
                     method_name!(frac_bor_atomic_acc<ty>),

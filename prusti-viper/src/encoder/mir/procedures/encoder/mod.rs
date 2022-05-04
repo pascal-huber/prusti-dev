@@ -76,6 +76,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let init_data = InitializationData::new(tcx, mir, &move_env);
     let locals_without_explicit_allocation: BTreeSet<_> = mir.vars_and_temps_iter().collect();
     let rd_perm = lifetimes.lifetime_count();
+    let frac_ref_ctr: u32 = 0;
     let specification_blocks = SpecificationBlocks::build(tcx, mir);
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
@@ -92,6 +93,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         locals_without_explicit_allocation,
         fresh_id_generator: 0,
         rd_perm,
+        frac_ref_ctr,
     };
     procedure_encoder.encode()
 }
@@ -117,6 +119,7 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     locals_without_explicit_allocation: BTreeSet<mir::Local>,
     fresh_id_generator: usize,
     rd_perm: u32,
+    frac_ref_ctr: u32,
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
@@ -699,13 +702,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 } else {
                     block_builder.add_statement(self.set_statement_error(
                         location,
-                        ErrorCtxt::CloseMutRef,
+                        ErrorCtxt::CloseFracRef,
                         vir_high::Statement::close_frac_ref_no_pos(
                             lifetime.clone(),
                             self.rd_perm,
                             object,
+                            self.frac_ref_ctr,
                         ),
                     )?);
+                    self.frac_ref_ctr = self.frac_ref_ctr + 1;
                 }
             } else {
                 unreachable!();
@@ -746,6 +751,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                             lifetime.clone(),
                             self.rd_perm,
                             object,
+                            self.frac_ref_ctr,
                         ),
                     )?);
                 }
