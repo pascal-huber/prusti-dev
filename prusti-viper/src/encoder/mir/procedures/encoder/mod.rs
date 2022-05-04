@@ -408,9 +408,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<()> {
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
-        if !set_rd_perm {
-            block_builder.set_rd_perm(self.rd_perm);
-        }
+        // TODO: remove this
+        // if !set_rd_perm {
+        //     block_builder.set_rd_perm(self.rd_perm);
+        // }
         let mir::BasicBlockData {
             statements,
             terminator,

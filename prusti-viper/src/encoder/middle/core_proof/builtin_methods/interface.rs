@@ -2060,23 +2060,23 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
                 // create FracRef from UniqueRef
                 // TODO: bor_fracture is probably at the wrong place here
-                self.encode_bor_fracture_method(ty)?;
-                let lifetime = self.encode_lifetime_const_into_variable(value.lifetime.clone())?;
-                use vir_low::macros::*;
-                var_decls! {
-                    lifetime_perm: Perm
-                }
-                let target_low = target.to_procedure_snapshot(self)?;
-                statements.push(vir_low::Statement::method_call_no_pos(
-                    method_name!(bor_fracture<ty>),
-                    vec![
-                        lifetime.into(),
-                        lifetime_perm.into(),
-                        target_low,
-                        // final_snapshot,
-                    ],
-                    vec![],
-                ))
+                // self.encode_bor_fracture_method(ty)?;
+                // let lifetime = self.encode_lifetime_const_into_variable(value.lifetime.clone())?;
+                // use vir_low::macros::*;
+                // var_decls! {
+                //     lifetime_perm: Perm
+                // }
+                // let target_low = target.to_procedure_snapshot(self)?;
+                // statements.push(vir_low::Statement::method_call_no_pos(
+                //     method_name!(bor_fracture<ty>),
+                //     vec![
+                //         lifetime.into(),
+                //         lifetime_perm.into(),
+                //         target_low,
+                //         // final_snapshot,
+                //     ],
+                //     vec![],
+                // ))
             }
         }
         Ok(())
