@@ -1166,7 +1166,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 self.builtin_methods_state
                     .encoded_copy_place_methods
                     .insert(ty.clone());
-                return Ok(())
+                return Ok(());
             }
             let mut method = method! {
                 copy_place<ty>(
@@ -2035,7 +2035,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 )?;
                 self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
             } else {
-
                 // TODO: check this, is this the right place?
                 println!("------ bor_fracture call");
                 let ty = target.get_type();
