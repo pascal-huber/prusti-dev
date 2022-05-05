@@ -496,15 +496,12 @@ impl IntoLow for vir_mid::Statement {
             Self::CloseFracRef(statement) => {
                 let place = statement.place.get_parent_ref().unwrap();
                 let ty = place.get_type();
-                // lowerer.encode_frac_bor_atomic_acc_method(ty)?;
-                // lowerer.encode_open_close_mut_ref_methods(ty)?;
                 let lifetime = lowerer.encode_lifetime_const_into_variable(statement.lifetime)?;
                 let perm_amount = vir_low::Expression::fractional_permission(statement.rd_perm);
                 let reference_place = lowerer.encode_expression_as_place(place)?;
                 let deref_place = lowerer
                     .reference_deref_place(reference_place.clone().into(), statement.position)?;
                 let reference_value = place.to_procedure_snapshot(lowerer)?;
-                // let snapshot = ty.to_snapshot(self)?;
                 let current_snapshot = lowerer.reference_target_current_snapshot(
                     ty,
                     reference_value.clone().into(),
