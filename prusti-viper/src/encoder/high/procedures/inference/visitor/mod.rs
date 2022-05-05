@@ -164,8 +164,7 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
         assert!(
             statement.is_comment()
                 || statement.is_leak_all()
-                || !statement.position().is_default()
-                || statement.is_set_rd_perm(),
+                || !statement.position().is_default(),
             "Statement has default position: {}",
             statement
         );

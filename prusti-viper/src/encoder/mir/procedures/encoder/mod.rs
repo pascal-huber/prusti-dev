@@ -387,14 +387,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         procedure_builder.set_entry(entry_label);
         self.encode_specification_blocks()?;
         self.reachable_blocks.insert(self.mir.start_node());
-        let mut set_rd_perm = false;
         for (bb, data) in rustc_middle::mir::traversal::reverse_postorder(self.mir) {
             if !self.specification_blocks.is_specification_block(bb)
                 && self.reachable_blocks.contains(&bb)
             {
-                self.encode_basic_block(procedure_builder, bb, data, set_rd_perm)?;
+                self.encode_basic_block(procedure_builder, bb, data)?;
             }
-            set_rd_perm = true;
         }
         Ok(())
     }
@@ -404,14 +402,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         procedure_builder: &mut ProcedureBuilder,
         bb: mir::BasicBlock,
         data: &mir::BasicBlockData<'tcx>,
-        set_rd_perm: bool,
     ) -> SpannedEncodingResult<()> {
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
-        // TODO: remove this
-        // if !set_rd_perm {
-        //     block_builder.set_rd_perm(self.rd_perm);
-        // }
         let mir::BasicBlockData {
             statements,
             terminator,

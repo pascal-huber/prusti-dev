@@ -39,7 +39,6 @@ pub enum Statement {
     OpenFracRef(OpenFracRef),
     CloseMutRef(CloseMutRef),
     CloseFracRef(CloseFracRef),
-    SetRdPerm(SetRdPerm),
 }
 
 #[display(fmt = "// {}", comment)]
@@ -283,9 +282,4 @@ pub struct CloseFracRef {
     pub place: Expression,
     pub id: u32,
     pub position: Position,
-}
-
-#[display(fmt = "lifetime_perm := write/{}", rd_perm)]
-pub struct SetRdPerm {
-    pub rd_perm: u32,
 }

@@ -596,15 +596,6 @@ impl IntoLow for vir_mid::Statement {
                 }];
                 Ok(statements)
             }
-            Self::SetRdPerm(statement) => {
-                var_decls! {
-                    lifetime_perm: Perm
-                }
-                Ok(vec![Statement::assign_no_pos(
-                    lifetime_perm,
-                    vir_low::Expression::fractional_permission(statement.rd_perm),
-                )])
-            }
         }
     }
 }

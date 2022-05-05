@@ -19,7 +19,7 @@ pub use self::{
         statement::{
             Assert, Assign, Assume, CloseFracRef, CloseMutRef, Comment, Consume, CopyPlace, Dead,
             EndLft, Exhale, Inhale, LeakAll, LifetimeReturn, LifetimeTake, MovePlace, NewLft,
-            OldLabel, OpenFracRef, OpenMutRef, SetRdPerm, SetUnionVariant, Statement, WriteAddress,
+            OldLabel, OpenFracRef, OpenMutRef, SetUnionVariant, Statement, WriteAddress,
             WritePlace,
         },
         ty::{self, Type},

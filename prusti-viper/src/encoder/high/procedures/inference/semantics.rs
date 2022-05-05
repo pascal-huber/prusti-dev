@@ -106,9 +106,6 @@ impl CollectPermissionChanges for vir_high::Statement {
             vir_high::Statement::LifetimeReturn(statement) => {
                 statement.collect(encoder, consumed_permissions, produced_permissions)
             }
-            vir_high::Statement::SetRdPerm(statement) => {
-                statement.collect(encoder, consumed_permissions, produced_permissions)
-            }
         }
     }
 }
@@ -615,17 +612,6 @@ impl CollectPermissionChanges for vir_high::CloseFracRef {
         // TODO: check this
         consumed_permissions.push(Permission::Owned(self.place.clone()));
         produced_permissions.push(Permission::Owned(self.place.clone()));
-        Ok(())
-    }
-}
-
-impl CollectPermissionChanges for vir_high::SetRdPerm {
-    fn collect<'v, 'tcx>(
-        &self,
-        _encoder: &mut Encoder<'v, 'tcx>,
-        _consumed_permissions: &mut Vec<Permission>,
-        _produced_permissions: &mut Vec<Permission>,
-    ) -> SpannedEncodingResult<()> {
         Ok(())
     }
 }
