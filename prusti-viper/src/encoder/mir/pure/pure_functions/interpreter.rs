@@ -1126,7 +1126,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BackwardMirInterpreter<'tcx>
                         // generate a shapshot representing a reference. If we do so, we should
                         // also migrate the simplification done by `Expr::simplify_addr_of` to
                         // snapshots.
-
                         let encoded_ref = match encoded_place {
                             vir::Expr::Field( vir::FieldExpr {
                                 box ref base,

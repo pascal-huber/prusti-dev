@@ -479,7 +479,7 @@ impl IntoLow for vir_mid::Statement {
                 let reference_value = place.to_procedure_snapshot(lowerer)?;
                 let tmp_var_name = format!("tmp_frac_ref_perm${}", lifetime.name);
                 let tmp_frac_ref_perm =
-                    lowerer.create_variable(tmp_var_name.clone(), vir_low::Type::Perm)?;
+                    lowerer.create_variable(tmp_var_name, vir_low::Type::Perm)?;
                 let targets = vec![vir_low::Expression::local_no_pos(tmp_frac_ref_perm)];
                 Ok(vec![Statement::method_call(
                     method_name!(frac_bor_atomic_acc<ty>),
@@ -499,22 +499,19 @@ impl IntoLow for vir_mid::Statement {
                 let lifetime = lowerer.encode_lifetime_const_into_variable(statement.lifetime)?;
                 let perm_amount = vir_low::Expression::fractional_permission(statement.rd_perm);
                 let reference_place = lowerer.encode_expression_as_place(place)?;
-                let deref_place = lowerer
-                    .reference_deref_place(reference_place.clone().into(), statement.position)?;
+                let deref_place =
+                    lowerer.reference_deref_place(reference_place, statement.position)?;
                 let reference_value = place.to_procedure_snapshot(lowerer)?;
                 let current_snapshot = lowerer.reference_target_current_snapshot(
-                    ty,
-                    reference_value.clone().into(),
-                    statement.position,
-                )?;
-                let address_snapshot = lowerer.reference_address_snapshot(
                     ty,
                     reference_value.clone(),
                     statement.position,
                 )?;
+                let address_snapshot =
+                    lowerer.reference_address_snapshot(ty, reference_value, statement.position)?;
                 let tmp_var_name = format!("tmp_frac_ref_perm${}", lifetime.name);
                 let tmp_frac_ref_perm =
-                    lowerer.create_variable(tmp_var_name.clone(), vir_low::Type::Perm)?;
+                    lowerer.create_variable(tmp_var_name, vir_low::Type::Perm)?;
                 let type_decl = lowerer.encoder.get_type_decl_mid(ty)?;
                 let target_type = &type_decl.unwrap_reference().target_type;
                 Ok(vec![

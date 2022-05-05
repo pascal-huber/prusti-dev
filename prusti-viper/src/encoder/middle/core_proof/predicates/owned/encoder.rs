@@ -285,9 +285,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     snapshot.into(),
                     position,
                 )?;
-                // let final_snapshot =
-                //     self.lowerer
-                //         .reference_target_final_snapshot(ty, snapshot.into(), position)?;
                 let target_type = &reference.target_type;
                 let deref_place = self.lowerer.reference_deref_place(place.into(), position)?;
                 self.encode_unique_ref(target_type)?;
@@ -400,19 +397,9 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             root_address: Address,
             snapshot: {snapshot_type}
         }
-        // let compute_address = ty!(Address);
-        // let to_bytes = ty! { Bytes };
         let current_validity = self
             .lowerer
             .encode_snapshot_valid_call_for_type(snapshot.clone().into(), ty)?;
-        // let final_validity = self
-        //     .lowerer
-        //     .encode_snapshot_valid_call_for_type(final_snapshot.clone().into(), ty)?;
-        // let size_of = self.lowerer.encode_type_size_expression(ty)?;
-        // let compute_address = expr! { ComputeAddress::compute_address(place, root_address) };
-        // let bytes = self
-        //     .lowerer
-        //     .encode_memory_block_bytes_expression(compute_address.clone(), size_of.clone())?;
         let predicate = match &type_decl {
             vir_mid::TypeDecl::Bool
             | vir_mid::TypeDecl::Int(_)
@@ -440,12 +427,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         snapshot.clone().into(),
                         Default::default(),
                     )?;
-                    // let final_field_snapshot = self.lowerer.obtain_struct_field_snapshot(
-                    //     ty,
-                    //     field,
-                    //     final_snapshot.clone().into(),
-                    //     Default::default(),
-                    // )?;
                     let field_ty = &field.ty;
                     self.encode_unique_ref(field_ty)?;
                     let acc = expr! {

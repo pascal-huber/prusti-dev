@@ -240,7 +240,6 @@ pub struct OpenFracRef {
     pub lifetime: LifetimeConst,
     pub rd_perm: u32,
     pub place: Expression,
-    pub id: u32,
     pub position: Position,
 }
 
@@ -257,6 +256,5 @@ pub struct CloseFracRef {
     pub lifetime: LifetimeConst,
     pub rd_perm: u32,
     pub place: Expression,
-    pub id: u32,
     pub position: Position,
 }

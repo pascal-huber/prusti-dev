@@ -2035,12 +2035,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 )?;
                 self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
             } else {
-                // TODO: check this, is this the right place?
-                println!("------ bor_fracture call");
                 let ty = target.get_type();
-                dbg!(&target);
-                dbg!(&ty);
-                self.encode_duplicate_frac_ref_method(ty)?;
+                // TODO: move this to the call
                 self.encode_frac_bor_atomic_acc_method(ty)?;
 
                 let final_snapshot = self.reference_target_final_snapshot(
@@ -2049,12 +2045,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     position,
                 )?;
                 dbg!(&final_snapshot);
-                self.encode_snapshot_update(
-                    statements,
-                    &value.place,
-                    final_snapshot.clone(),
-                    position,
-                )?;
+                self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
                 dbg!(&value);
 
                 // create FracRef from UniqueRef
@@ -2129,12 +2120,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let current_snapshot =
                 self.reference_target_current_snapshot(ty, snapshot.clone().into(), position)?;
 
-            let parameters = vec![
-                lifetime.clone(),
-                lifetime_perm.clone(),
-                place.clone(),
-                snapshot,
-            ];
+            let parameters = vec![lifetime.clone(), lifetime_perm.clone(), place, snapshot];
 
             let lifetime_access = vir_low::Expression::predicate_access_predicate_no_pos(
                 stringify!(LifetimeToken).to_string(),
@@ -2241,7 +2227,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    fn encode_bor_fracture_method(&mut self, ty_with_lifetime: &vir_mid::Type) -> SpannedEncodingResult<()> {
+    fn encode_bor_fracture_method(
+        &mut self,
+        ty_with_lifetime: &vir_mid::Type,
+    ) -> SpannedEncodingResult<()> {
         let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
         ty.erase_lifetime();
         if !self

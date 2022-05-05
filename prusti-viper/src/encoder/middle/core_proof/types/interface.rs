@@ -51,7 +51,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         ty: &vir_mid::Type,
         type_decl: &vir_mid::TypeDecl,
     ) -> SpannedEncodingResult<()> {
-        // TODO:
         use vir_low::macros::*;
         let domain_name = self.encode_snapshot_domain_name(ty)?;
         match type_decl {
