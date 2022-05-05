@@ -29,7 +29,6 @@ pub(super) struct PredicateEncoder<'l, 'p, 'v, 'tcx> {
     encoded_owned_predicates: FxHashSet<vir_mid::Type>,
     encoded_mut_borrow_predicates: FxHashSet<vir_mid::Type>,
     encoded_frac_borrow_predicates: FxHashSet<vir_mid::Type>,
-    // encoded_shared_borrow_predicates: FxHashSet<vir_mid::Type>,
     predicates: Vec<vir_low::PredicateDecl>,
 }
 
@@ -44,7 +43,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             encoded_owned_predicates: Default::default(),
             encoded_mut_borrow_predicates: Default::default(),
             encoded_frac_borrow_predicates: Default::default(),
-            // encoded_shared_borrow_predicates: Default::default(),
             predicates: Default::default(),
         }
     }
@@ -55,16 +53,13 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
 
     pub(super) fn encode_owned_non_aliased(
         &mut self,
-        ty_x: &vir_mid::Type,
+        ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        // TODO: is this necessary here or redundant?
-        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
         ty.erase_lifetime();
         if self.encoded_owned_predicates.contains(ty) {
             return Ok(());
         }
-        // println!("encode_owned_non_aliased");
-        // dbg!(&ty);
         self.encoded_owned_predicates.insert(ty.clone());
         self.lowerer.encode_compute_address(ty)?;
         use vir_low::macros::*;

@@ -1820,9 +1820,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     // invariant in it. Otherwise, that resource would be leaked.
     fn encode_into_memory_block_method(
         &mut self,
-        ty_x: &vir_mid::Type,
+        ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
         ty.erase_lifetime();
         if !self
             .builtin_methods_state
@@ -2101,9 +2101,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
     fn encode_frac_bor_atomic_acc_method(
         &mut self,
-        ty_x: &vir_mid::Type,
+        ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
         ty.erase_lifetime();
         if !self
             .builtin_methods_state
@@ -2191,9 +2191,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
     fn encode_duplicate_frac_ref_method(
         &mut self,
-        ty_x: &vir_mid::Type,
+        ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
         ty.erase_lifetime();
         if !self
             .builtin_methods_state
@@ -2241,17 +2241,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    fn encode_bor_fracture_method(&mut self, ty_x: &vir_mid::Type) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_x.clone();
+    fn encode_bor_fracture_method(&mut self, ty_with_lifetime: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
         ty.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_bor_fracture_methods
             .contains(ty)
         {
-            // TODO: ??? no
-            // self.encoder.encode_snapshot_destructor(target_ty.clone(), vec![]);
-
             use vir_low::macros::*;
             let method_name = self.encode_bor_fracture_method_name(ty)?;
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
