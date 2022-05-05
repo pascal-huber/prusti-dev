@@ -904,7 +904,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     target_root_address: Address,
                     source_place: Place,
                     source_root_address: Address,
-                    source_value: {ty.to_snapshot(self)?}
+                    source_value: {ty.to_snapshot(self)?},
+                lifetime: Lifetime
             };
             let source_address =
                 expr! { ComputeAddress::compute_address(source_place, source_root_address) };
@@ -912,11 +913,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 self.encode_memory_block_bytes_expression(source_address.clone(), size_of.clone())?;
             let target_address =
                 expr! { ComputeAddress::compute_address(target_place, target_root_address) };
-            statements.push(stmtp! { position =>
-                unfold OwnedNonAliased<ty>(source_place, source_root_address, source_value)
-            });
             self.mark_owned_non_aliased_as_unfolded(ty)?;
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
+            if let vir_mid::TypeDecl::Reference(_) = type_decl {
+                statements.push(stmtp! { position =>
+                    unfold OwnedNonAliased<ty>(source_place, source_root_address, source_value, lifetime)
+                });
+            } else {
+                statements.push(stmtp! { position =>
+                    unfold OwnedNonAliased<ty>(source_place, source_root_address, source_value)
+                });
+            }
             match type_decl {
                 vir_mid::TypeDecl::Bool
                 | vir_mid::TypeDecl::Int(_)
@@ -932,7 +939,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 vir_mid::TypeDecl::TypeVar(_) => {
                     // move_place of a generic variable has no body
                 }
-                vir_mid::TypeDecl::Tuple(decl) => {
+                vir_mid::TypeDecl::Tuple(ref decl) => {
                     if decl.arguments.is_empty() {
                         self.encode_write_address_method(ty)?;
                         statements.push(stmtp! { position =>
@@ -943,7 +950,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         unimplemented!()
                     }
                 }
-                vir_mid::TypeDecl::Struct(decl) => {
+                vir_mid::TypeDecl::Struct(ref decl) => {
                     if decl.fields.is_empty() {
                         self.encode_write_address_method(ty)?;
                         statements.push(stmtp! { position =>
@@ -994,7 +1001,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         });
                     }
                 }
-                vir_mid::TypeDecl::Enum(decl) => {
+                vir_mid::TypeDecl::Enum(ref decl) => {
                     let discriminant_call =
                         self.obtain_enum_discriminant(source_value.clone().into(), ty, position)?;
                     self.encode_memory_block_split_method(ty)?;
@@ -1074,7 +1081,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         call memory_block_join<ty>([source_address], [discriminant_call])
                     });
                 }
-                vir_mid::TypeDecl::Union(_decl) => {
+                vir_mid::TypeDecl::Union(ref _decl) => {
                     unimplemented!();
                 }
                 vir_mid::TypeDecl::Array(_) => {
@@ -1090,10 +1097,53 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     unimplemented!()
                 }
             }
-            statements.push(stmtp! { position =>
-                // TODO: fix this
-                fold OwnedNonAliased<ty>(target_place, target_root_address, source_value)
-            });
+
+            let arguments;
+            let preconditions;
+            let postconditions;
+            if let vir_mid::TypeDecl::Reference(_) = type_decl {
+                statements.push(stmtp! { position =>
+                    fold OwnedNonAliased<ty>(target_place, target_root_address, source_value, lifetime)
+                });
+                arguments = vec![
+                    target_place.clone(),
+                    target_root_address.clone(),
+                    source_place.clone(),
+                    source_root_address.clone(),
+                    source_value.clone(),
+                    lifetime.clone(),
+                ];
+                preconditions = vec![
+                    expr! {(acc(MemoryBlock((ComputeAddress::compute_address(target_place, target_root_address)), [size_of.clone()])))},
+                    expr! {(acc(OwnedNonAliased<ty>(source_place, source_root_address, source_value, lifetime)))},
+                ];
+                postconditions = vec![
+                    expr! {(acc(OwnedNonAliased<ty>(target_place, target_root_address, source_value, lifetime)))},
+                    expr! {(acc(MemoryBlock((ComputeAddress::compute_address(source_place, source_root_address)), [size_of])))},
+                    expr! {(([bytes]) == (Snap<ty>::to_bytes(source_value)))},
+                ];
+            } else {
+                statements.push(stmtp! { position =>
+                    fold OwnedNonAliased<ty>(target_place, target_root_address, source_value)
+                });
+                arguments = vec![
+                    target_place.clone(),
+                    target_root_address.clone(),
+                    source_place.clone(),
+                    source_root_address.clone(),
+                    source_value.clone(),
+                ];
+                preconditions = vec![
+                    expr! {(acc(MemoryBlock((ComputeAddress::compute_address(target_place, target_root_address)), [size_of.clone()])))},
+                    expr! {(acc(OwnedNonAliased<ty>(source_place, source_root_address, source_value)))},
+                ];
+                postconditions = vec![
+                    expr! {(acc(OwnedNonAliased<ty>(target_place, target_root_address, source_value)))},
+                    expr! {(acc(MemoryBlock((ComputeAddress::compute_address(source_place, source_root_address)), [size_of])))},
+                    expr! {(([bytes]) == (Snap<ty>::to_bytes(source_value)))},
+                ];
+            }
+
             let body = if ty.is_type_var() {
                 None
             } else {
@@ -1101,24 +1151,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             };
             let method = vir_low::MethodDecl::new(
                 method_name! { move_place<ty> },
-                vec![
-                    target_place.clone(),
-                    target_root_address.clone(),
-                    source_place.clone(),
-                    source_root_address.clone(),
-                    source_value.clone(),
-                    // TODO: add lifetime
-                ],
+                arguments,
                 Vec::new(),
-                vec![
-                    expr! {(acc(MemoryBlock((ComputeAddress::compute_address(target_place, target_root_address)), [size_of.clone()])))},
-                    expr! {(acc(OwnedNonAliased<ty>(source_place, source_root_address, source_value)))},
-                ],
-                vec![
-                    expr! {(acc(OwnedNonAliased<ty>(target_place, target_root_address, source_value)))},
-                    expr! {(acc(MemoryBlock((ComputeAddress::compute_address(source_place, source_root_address)), [size_of])))},
-                    expr! {(([bytes]) == (Snap<ty>::to_bytes(source_value)))},
-                ],
+                preconditions,
+                postconditions,
                 body,
             );
             self.declare_method(method)?;
