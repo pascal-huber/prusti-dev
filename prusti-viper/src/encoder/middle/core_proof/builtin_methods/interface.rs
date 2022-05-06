@@ -846,22 +846,21 @@ pub(in super::super) trait BuiltinMethodsInterface {
 
 impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     fn encode_write_address_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
-        let mut ty_clone = ty.clone();
-        ty_clone.erase_lifetime();
+        let mut ty_without_lifetime = ty.clone();
+        ty_without_lifetime.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_write_address_methods
-            .contains(&ty_clone)
+            .contains(&ty_without_lifetime)
         {
             self.encode_snapshot_to_bytes_function(ty)?;
             self.encode_memory_block_predicate()?;
             use vir_low::macros::*;
-            let size_of = self.encode_type_size_expression(&ty_clone)?;
+            let size_of = self.encode_type_size_expression(&ty_without_lifetime)?;
             let to_bytes = ty! { Bytes };
             let method = method! {
                 write_address<ty>(
                     address: Address,
-                    // TODO: is this the right ty?
                     value: {ty.to_snapshot(self)?}
                 ) returns ()
                     raw_code {
@@ -877,7 +876,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.declare_method(method)?;
             self.builtin_methods_state
                 .encoded_write_address_methods
-                .insert(ty_clone.clone());
+                .insert(ty_without_lifetime.clone());
         }
         Ok(())
     }
@@ -1183,7 +1182,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let compute_address = ty!(Address);
             let mut statements = Vec::new();
             if ty.is_reference() {
-                // TODO: is this right?
+                // TODO: fix copy_place for references
                 let mut method = method! {
                     copy_place<ty>(
                         target_place: Place,
@@ -2031,7 +2030,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                             vir_mid::TypeDecl::Unsupported(_) => unimplemented!("ty: {}", ty),
                         };
                     }
-                    // This is also needed for move_place
                     requires ([ self.acc_owned_non_aliased(ty, place, root_address, value.clone(), lifetimes_copy)? ]);
                     ensures (acc(MemoryBlock([address], [size_of])));
                     ensures (([bytes]) == (Snap<ty>::to_bytes(value)));
@@ -2111,10 +2109,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             .builtin_methods_state
             .encoded_frac_bor_atomic_acc_methods
             .contains(ty)
-        // TODO: ty or target_type?
         {
             use vir_low::macros::*;
-            let method_name = self.encode_frac_bor_atomic_acc_method_name(ty)?; // TODO: ty or target_type?
+            let method_name = self.encode_frac_bor_atomic_acc_method_name(ty)?;
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
             let target_type = &type_decl.unwrap_reference().target_type;
             var_decls! {
@@ -2139,7 +2136,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 lifetime_perm.clone().into(),
             );
             let frac_ref_access = vir_low::Expression::predicate_access_predicate_no_pos(
-                format!("{}${}", "FracRef", target_type.get_identifier()), // TODO: right ty?
+                format!("{}${}", "FracRef", target_type.get_identifier()),
                 vec![
                     lifetime.into(),
                     deref_place.clone(),
@@ -2156,7 +2153,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 frac_ref_access,
             ];
 
-            // TODO: use macro or function?
             let owned_access = vir_low::Expression::predicate_access_predicate_no_pos(
                 format!("{}${}", "OwnedNonAliased", target_type.get_identifier()),
                 vec![deref_place, address_snapshot, current_snapshot],
@@ -2170,7 +2166,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 expr! {
                     [vir_low::Expression::no_permission()] < owned_perm
                 },
-                // TODO: use macro
                 owned_access.clone(),
                 vir_low::Expression::magic_wand_no_pos(owned_access, lifetime_access),
             ];
@@ -2215,7 +2210,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let parameters = vec![lifetime.clone(), place.clone(), snapshot];
 
             let expr = vir_low::Expression::predicate_access_predicate_no_pos(
-                format!("{}${}", "FracRef", target_type.get_identifier()), // TODO: right ty?
+                format!("{}${}", "FracRef", target_type.get_identifier()),
                 vec![
                     lifetime.into(),
                     place.into(),
@@ -2301,9 +2296,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             // Postconditions
             let posts = vec![
                 lifetime_access,
-                // TODO: use macro for this
                 vir_low::Expression::predicate_access_predicate_no_pos(
-                    format!("{}${}", "FracRef", target_type.get_identifier()), // TODO: right ty?
+                    format!("{}${}", "FracRef", target_type.get_identifier()),
                     vec![
                         lifetime.into(),
                         place.into(),
