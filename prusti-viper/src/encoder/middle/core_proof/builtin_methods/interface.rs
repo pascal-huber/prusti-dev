@@ -1144,7 +1144,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 ];
             }
 
-            let body = if ty.is_type_var() {
+            let body = if ty.is_type_var() || ty.is_reference() {
                 None
             } else {
                 Some(statements)
@@ -1257,7 +1257,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     ensures (acc(OwnedNonAliased<ty>(target_place, target_address, source_value)));
                     ensures (acc(OwnedNonAliased<ty>(source_place, source_address, source_value)));
             };
-            method.body = Some(statements);
+            method.body = if ty.is_reference() {
+                None
+            } else {
+                Some(statements)
+            };
             self.declare_method(method)?;
             self.builtin_methods_state
                 .encoded_copy_place_methods
@@ -2044,16 +2048,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         value: vir_mid::Rvalue,
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()> {
-        println!("-----hello");
         let method_name = self.encode_assign_method_name(target.get_type(), &value)?;
         self.encode_assign_method(&method_name, target.get_type(), &value)?;
         let target_place = self.encode_expression_as_place(&target)?;
         let target_address = self.extract_root_address(&target)?;
         let mut arguments = vec![target_place, target_address];
-        dbg!(&value);
         self.encode_rvalue_arguments(&mut arguments, &value)?;
         let target_value_type = target.get_type().to_snapshot(self)?;
-        dbg!(&target_value_type);
         let result_value = self.create_new_temporary_variable(target_value_type)?;
         statements.push(vir_low::Statement::method_call(
             method_name,
@@ -2071,38 +2072,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 )?;
                 self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
             } else {
-                let ty = target.get_type();
-                // TODO: move this to the call
-                self.encode_frac_bor_atomic_acc_method(ty)?;
-
                 let final_snapshot = self.reference_target_final_snapshot(
                     target.get_type(),
                     result_value.into(),
                     position,
                 )?;
-                dbg!(&final_snapshot);
                 self.encode_snapshot_update(statements, &value.place, final_snapshot, position)?;
-                dbg!(&value);
-
-                // create FracRef from UniqueRef
-                // TODO: bor_fracture is probably at the wrong place here
-                // self.encode_bor_fracture_method(ty)?;
-                // let lifetime = self.encode_lifetime_const_into_variable(value.lifetime.clone())?;
-                // use vir_low::macros::*;
-                // var_decls! {
-                //     lifetime_perm: Perm
-                // }
-                // let target_low = target.to_procedure_snapshot(self)?;
-                // statements.push(vir_low::Statement::method_call_no_pos(
-                //     method_name!(bor_fracture<ty>),
-                //     vec![
-                //         lifetime.into(),
-                //         lifetime_perm.into(),
-                //         target_low,
-                //         // final_snapshot,
-                //     ],
-                //     vec![],
-                // ))
             }
         }
         Ok(())

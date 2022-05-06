@@ -387,7 +387,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
         self.encoded_frac_borrow_predicates.insert(ty.clone());
         self.lowerer.encode_compute_address(ty)?;
         use vir_low::macros::*;
-        // let position = Default::default();
         let type_decl = self.lowerer.encoder.get_type_decl_mid(ty)?;
         self.lowerer.encode_snapshot_to_bytes_function(ty)?;
         let snapshot_type = ty.to_snapshot(self.lowerer)?;
@@ -459,7 +458,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             }
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_unique() => {
-                // TODO: what to put here?
                 unimplemented!();
             }
             // vir_mid::TypeDecl::Never => {},
@@ -580,7 +578,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             }
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_unique() => {
-                // TODO: what to put here?
                 unimplemented!();
             }
             // vir_mid::TypeDecl::Never => {},

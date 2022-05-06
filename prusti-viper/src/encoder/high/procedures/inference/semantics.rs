@@ -582,7 +582,6 @@ impl CollectPermissionChanges for vir_high::OpenFracRef {
         consumed_permissions: &mut Vec<Permission>,
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
-        // TODO: check this
         consumed_permissions.push(Permission::Owned(self.place.clone()));
         produced_permissions.push(Permission::Owned(self.place.clone()));
         Ok(())
@@ -609,7 +608,6 @@ impl CollectPermissionChanges for vir_high::CloseFracRef {
         consumed_permissions: &mut Vec<Permission>,
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
-        // TODO: check this
         consumed_permissions.push(Permission::Owned(self.place.clone()));
         produced_permissions.push(Permission::Owned(self.place.clone()));
         Ok(())

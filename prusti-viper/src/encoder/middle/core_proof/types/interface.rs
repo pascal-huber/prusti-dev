@@ -170,11 +170,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     self.register_struct_constructor(&domain_name, parameters.clone())?;
                     self.encode_validity_axioms_struct(&domain_name, parameters, true.into())?;
                 } else {
-                    // TODO: this should create the deconstructor
-                    // NOTE: I added target_final because I think its needed even for shared references
                     let parameters = vars! {
                         address: Address,
                         target_current: {target_type.clone()},
+                        // NOTE: final destructor is also necessary for shared references
                         target_final: {target_type.clone()}
                     };
                     self.register_struct_constructor(&domain_name, parameters.clone())?;
