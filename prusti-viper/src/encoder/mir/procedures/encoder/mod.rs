@@ -126,13 +126,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let (allocate_returns, deallocate_returns) = self.encode_returns()?;
         let (assume_preconditions, assert_postconditions) =
             self.encode_functional_specifications()?;
-        let (assume_lifetime_preconditions, assert_lifetime_postconditions) =
-            self.encode_lifetime_specifications()?;
+        let assume_lifetime_preconditions = self.encode_lifetime_specifications()?;
         let mut procedure_builder = ProcedureBuilder::new(
             name,
             allocate_parameters,
             allocate_returns,
             assume_preconditions,
+            assume_lifetime_preconditions,
             deallocate_parameters,
             deallocate_returns,
             assert_postconditions,
@@ -283,7 +283,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
 
     fn encode_lifetime_specifications(
         &mut self,
-    ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)> {
+    ) -> SpannedEncodingResult<Vec<vir_high::Statement>> {
+        let mir_span = self.mir.span;
         let (first_bb, _) = rustc_middle::mir::traversal::reverse_postorder(self.mir)
             .into_iter()
             .next()
@@ -293,9 +294,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
 
-        let live_on_entry = self
+        let live_on_entry: Vec<vir_high::ty::LifetimeConst> = self
             .lifetimes
-            .get_origin_live_on_entry_at_start(first_location);
+            .get_origin_live_on_entry_at_start(first_location)
+            .iter()
+            .map(|lifetime| vir_high::ty::LifetimeConst {
+                name: lifetime.to_text(),
+            })
+            .collect();
         let subset_base_on_entry: Vec<(vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst)> =
             self.lifetimes
                 .get_subset_base_at_start(first_location)
@@ -308,17 +314,24 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 })
                 .collect();
 
-        dbg!(subset_base_on_entry);
-
-        // println!("-----");
-        // dbg!(live_on_entry);
-        // println!("subset_base:");
-        // for (r1, r2) in subset_base {
-        //     println!("{} subset of {}", r1.to_text(), r2.to_text());
-        // }
+        let mut preconditions = vec![vir_high::Statement::comment(
+            "Assume lifetime preconditions.".to_string(),
+        )];
+        // TODO: why is there no vector of lifetimes???
+        for lifetime in live_on_entry {
+            let inhale_statement = self.encoder.set_statement_error_ctxt(
+                vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
+                    lifetime,
+                )),
+                mir_span,
+                ErrorCtxt::UnexpectedAssumeMethodPrecondition,
+                self.def_id,
+            )?;
+            preconditions.push(inhale_statement);
+        }
 
         // return
-        Ok((vec![], vec![]))
+        Ok(preconditions)
     }
 
     fn encode_functional_specifications(

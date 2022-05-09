@@ -604,7 +604,10 @@ impl IntoLow for vir_mid::Predicate {
         use vir_mid::Predicate;
         let result = match self {
             Predicate::LifetimeToken(predicate) => {
-                unimplemented!("predicate: {}", predicate);
+                lowerer.encode_lifetime_token_predicate()?;
+                let lifetime = lowerer.encode_lifetime_const_into_variable(predicate.lifetime)?;
+                expr! { acc(LifetimeToken([lifetime.into()]))}
+                    .set_default_position(predicate.position)
             }
             Predicate::MemoryBlockStack(predicate) => {
                 lowerer.encode_memory_block_predicate()?;
