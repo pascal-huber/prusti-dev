@@ -17,7 +17,8 @@ pub enum Predicate {
 
 #[display(fmt = "LifetimeToken")]
 pub struct LifetimeToken {
-    pub lifetime: Expression, // TODO: or LifetimeConst?
+    pub lifetime: LifetimeConst,
+    pub position: Position,
 }
 
 /// A memory block on the stack allocated with `StorageLive`.
