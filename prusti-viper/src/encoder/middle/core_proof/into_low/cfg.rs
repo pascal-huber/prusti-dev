@@ -451,7 +451,7 @@ impl IntoLow for vir_mid::Statement {
                         statement.target.to_procedure_snapshot(lowerer)?,
                     )];
                     Ok(vec![Statement::method_call(
-                        String::from("lft_tok_sep_take"),
+                        format!("lft_tok_sep_take${}", statement.value.len()),
                         arguments,
                         target,
                         statement.position,
@@ -603,6 +603,9 @@ impl IntoLow for vir_mid::Predicate {
         use vir_low::macros::*;
         use vir_mid::Predicate;
         let result = match self {
+            Predicate::LifetimeToken(predicate) => {
+                unimplemented!("predicate: {}", predicate);
+            }
             Predicate::MemoryBlockStack(predicate) => {
                 lowerer.encode_memory_block_predicate()?;
                 let place = lowerer.encode_expression_as_place_address(&predicate.place)?;

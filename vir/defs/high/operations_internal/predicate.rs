@@ -11,6 +11,12 @@ use super::super::{
 impl Predicate {
     pub fn parameter_types(&self) -> Vec<Type> {
         match self {
+            Self::LifetimeToken(_predicate) => {
+                // TODO: check what this means
+                vec![
+                    // predicate.lifetime.clone(),
+                ]
+            }
             Self::MemoryBlockStack(predicate) => {
                 vec![
                     predicate.place.get_type().clone(),

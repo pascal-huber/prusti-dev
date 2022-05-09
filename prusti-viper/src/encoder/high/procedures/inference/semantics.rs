@@ -145,6 +145,7 @@ fn extract_managed_predicate_place(
             Ok(Some(Permission::Owned(predicate.place.clone())))
         }
         vir_high::Predicate::MemoryBlockStackDrop(_)
+        | vir_high::Predicate::LifetimeToken(_) // TODO: check what is this
         | vir_high::Predicate::MemoryBlockHeap(_)
         | vir_high::Predicate::MemoryBlockHeapDrop(_) => {
             // Unmanaged predicates.

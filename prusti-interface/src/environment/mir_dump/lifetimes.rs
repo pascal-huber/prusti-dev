@@ -46,6 +46,14 @@ impl Lifetimes {
             output_facts,
         }
     }
+    // pub fn get_subset() -> BTreeSet<String> {
+    //     // TODO: possibly redundant code
+    //     borrowck_in_facts
+    //         .subset_base
+    //         .iter()
+    //         // .flat_map(|&(r1, r2, _)| [r1, r2])
+    //         // .collect();
+    // }
     pub fn get_loan_live_at_start(&self, location: mir::Location) -> BTreeSet<String> {
         let info = self.get_loan_live_at(RichLocation::Start(location));
         info.into_iter()
@@ -124,6 +132,24 @@ impl Lifetimes {
             .map(|(region, _, _)| *region)
             .collect()
     }
+    // pub fn get_all_subset_base(&self) -> BTreeSet<(Region, Region)> {
+    //     let borrowck_in_facts = self.borrowck_in_facts();
+    //     borrowck_in_facts
+    //         .subset_base
+    //         .iter()
+    //         .flat_map(|&(r1, r2, _)| Some((r1, r2)))
+    //         .collect()
+    // }
+    pub fn get_subset_base_at_start(&self, location: mir::Location) -> Vec<(Region, Region)> {
+        let rich_location = RichLocation::Start(location);
+        let point = self.location_to_point(rich_location);
+        let borrowck_in_facts = self.borrowck_in_facts();
+        borrowck_in_facts
+            .subset_base
+            .iter()
+            .flat_map(|&(r1, r2, p)| if p == point { Some((r1, r2)) } else { None })
+            .collect()
+    }
     pub(super) fn get_subset_base(&self, location: RichLocation) -> Vec<(Region, Region)> {
         let point = self.location_to_point(location);
         let borrowck_in_facts = self.borrowck_in_facts();
@@ -149,7 +175,17 @@ impl Lifetimes {
             BTreeMap::new()
         }
     }
-    pub(super) fn get_origin_live_on_entry(&self, location: RichLocation) -> Vec<Region> {
+    pub fn get_origin_live_on_entry_at_start(&self, location: mir::Location) -> Vec<Region> {
+        let rich_location = RichLocation::Start(location);
+        let point = self.location_to_point(rich_location);
+        let borrowck_out_facts = self.borrowck_out_facts();
+        if let Some(origins) = borrowck_out_facts.origin_live_on_entry.get(&point) {
+            origins.clone()
+        } else {
+            Vec::new()
+        }
+    }
+    pub fn get_origin_live_on_entry(&self, location: RichLocation) -> Vec<Region> {
         let point = self.location_to_point(location);
         let borrowck_out_facts = self.borrowck_out_facts();
         if let Some(origins) = borrowck_out_facts.origin_live_on_entry.get(&point) {

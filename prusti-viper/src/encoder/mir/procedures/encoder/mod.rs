@@ -126,6 +126,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let (allocate_returns, deallocate_returns) = self.encode_returns()?;
         let (assume_preconditions, assert_postconditions) =
             self.encode_functional_specifications()?;
+        let (assume_lifetime_preconditions, assert_lifetime_postconditions) =
+            self.encode_lifetime_specifications()?;
         let mut procedure_builder = ProcedureBuilder::new(
             name,
             allocate_parameters,
@@ -277,6 +279,46 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             postconditions.push(expression);
         }
         Ok(postconditions)
+    }
+
+    fn encode_lifetime_specifications(
+        &mut self,
+    ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)> {
+        let (first_bb, _) = rustc_middle::mir::traversal::reverse_postorder(self.mir)
+            .into_iter()
+            .next()
+            .unwrap();
+        let first_location = mir::Location {
+            block: first_bb,
+            statement_index: 0,
+        };
+
+        let live_on_entry = self
+            .lifetimes
+            .get_origin_live_on_entry_at_start(first_location);
+        let subset_base_on_entry: Vec<(vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst)> =
+            self.lifetimes
+                .get_subset_base_at_start(first_location)
+                .iter()
+                .map(|(r1, r2)| {
+                    (
+                        vir_high::ty::LifetimeConst { name: r1.to_text() },
+                        vir_high::ty::LifetimeConst { name: r2.to_text() },
+                    )
+                })
+                .collect();
+
+        dbg!(subset_base_on_entry);
+
+        // println!("-----");
+        // dbg!(live_on_entry);
+        // println!("subset_base:");
+        // for (r1, r2) in subset_base {
+        //     println!("{} subset of {}", r1.to_text(), r2.to_text());
+        // }
+
+        // return
+        Ok((vec![], vec![]))
     }
 
     fn encode_functional_specifications(
