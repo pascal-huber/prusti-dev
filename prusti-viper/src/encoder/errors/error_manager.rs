@@ -48,6 +48,9 @@ pub enum ErrorCtxt {
     Panic(PanicCause),
     /// A Viper `exhale expr` that encodes the call of a Rust procedure with precondition `expr`
     ExhaleMethodPrecondition,
+    /// An error when inhaling method's lifetime specification.
+    UnexpectedInhaleLifetimePrecondition,
+    LifetimeIncluded, // TODO: make nicer and and add desc.
     /// An error when assuming method's functional specification.
     UnexpectedAssumeMethodPrecondition,
     /// An error when assuming method's functional specification.

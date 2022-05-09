@@ -38,6 +38,7 @@ pub enum SuccessorBuilder {
 }
 
 impl ProcedureBuilder {
+    #![allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,
         allocate_parameters: Vec<vir_high::Statement>,
