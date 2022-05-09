@@ -281,6 +281,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(postconditions)
     }
 
+    // TODO: move this method to lifetimes.rs
     fn encode_lifetime_specifications(
         &mut self,
     ) -> SpannedEncodingResult<Vec<vir_high::Statement>> {
@@ -331,6 +332,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 })
                 .collect();
         for (lifetime_1, lifetime_2) in lifetime_subsets {
+            // TODO: make this an Inhale statement with an "LifetimeIncludes" Expression
             let statement = self.encoder.set_statement_error_ctxt(
                 vir_high::Statement::lifetime_included_no_pos(lifetime_1, lifetime_2),
                 mir_span,

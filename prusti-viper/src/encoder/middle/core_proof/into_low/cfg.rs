@@ -620,6 +620,7 @@ impl IntoLow for vir_mid::Predicate {
         let result = match self {
             Predicate::LifetimeToken(predicate) => {
                 lowerer.encode_lifetime_token_predicate()?;
+                // TODO: inhale only fractional permission for shared references
                 let lifetime = lowerer.encode_lifetime_const_into_variable(predicate.lifetime)?;
                 expr! { acc(LifetimeToken([lifetime.into()]))}
                     .set_default_position(predicate.position)
