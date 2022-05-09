@@ -302,7 +302,24 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 name: lifetime.to_text(),
             })
             .collect();
-        let subset_base_on_entry: Vec<(vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst)> =
+        let mut preconditions = vec![vir_high::Statement::comment(
+            "Assume lifetime preconditions.".to_string(),
+        )];
+
+        for lifetime in live_on_entry {
+            let inhale_statement = self.encoder.set_statement_error_ctxt(
+                vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
+                    lifetime,
+                )),
+                mir_span,
+                ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+                self.def_id,
+            )?;
+            preconditions.push(inhale_statement);
+        }
+
+        // TODO: why is there no vector of lifetimes???
+        let lifetime_subsets: Vec<(vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst)> =
             self.lifetimes
                 .get_subset_base_at_start(first_location)
                 .iter()
@@ -313,21 +330,58 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     )
                 })
                 .collect();
-
-        let mut preconditions = vec![vir_high::Statement::comment(
-            "Assume lifetime preconditions.".to_string(),
-        )];
-        // TODO: why is there no vector of lifetimes???
-        for lifetime in live_on_entry {
-            let inhale_statement = self.encoder.set_statement_error_ctxt(
-                vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
-                    lifetime,
-                )),
+        for (lifetime_1, lifetime_2) in lifetime_subsets {
+            let statement = self.encoder.set_statement_error_ctxt(
+                vir_high::Statement::lifetime_included_no_pos(lifetime_1, lifetime_2),
                 mir_span,
-                ErrorCtxt::UnexpectedAssumeMethodPrecondition,
+                ErrorCtxt::LifetimeIncluded,
                 self.def_id,
             )?;
-            preconditions.push(inhale_statement);
+            preconditions.push(statement);
+
+            // PROBLEM: no domain_func_app in vir_high -> new statement for this.
+            // let arguments: Vec<vir_high::Expression> = vec![]
+            // let parameters = arguments
+            //     .iter()
+            //     .enumerate()
+            //     .map(|(i, argument)| VariableDecl {
+            //         name: format!("_{}", i),
+            //         ty: argument.get_type().clone(),
+            //     })
+            //     .collect();
+            // let assume_statement = self.encoder.set_statement_error_ctxt(
+            //     vir_high::Statement::assume_no_pos(
+            //         vir_high::Expression::func_app_no_pos(
+            //             // pub function_name: String,
+            //             "included".to_string(),
+            //             // pub type_arguments: Vec<Type>,
+            //             vec![
+            //             ],
+            //             // pub arguments: Vec<Expression>,
+            //             vec![],
+            //             // pub parameters: Vec<VariableDecl>,
+            //             vec![
+            //                 vir_high::VariableDecl{
+            //                     name: "_0".to_string(),
+            //                     ty: vir_high::Type::TypeVar(
+            //                         vir_high::ty::TypeVar::LifetimeConst(lifetime_1)
+            //                     ),
+            //                 },
+            //                 vir_high::VariableDecl{
+            //                     name: "_1".to_string(),
+            //                     ty: vir_high::Type::TypeVar(
+            //                         vir_high::ty::TypeVar::LifetimeConst(lifetime_2)
+            //                     ),
+            //                 },
+            //             ],
+            //             // pub return_type: Type,
+            //             vir_high::Type::Bool,
+            //         )
+            //     ),
+            //     mir_span,
+            //     ErrorCtxt::UnexpectedAssumeMethodPrecondition,
+            //     self.def_id,
+            // )?;
         }
 
         // return

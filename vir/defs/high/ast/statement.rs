@@ -33,6 +33,7 @@ pub enum Statement {
     Dead(Dead),
     LifetimeTake(LifetimeTake),
     LifetimeReturn(LifetimeReturn),
+    LifetimeIncluded(LifetimeIncluded),
     OpenMutRef(OpenMutRef),
     OpenFracRef(OpenFracRef),
     CloseMutRef(CloseMutRef),
@@ -224,6 +225,13 @@ pub struct LifetimeReturn {
     pub target: VariableDecl,
     pub value: Vec<VariableDecl>,
     pub rd_perm: u32,
+    pub position: Position,
+}
+
+#[display(fmt = "lifetime_included({}, {})", lhs, rhs)]
+pub struct LifetimeIncluded {
+    pub lhs: LifetimeConst,
+    pub rhs: LifetimeConst,
     pub position: Position,
 }
 

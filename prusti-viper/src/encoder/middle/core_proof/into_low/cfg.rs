@@ -483,6 +483,21 @@ impl IntoLow for vir_mid::Statement {
                     Ok(vec![])
                 }
             }
+            Self::LifetimeIncluded(statement) => {
+                lowerer.encode_lifetime_included()?;
+                let lhs = lowerer.encode_lifetime_const_into_variable(statement.lhs)?;
+                let rhs = lowerer.encode_lifetime_const_into_variable(statement.rhs)?;
+                let arguments: Vec<vir_low::Expression> = vec![lhs.into(), rhs.into()];
+                Ok(vec![Statement::assume(
+                    vir_low::Expression::domain_function_call(
+                        "Lifetime",
+                        "included$",
+                        arguments,
+                        vir_low::ty::Type::Bool,
+                    ),
+                    statement.position,
+                )])
+            }
             Self::OpenFracRef(statement) => {
                 let place = statement.place.get_parent_ref().unwrap();
                 let ty = place.get_type();
