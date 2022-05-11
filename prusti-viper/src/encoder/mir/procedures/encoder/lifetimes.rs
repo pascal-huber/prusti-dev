@@ -113,6 +113,10 @@ pub(super) trait LifetimesEncoder {
         &mut self,
         lifetime_const: vir_high::ty::LifetimeConst,
     ) -> SpannedEncodingResult<vir_high::Statement>;
+    fn encode_exhale_lifetime_token(
+        &mut self,
+        lifetime_const: vir_high::ty::LifetimeConst,
+    ) -> SpannedEncodingResult<vir_high::Statement>;
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
@@ -591,6 +595,21 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<vir_high::Statement> {
         self.encoder.set_statement_error_ctxt(
             vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
+                lifetime_const,
+                self.rd_perm,
+            )),
+            self.mir.span,
+            ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+            self.def_id,
+        )
+    }
+
+    fn encode_exhale_lifetime_token(
+        &mut self,
+        lifetime_const: vir_high::ty::LifetimeConst,
+    ) -> SpannedEncodingResult<vir_high::Statement> {
+        self.encoder.set_statement_error_ctxt(
+            vir_high::Statement::exhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
                 lifetime_const,
                 self.rd_perm,
             )),

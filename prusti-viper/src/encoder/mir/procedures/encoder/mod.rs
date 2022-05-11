@@ -1333,6 +1333,36 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             )?);
         }
         // TODO: exhale lifetimetokens needed in function here
+        // TODO: which ones? all of them?
+        let (first_bb, _) = rustc_middle::mir::traversal::reverse_postorder(self.mir)
+            .into_iter()
+            .next()
+            .unwrap();
+        let first_location = mir::Location {
+            block: first_bb,
+            statement_index: 0,
+        };
+        let lifetimes_to_exhale = self.lifetimes_to_inhale(&first_location)?;
+        block_builder.add_statement(self.encoder.set_statement_error_ctxt(
+            vir_high::Statement::comment("Exhale Lifetimes.".to_string(),),
+            span,
+            ErrorCtxt::LifetimeEncoding,
+            self.def_id
+        )?);
+        for lifetime in &lifetimes_to_exhale {
+            block_builder.add_statement(
+                self.encoder.set_statement_error_ctxt(
+                    vir_high::Statement::exhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
+                        lifetime.clone(),
+                        self.rd_perm,
+                    )),
+                    self.mir.span,
+                    ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+                    self.def_id,
+                )?
+            );
+        }
+
 
         let procedure_contract = self
             .encoder
@@ -1400,7 +1430,23 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     ErrorCtxt::ProcedureCall,
                     self.def_id,
                 )?);
+
                 // TODO: inhale LifetimeTokens back here
+                for lifetime in &lifetimes_to_exhale {
+                    post_call_block_builder.add_statement(
+                        self.encoder.set_statement_error_ctxt(
+                            vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
+                                lifetime.clone(),
+                                self.rd_perm,
+                            )),
+                            self.mir.span,
+                            ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+                            self.def_id,
+                        )?
+                    );
+                }
+
+
                 for expression in postcondition_expressions {
                     let assume_statement = self.encoder.set_statement_error_ctxt(
                         vir_high::Statement::assume_no_pos(expression),
@@ -1460,7 +1506,24 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         ErrorCtxt::ProcedureCall,
                         self.def_id,
                     )?);
+
                     // TODO: inhale LifetimeToken here too in case of panic
+                    // TODO: remove redundant code
+                    for lifetime in &lifetimes_to_exhale {
+                        cleanup_block_builder.add_statement(
+                            self.encoder.set_statement_error_ctxt(
+                                vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
+                                    lifetime.clone(),
+                                    self.rd_perm,
+                                )),
+                                self.mir.span,
+                                ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+                                self.def_id,
+                            )?
+                        );
+                    }
+
+
                     cleanup_block_builder.build();
                     block_builder.set_successor_jump(vir_high::Successor::NonDetChoice(
                         fresh_destination_label,
