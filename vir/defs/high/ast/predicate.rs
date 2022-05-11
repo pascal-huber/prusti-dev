@@ -18,6 +18,7 @@ pub enum Predicate {
 #[display(fmt = "LifetimeToken")]
 pub struct LifetimeToken {
     pub lifetime: LifetimeConst,
+    pub rd_perm: u32,
     pub position: Position,
 }
 

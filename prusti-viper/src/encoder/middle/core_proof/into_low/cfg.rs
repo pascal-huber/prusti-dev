@@ -495,7 +495,12 @@ impl IntoLow for vir_mid::Statement {
                     rhs.push(var);
                 }
                 lowerer.encode_lifetime_included()?;
-                let intersection = lowerer.encode_lifetime_intersection(&rhs)?;
+                let intersection = if rhs.len() > 1 {
+                    lowerer.encode_lifetime_intersection(&rhs)?
+                } else {
+                    let lifetime = rhs.first().unwrap().clone();
+                    lifetime.into()
+                };
                 let arguments: Vec<vir_low::Expression> = vec![lhs.into(), intersection];
                 let assume_statement = Statement::assume(
                     vir_low::Expression::domain_function_call(
@@ -635,7 +640,8 @@ impl IntoLow for vir_mid::Predicate {
                 lowerer.encode_lifetime_token_predicate()?;
                 // TODO: inhale only fractional permission for shared references
                 let lifetime = lowerer.encode_lifetime_const_into_variable(predicate.lifetime)?;
-                expr! { acc(LifetimeToken([lifetime.into()]))}
+                let perm_amount = vir_low::Expression::fractional_permission(predicate.rd_perm);
+                expr! { acc(LifetimeToken([lifetime.into()]), [perm_amount])}
                     .set_default_position(predicate.position)
             }
             Predicate::MemoryBlockStack(predicate) => {
