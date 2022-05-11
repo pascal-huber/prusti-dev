@@ -285,7 +285,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
     fn encode_lifetime_specifications(
         &mut self,
     ) -> SpannedEncodingResult<Vec<vir_high::Statement>> {
-        let mir_span = self.mir.span;
         let (first_bb, _) = rustc_middle::mir::traversal::reverse_postorder(self.mir)
             .into_iter()
             .next()
@@ -295,99 +294,228 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
 
-        let live_on_entry: Vec<vir_high::ty::LifetimeConst> = self
-            .lifetimes
-            .get_origin_live_on_entry_at_start(first_location)
-            .iter()
-            .map(|lifetime| vir_high::ty::LifetimeConst {
-                name: lifetime.to_text(),
-            })
-            .collect();
+        // Inhale LifetimeTokens
         let mut preconditions = vec![vir_high::Statement::comment(
             "Assume lifetime preconditions.".to_string(),
         )];
-
-        for lifetime in live_on_entry {
-            let inhale_statement = self.encoder.set_statement_error_ctxt(
-                vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
-                    lifetime,
-                )),
-                mir_span,
-                ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
-                self.def_id,
-            )?;
+        let lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> =
+            self.lifetimes_to_inhale(&first_location)?;
+        for lifetime in lifetimes_to_inhale {
+            let inhale_statement = self.encode_inhale_lifetime_token(lifetime)?;
             preconditions.push(inhale_statement);
         }
 
-        // TODO: why is there no vector of lifetimes???
-        let lifetime_subsets: Vec<(vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst)> =
-            self.lifetimes
-                .get_subset_base_at_start(first_location)
-                .iter()
-                .map(|(r1, r2)| {
-                    (
-                        vir_high::ty::LifetimeConst { name: r1.to_text() },
-                        vir_high::ty::LifetimeConst { name: r2.to_text() },
-                    )
-                })
-                .collect();
-        for (lifetime_1, lifetime_2) in lifetime_subsets {
-            // TODO: make this an Inhale statement with an "LifetimeIncludes" Expression
-            let statement = self.encoder.set_statement_error_ctxt(
-                vir_high::Statement::lifetime_included_no_pos(lifetime_1, lifetime_2),
-                mir_span,
-                ErrorCtxt::LifetimeIncluded,
+        // Inhale Opaque lifetimes
+        let opaque_conditions: BTreeMap<String, BTreeSet<String>> =
+            self.get_opaque_lifetime_conditions()?;
+        for (lifetime, condition) in opaque_conditions {
+            let assume_statement = self.encoder.set_statement_error_ctxt(
+                vir_high::Statement::lifetime_included_no_pos(
+                    vir_high::ty::LifetimeConst { name: lifetime },
+                    condition
+                        .iter()
+                        .map(|lft| vir_high::ty::LifetimeConst { name: lft.clone() })
+                        .collect(),
+                ),
+                self.mir.span,
+                ErrorCtxt::UnexpectedInhaleLifetimePrecondition, // TODO: other errorctxt
                 self.def_id,
             )?;
-            preconditions.push(statement);
-
-            // PROBLEM: no domain_func_app in vir_high -> new statement for this.
-            // let arguments: Vec<vir_high::Expression> = vec![]
-            // let parameters = arguments
-            //     .iter()
-            //     .enumerate()
-            //     .map(|(i, argument)| VariableDecl {
-            //         name: format!("_{}", i),
-            //         ty: argument.get_type().clone(),
-            //     })
-            //     .collect();
-            // let assume_statement = self.encoder.set_statement_error_ctxt(
-            //     vir_high::Statement::assume_no_pos(
-            //         vir_high::Expression::func_app_no_pos(
-            //             // pub function_name: String,
-            //             "included".to_string(),
-            //             // pub type_arguments: Vec<Type>,
-            //             vec![
-            //             ],
-            //             // pub arguments: Vec<Expression>,
-            //             vec![],
-            //             // pub parameters: Vec<VariableDecl>,
-            //             vec![
-            //                 vir_high::VariableDecl{
-            //                     name: "_0".to_string(),
-            //                     ty: vir_high::Type::TypeVar(
-            //                         vir_high::ty::TypeVar::LifetimeConst(lifetime_1)
-            //                     ),
-            //                 },
-            //                 vir_high::VariableDecl{
-            //                     name: "_1".to_string(),
-            //                     ty: vir_high::Type::TypeVar(
-            //                         vir_high::ty::TypeVar::LifetimeConst(lifetime_2)
-            //                     ),
-            //                 },
-            //             ],
-            //             // pub return_type: Type,
-            //             vir_high::Type::Bool,
-            //         )
-            //     ),
-            //     mir_span,
-            //     ErrorCtxt::UnexpectedAssumeMethodPrecondition,
-            //     self.def_id,
-            // )?;
+            // let mut cond_vec: VecDeque<String> = VecDeque::from_iter(condition.clone());
+            // if condition.len() == 0 {
+            //     // static lifetime, do nothing
+            // } else {
+            //     // fold intersection
+            //     // let intersection = condition.iter().next().fold(z, |result, lifetime|
+            //     let rhs_expr = self.fold_lifetime_intersection(&mut cond_vec)?;
+            //     let assume_statement = self.encoder.set_statement_error_ctxt(
+            //             vir_high::Statement::assume_no_pos(vir_high::Expression::binary_op_no_pos(
+            //                 vir_high::BinaryOpKind::LifetimeIncludes,
+            //                 vir_high::Expression::local_no_pos(
+            //                     vir_high::VariableDecl{
+            //                         name: lifetime,
+            //                         ty: vir_high::ty::Type::Lifetime,
+            //                     }
+            //                 ),
+            //                 rhs_expr
+            //             )),
+            //             self.mir.span,
+            //             ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+            //             self.def_id,
+            //         )?;
+            //     dbg!(&assume_statement);
+            //     // preconditions.push(assume_statement);
+            // }
+            preconditions.push(assume_statement);
         }
+
+        // let mut live_on_entry: BTreeSet<vir_high::ty::LifetimeConst> = self
+        //     .lifetimes
+        //     .get_origin_live_on_entry_at_start(first_location)
+        //     .iter()
+        //     .map(|lifetime| vir_high::ty::LifetimeConst {
+        //         name: lifetime.to_text(),
+        //     })
+        //     .collect();
+
+        // // TODO: why is there no vector of lifetimes???
+        // let lifetime_subsets: Vec<(vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst)> =
+        //     self.lifetimes
+        //         .get_subset_base_at_start(first_location)
+        //         .iter()
+        //         .map(|(r1, r2)| {
+        //             (
+        //                 vir_high::ty::LifetimeConst { name: r1.to_text() },
+        //                 vir_high::ty::LifetimeConst { name: r2.to_text() },
+        //             )
+        //         })
+        //         .collect();
+
+        // for (lifetime_1, lifetime_2) in lifetime_subsets {
+        //     // TODO: make this an Assume statement with an "LifetimeIncludes" BinaryOp Expression
+        //     // let statement = self.encoder.set_statement_error_ctxt(
+        //     //     vir_high::Statement::assume_no_pos(
+        //     //         vir_high::Expression::binary_op_no_pos(
+        //     //             vir_high::Expression::BinaryOpKind::LifetimeIncludes,
+        //     //             lifetime_1.into(),
+        //     //             lifetime_2.into(),
+        //     //         )
+        //     //     ),
+        //     //     mir_span,
+        //     //     ErrorCtxt::LifetimeIncluded,
+        //     //     self.def_id,
+        //     // )?;
+        //     // preconditions.push(statement);
+        //
+        //     // PROBLEM: no domain_func_app in vir_high -> new statement for this.
+        //     // let arguments: Vec<vir_high::Expression> = vec![]
+        //     // let parameters = arguments
+        //     //     .iter()
+        //     //     .enumerate()
+        //     //     .map(|(i, argument)| VariableDecl {
+        //     //         name: format!("_{}", i),
+        //     //         ty: argument.get_type().clone(),
+        //     //     })
+        //     //     .collect();
+        //     // let assume_statement = self.encoder.set_statement_error_ctxt(
+        //     //     vir_high::Statement::assume_no_pos(
+        //     //         vir_high::Expression::func_app_no_pos(
+        //     //             // pub function_name: String,
+        //     //             "included".to_string(),
+        //     //             // pub type_arguments: Vec<Type>,
+        //     //             vec![
+        //     //             ],
+        //     //             // pub arguments: Vec<Expression>,
+        //     //             vec![],
+        //     //             // pub parameters: Vec<VariableDecl>,
+        //     //             vec![
+        //     //                 vir_high::VariableDecl{
+        //     //                     name: "_0".to_string(),
+        //     //                     ty: vir_high::Type::TypeVar(
+        //     //                         vir_high::ty::TypeVar::LifetimeConst(lifetime_1)
+        //     //                     ),
+        //     //                 },
+        //     //                 vir_high::VariableDecl{
+        //     //                     name: "_1".to_string(),
+        //     //                     ty: vir_high::Type::TypeVar(
+        //     //                         vir_high::ty::TypeVar::LifetimeConst(lifetime_2)
+        //     //                     ),
+        //     //                 },
+        //     //             ],
+        //     //             // pub return_type: Type,
+        //     //             vir_high::Type::Bool,
+        //     //         )
+        //     //     ),
+        //     //     mir_span,
+        //     //     ErrorCtxt::UnexpectedAssumeMethodPrecondition,
+        //     //     self.def_id,
+        //     // )?;
+        // }
 
         // return
         Ok(preconditions)
+    }
+
+    // fn fold_lifetime_intersection(
+    //     &mut self,
+    //     lifetimes: &mut VecDeque<String>,
+    // ) -> SpannedEncodingResult<vir_high::Expression> {
+    //     if lifetimes.len() == 1 {
+    //         return Ok(vir_high::Expression::local_no_pos(vir_high::VariableDecl {
+    //             name: lifetimes.pop_front().unwrap(),
+    //             ty: vir_high::ty::Type::Lifetime,
+    //         }));
+    //     } else {
+    //         let lhs = lifetimes.pop_front().unwrap();
+    //         return Ok(vir_high::Expression::binary_op_no_pos(
+    //             vir_high::BinaryOpKind::LifetimeIntersection,
+    //             vir_high::Expression::local_no_pos(vir_high::VariableDecl {
+    //                 name: lhs,
+    //                 ty: vir_high::ty::Type::Lifetime,
+    //             }),
+    //             self.fold_lifetime_intersection(lifetimes).unwrap(),
+    //         ));
+    //     }
+    // }
+
+    fn get_opaque_lifetime_conditions(
+        &mut self,
+    ) -> SpannedEncodingResult<BTreeMap<String, BTreeSet<String>>> {
+        let mut conditions = BTreeMap::new();
+        let opaque_lifetimes = self.lifetimes.get_opaque_lifetimes_with_inclusions();
+        for lifetime_with_inclusions in opaque_lifetimes {
+            conditions.insert(
+                lifetime_with_inclusions.lifetime.to_text(),
+                lifetime_with_inclusions
+                    .included_in
+                    .iter()
+                    .map(|x| x.to_text())
+                    .collect(),
+            );
+        }
+        Ok(conditions)
+    }
+
+    fn lifetimes_to_inhale(
+        &mut self,
+        first_location: &mir::Location,
+    ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>> {
+        let mut lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> = self
+            .lifetimes
+            .get_opaque_lifetimes_with_inclusions()
+            .iter()
+            .map(|x| vir_high::ty::LifetimeConst {
+                name: x.lifetime.to_text(),
+            })
+            .collect();
+
+        let lifetime_subsets_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> = self
+            .lifetimes
+            .get_subset_base_at_start(*first_location)
+            .iter()
+            .flat_map(|(r1, r2)| {
+                [
+                    vir_high::ty::LifetimeConst { name: r1.to_text() },
+                    vir_high::ty::LifetimeConst { name: r2.to_text() },
+                ]
+            })
+            .collect();
+        lifetimes_to_inhale.extend(lifetime_subsets_to_inhale);
+        Ok(lifetimes_to_inhale)
+    }
+
+    fn encode_inhale_lifetime_token(
+        &mut self,
+        lifetime_const: vir_high::ty::LifetimeConst,
+    ) -> SpannedEncodingResult<vir_high::Statement> {
+        self.encoder.set_statement_error_ctxt(
+            vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
+                lifetime_const,
+            )),
+            self.mir.span,
+            ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+            self.def_id,
+        )
     }
 
     fn encode_functional_specifications(
@@ -1441,6 +1569,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 self.def_id,
             )?);
         }
+        // TODO: exhale lifetimetokens needed in function here
 
         let procedure_contract = self
             .encoder
@@ -1508,6 +1637,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     ErrorCtxt::ProcedureCall,
                     self.def_id,
                 )?);
+                // TODO: inhale LifetimeTokens back here
                 for expression in postcondition_expressions {
                     let assume_statement = self.encoder.set_statement_error_ctxt(
                         vir_high::Statement::assume_no_pos(expression),
@@ -1567,6 +1697,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         ErrorCtxt::ProcedureCall,
                         self.def_id,
                     )?);
+                    // TODO: inhale LifetimeToken here too in case of panic
                     cleanup_block_builder.build();
                     block_builder.set_successor_jump(vir_high::Successor::NonDetChoice(
                         fresh_destination_label,

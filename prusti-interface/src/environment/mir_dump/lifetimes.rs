@@ -16,10 +16,10 @@ pub struct Lifetimes {
     output_facts: AllOutputFacts,
 }
 
-pub(super) struct LifetimeWithInclusions {
-    lifetime: Region,
+pub struct LifetimeWithInclusions {
+    pub lifetime: Region,
     loan: Loan,
-    included_in: Vec<Region>,
+    pub included_in: Vec<Region>,
 }
 
 impl super::graphviz::ToText for super::lifetimes::LifetimeWithInclusions {
@@ -107,7 +107,7 @@ impl Lifetimes {
     pub(super) fn debug_borrowck_out_facts(&self) {
         eprintln!("{:?}", self.borrowck_out_facts());
     }
-    pub(super) fn get_opaque_lifetimes_with_inclusions(&self) -> Vec<LifetimeWithInclusions> {
+    pub fn get_opaque_lifetimes_with_inclusions(&self) -> Vec<LifetimeWithInclusions> {
         let borrowck_in_facts = self.borrowck_in_facts();
         let mut opaque_lifetimes = Vec::new();
         for &(placeholder, loan) in &borrowck_in_facts.placeholder {

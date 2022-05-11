@@ -371,6 +371,7 @@ impl Typed for BinaryOp {
             | BinaryOpKind::Mul
             | BinaryOpKind::Div
             | BinaryOpKind::Mod
+            | BinaryOpKind::LifetimeIncludes
             | BinaryOpKind::LifetimeIntersection => {
                 let ty1 = self.left.get_type();
                 let ty2 = self.right.get_type();

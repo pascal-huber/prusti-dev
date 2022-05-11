@@ -251,10 +251,10 @@ pub struct LifetimeReturn {
     pub position: Position,
 }
 
-#[display(fmt = "lifetime_included({}, {})", lhs, rhs)]
+#[display(fmt = "lifetime_included({}, {})", lhs, "display::cjoin(rhs)")]
 pub struct LifetimeIncluded {
     pub lhs: LifetimeConst,
-    pub rhs: LifetimeConst,
+    pub rhs: Vec<LifetimeConst>,
     pub position: Position,
 }
 

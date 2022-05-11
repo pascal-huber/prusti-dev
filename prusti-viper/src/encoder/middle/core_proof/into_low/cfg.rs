@@ -484,11 +484,20 @@ impl IntoLow for vir_mid::Statement {
                 }
             }
             Self::LifetimeIncluded(statement) => {
+                if statement.rhs.is_empty() {
+                    return Ok(vec![]); // static lifetime
+                }
                 lowerer.encode_lifetime_included()?;
                 let lhs = lowerer.encode_lifetime_const_into_variable(statement.lhs)?;
-                let rhs = lowerer.encode_lifetime_const_into_variable(statement.rhs)?;
-                let arguments: Vec<vir_low::Expression> = vec![lhs.into(), rhs.into()];
-                Ok(vec![Statement::assume(
+                let mut rhs: Vec<vir_low::VariableDecl> = Vec::new();
+                for lft in statement.rhs {
+                    let var = lowerer.encode_lifetime_const_into_variable(lft)?;
+                    rhs.push(var);
+                }
+                lowerer.encode_lifetime_included()?;
+                let intersection = lowerer.encode_lifetime_intersection(&rhs)?;
+                let arguments: Vec<vir_low::Expression> = vec![lhs.into(), intersection];
+                let assume_statement = Statement::assume(
                     vir_low::Expression::domain_function_call(
                         "Lifetime",
                         "included$",
@@ -496,7 +505,11 @@ impl IntoLow for vir_mid::Statement {
                         vir_low::ty::Type::Bool,
                     ),
                     statement.position,
-                )])
+                );
+                Ok(vec![
+                    // Statement::comment(format!("inhale {:?} ⊆ {:?}", &lhs, &rhs)),
+                    assume_statement,
+                ])
             }
             Self::OpenFracRef(statement) => {
                 let place = statement.place.get_parent_ref().unwrap();
