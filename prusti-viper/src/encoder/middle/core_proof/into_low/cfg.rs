@@ -460,7 +460,7 @@ impl IntoLow for vir_mid::Statement {
                         statement.target.to_procedure_snapshot(lowerer)?,
                     )];
                     Ok(vec![Statement::method_call(
-                        String::from("lft_tok_sep_take"),
+                        format!("lft_tok_sep_take${}", statement.value.len()),
                         arguments,
                         target,
                         statement.position,
@@ -483,7 +483,7 @@ impl IntoLow for vir_mid::Statement {
                         statement.rd_perm,
                     ));
                     Ok(vec![Statement::method_call(
-                        String::from("lft_tok_sep_take"),
+                        format!("lft_tok_sep_return${}", statement.value.len()),
                         arguments,
                         vec![],
                         statement.position,
