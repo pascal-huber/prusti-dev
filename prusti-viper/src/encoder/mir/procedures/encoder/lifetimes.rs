@@ -109,6 +109,9 @@ pub(super) trait LifetimesEncoder {
         &mut self,
         first_location: &mir::Location,
     ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>>;
+    fn lifetimes_to_exhale_inhale_function(
+        &mut self,
+    ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>>;
     fn encode_inhale_lifetime_token(
         &mut self,
         lifetime_const: vir_high::ty::LifetimeConst,
@@ -587,6 +590,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             .collect();
         lifetimes_to_inhale.extend(lifetime_subsets_to_inhale);
         Ok(lifetimes_to_inhale)
+    }
+
+    fn lifetimes_to_exhale_inhale_function(
+        &mut self
+    ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>> {
+        Ok(BTreeSet::new())
     }
 
     fn encode_inhale_lifetime_token(

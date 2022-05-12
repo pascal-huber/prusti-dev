@@ -433,7 +433,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             location.statement_index += 1;
         }
         if let Some(terminator) = terminator {
-            self.encode_terminator(&mut block_builder, location, terminator)?;
+            self.encode_terminator(&mut block_builder, location, terminator, &mut original_lifetimes, &mut derived_lifetimes)?;
         }
         block_builder.build();
         Ok(())
@@ -904,6 +904,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
         terminator: &mir::Terminator<'tcx>,
+        original_lifetimes: &mut BTreeSet<String>,
+        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         block_builder.add_comment(format!("{:?} {:?}", location, terminator.kind));
         let span = self.encoder.get_span_of_location(self.mir, location);
@@ -963,6 +965,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     destination,
                     cleanup,
                     *fn_span,
+                    original_lifetimes,
+                    derived_lifetimes,
                 )?;
                 // The encoding of the call is expected to set the successor.
                 return Ok(());
@@ -1219,6 +1223,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         destination: &Option<(mir::Place<'tcx>, mir::BasicBlock)>,
         cleanup: &Option<mir::BasicBlock>,
         _fn_span: Span,
+        original_lifetimes: &mut BTreeSet<String>,
+        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         if let ty::TyKind::FnDef(def_id, _substs) = ty.kind() {
             let full_called_function_name = self.encoder.env().tcx().def_path_str(*def_id);
@@ -1231,6 +1237,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 cleanup,
             )? {
                 if let ty::TyKind::FnDef(called_def_id, call_substs) = ty.kind() {
+                    // FIXME: unnecessarily many lifetimes are exhaled/inhaled before/after function call
+                    let mut lifetimes_to_exhale_inhale: BTreeSet<String> = original_lifetimes.clone();
+                    let mut derived_lifetimes_to_exhale: BTreeSet<String> = derived_lifetimes.clone().keys().cloned().collect();
+                    lifetimes_to_exhale_inhale.append(&mut derived_lifetimes_to_exhale);
                     self.encode_function_call(
                         block_builder,
                         location,
@@ -1240,6 +1250,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         args,
                         destination,
                         cleanup,
+                        &lifetimes_to_exhale_inhale,
                     )?;
                 } else {
                     // Other kind of calls?
@@ -1300,6 +1311,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         args: &[mir::Operand<'tcx>],
         destination: &Option<(mir::Place<'tcx>, mir::BasicBlock)>,
         cleanup: &Option<mir::BasicBlock>,
+        lifetimes_to_exhale_inhale: &BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
         // The called method might be a trait method.
         // We try to resolve it to the concrete implementation
@@ -1332,28 +1344,19 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 self.def_id,
             )?);
         }
-        // TODO: exhale lifetimetokens needed in function here
-        // TODO: which ones? all of them?
-        let (first_bb, _) = rustc_middle::mir::traversal::reverse_postorder(self.mir)
-            .into_iter()
-            .next()
-            .unwrap();
-        let first_location = mir::Location {
-            block: first_bb,
-            statement_index: 0,
-        };
-        let lifetimes_to_exhale = self.lifetimes_to_inhale(&first_location)?;
         block_builder.add_statement(self.encoder.set_statement_error_ctxt(
             vir_high::Statement::comment("Exhale Lifetimes.".to_string(),),
             span,
             ErrorCtxt::LifetimeEncoding,
             self.def_id
         )?);
-        for lifetime in &lifetimes_to_exhale {
+        for lifetime in lifetimes_to_exhale_inhale {
             block_builder.add_statement(
                 self.encoder.set_statement_error_ctxt(
                     vir_high::Statement::exhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
-                        lifetime.clone(),
+                        vir_high::ty::LifetimeConst {
+                            name: lifetime.to_string(),
+                        },
                         self.rd_perm,
                     )),
                     self.mir.span,
@@ -1432,11 +1435,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 )?);
 
                 // TODO: inhale LifetimeTokens back here
-                for lifetime in &lifetimes_to_exhale {
+                for lifetime in lifetimes_to_exhale_inhale {
                     post_call_block_builder.add_statement(
                         self.encoder.set_statement_error_ctxt(
                             vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
-                                lifetime.clone(),
+                                vir_high::ty::LifetimeConst {
+                                    name: lifetime.to_string(),
+                                },
                                 self.rd_perm,
                             )),
                             self.mir.span,
@@ -1509,11 +1514,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
 
                     // TODO: inhale LifetimeToken here too in case of panic
                     // TODO: remove redundant code
-                    for lifetime in &lifetimes_to_exhale {
+                    for lifetime in lifetimes_to_exhale_inhale {
                         cleanup_block_builder.add_statement(
                             self.encoder.set_statement_error_ctxt(
                                 vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
-                                    lifetime.clone(),
+                                    vir_high::ty::LifetimeConst {
+                                        name: lifetime.to_string(),
+                                    },
                                     self.rd_perm,
                                 )),
                                 self.mir.span,
