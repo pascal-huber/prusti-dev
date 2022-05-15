@@ -26,6 +26,8 @@ impl<'v, 'tcx: 'v> HighGenericsEncoderInterface<'tcx> for super::super::super::E
         substs: SubstsRef<'tcx>,
     ) -> EncodingResult<Vec<vir_poly::Type>> {
         let type_arguments = self.encode_generic_arguments_high(def_id, substs)?;
+        println!(">>");
+        dbg!(&type_arguments);
         Ok(type_arguments.lower(self))
     }
 }

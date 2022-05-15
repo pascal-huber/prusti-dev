@@ -593,7 +593,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
     }
 
     fn lifetimes_to_exhale_inhale_function(
-        &mut self
+        &mut self,
     ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>> {
         Ok(BTreeSet::new())
     }
