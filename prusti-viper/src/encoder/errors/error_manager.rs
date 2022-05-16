@@ -50,6 +50,7 @@ pub enum ErrorCtxt {
     ExhaleMethodPrecondition,
     /// An error when inhaling method's lifetime specification.
     UnexpectedInhaleLifetimePrecondition,
+    UnexpectedExhaleLifetimePostcondition,
     LifetimeIncluded, // TODO: make nicer and and add desc.
     /// An error when assuming method's functional specification.
     UnexpectedAssumeMethodPrecondition,

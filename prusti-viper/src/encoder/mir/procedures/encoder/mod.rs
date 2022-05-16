@@ -442,13 +442,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             location.statement_index += 1;
         }
         if let Some(terminator) = terminator {
-            self.encode_terminator(
-                &mut block_builder,
-                location,
-                terminator,
-                &mut original_lifetimes,
-                &mut derived_lifetimes,
-            )?;
+            self.encode_terminator(&mut block_builder, location, terminator)?;
         }
         block_builder.build();
         Ok(())
@@ -919,8 +913,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
         terminator: &mir::Terminator<'tcx>,
-        original_lifetimes: &mut BTreeSet<String>,
-        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         block_builder.add_comment(format!("{:?} {:?}", location, terminator.kind));
         let span = self.encoder.get_span_of_location(self.mir, location);
@@ -980,8 +972,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     destination,
                     cleanup,
                     *fn_span,
-                    original_lifetimes,
-                    derived_lifetimes,
                 )?;
                 // The encoding of the call is expected to set the successor.
                 return Ok(());
@@ -1238,13 +1228,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         destination: &Option<(mir::Place<'tcx>, mir::BasicBlock)>,
         cleanup: &Option<mir::BasicBlock>,
         _fn_span: Span,
-        original_lifetimes: &mut BTreeSet<String>,
-        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
-        if let ty::TyKind::FnDef(def_id, substs) = ty.kind() {
-            println!("----");
-            dbg!(&def_id);
-            dbg!(&substs);
+        if let ty::TyKind::FnDef(def_id, _substs) = ty.kind() {
             let full_called_function_name = self.encoder.env().tcx().def_path_str(*def_id);
             if !self.try_encode_builtin_call(
                 block_builder,
@@ -1254,16 +1239,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 destination,
                 cleanup,
             )? {
+                // TODO: Remove unnecessary nesting
                 if let ty::TyKind::FnDef(called_def_id, call_substs) = ty.kind() {
-                    // let generic_args = self
-                    //     .encoder
-                    //     .encode_generic_arguments(*called_def_id, call_substs);
-                    // FIXME: unnecessarily many lifetimes are exhaled/inhaled before/after function call
-                    let mut lifetimes_to_exhale_inhale: BTreeSet<String> =
-                        original_lifetimes.clone();
-                    let mut derived_lifetimes_to_exhale: BTreeSet<String> =
-                        derived_lifetimes.clone().keys().cloned().collect();
-                    lifetimes_to_exhale_inhale.append(&mut derived_lifetimes_to_exhale);
                     self.encode_function_call(
                         block_builder,
                         location,
@@ -1342,61 +1319,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 .env()
                 .resolve_method_call(self.def_id, called_def_id, call_substs);
 
-        // println!("######################################## substs:");
-        // use crate::rustc_middle::ty::fold::RegionFolder;
-        // dbg!(&called_def_id);
-
-        // let caller_def_id = self.def_id;
-        // dbg!(&caller_def_id);
-        // dbg!(&called_def_id);
-        //
-        // let called_substs = self.encoder.env().identity_substs(called_def_id);
-        // let caller_substs = self.encoder.env().identity_substs(self.def_id);
-        // dbg!(&called_substs);
-        // dbg!(&caller_substs);
-        //
-        // // Generic args do not seem to be present, they both return "Ok( [] )"
-        // let generic_args_called = self.encoder.encode_generic_arguments(called_def_id, called_substs);
-        // dbg!(&generic_args_called);
-        // let generic_args_caller = self.encoder.encode_generic_arguments(caller_def_id, caller_substs);
-        // dbg!(&generic_args_caller);
-        //
-        // // Generic params do not seem to be present, they bot return "Ok( [] )"
-        // let generic_params_called = self.encoder.encode_generic_parameters(called_def_id);
-        // dbg!(&generic_params_called);
-        // let generic_params_caller = self.encoder.encode_generic_parameters(caller_def_id);
-        // dbg!(&generic_params_caller);
-        //
-        // // also does not seem to contain any useful information
-        // // NOTE: if there are multiple lifetimes
-        // dbg!(self.encoder.env().tcx().generics_of(called_def_id));
-        // dbg!(self.encoder.env().tcx().generics_of(caller_def_id));
-
-        // keeping this for possible use later...
-        // dbg!(self.encoder.env().tcx().format_generic_args());
-
-        // not really helpful:
-        // dbg!(self.encoder.env().tcx().region_scope_tree(caller_def_id));
-        // dbg!(self.encoder.env().tcx().region_scope_tree(called_def_id));
-
-        // // param_env is only about the where clauses (I think)
-        // dbg!(self.encoder.env().tcx().param_env(caller_def_id));
-        // dbg!(self.encoder.env().tcx().param_env(called_def_id));
-
-        // args does not contain the lifetimes
-        // dbg!(&args);
-
-        // fn_sig does not seem to contain the lifetimes
-        // let fn_sig = self.encoder.env()
-        //     .tcx()
-        //     .fn_sig(called_def_id)
-        //     .skip_binder();
-        // .subst(self.encoder.env().tcx(), called_substs);
-        // dbg!(&fn_sig);
-
-        // println!("########################################");
-
         let mut lifetimes_to_exhale_inhale: BTreeSet<String> = BTreeSet::new();
+
         // TODO: is this really the way? - the lifetimes here are newly introduced
         // lifetimes_to_exhale_inhale = call_substs
         //     .iter()
@@ -1406,7 +1330,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         //     })
         //     .collect();
 
-        // Those are the lifetimes which correspond to the moved variables
+        // Get lifetimes to exhale and inhale from move-arguments
         for arg in args {
             if let mir::Operand::Move(place) = arg {
                 let place_high = self.encoder.encode_place_high(self.mir, *place)?;

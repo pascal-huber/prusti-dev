@@ -511,10 +511,7 @@ impl IntoLow for vir_mid::Statement {
                     ),
                     statement.position,
                 );
-                Ok(vec![
-                    // Statement::comment(format!("inhale {:?} ⊆ {:?}", &lhs, &rhs)),
-                    assume_statement,
-                ])
+                Ok(vec![assume_statement])
             }
             Self::OpenFracRef(statement) => {
                 let place = statement.place.get_parent_ref().unwrap();
@@ -638,7 +635,6 @@ impl IntoLow for vir_mid::Predicate {
         let result = match self {
             Predicate::LifetimeToken(predicate) => {
                 lowerer.encode_lifetime_token_predicate()?;
-                // TODO: inhale only fractional permission for shared references
                 let lifetime = lowerer.encode_lifetime_const_into_variable(predicate.lifetime)?;
                 let perm_amount = vir_low::Expression::fractional_permission(predicate.rd_perm);
                 expr! { acc(LifetimeToken([lifetime.into()]), [perm_amount])}

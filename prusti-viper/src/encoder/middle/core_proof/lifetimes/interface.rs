@@ -272,7 +272,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<vir_low::Expression> {
         self.encode_lifetime_token_predicate()?; // TODO: right place?
         self.encode_lifetime_intersect(lifetimes.len())?;
-        // TODO: add domain function call intersect$len(args..)
         use vir_low::macros::*;
         let mut arguments: Vec<vir_low::Expression> = Vec::new();
         for lifetime in lifetimes {

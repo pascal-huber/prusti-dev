@@ -16,7 +16,7 @@ pub struct Lifetimes {
     output_facts: AllOutputFacts,
 }
 
-pub struct LifetimeWithInclusions {
+pub(super) struct LifetimeWithInclusions {
     lifetime: Region,
     loan: Loan,
     included_in: Vec<Region>,
@@ -146,14 +146,6 @@ impl Lifetimes {
             .map(|(region, _, _)| *region)
             .collect()
     }
-    // pub fn get_all_subset_base(&self) -> BTreeSet<(Region, Region)> {
-    //     let borrowck_in_facts = self.borrowck_in_facts();
-    //     borrowck_in_facts
-    //         .subset_base
-    //         .iter()
-    //         .flat_map(|&(r1, r2, _)| Some((r1, r2)))
-    //         .collect()
-    // }
     pub fn get_subset_base_at_start(&self, location: mir::Location) -> Vec<(Region, Region)> {
         let rich_location = RichLocation::Start(location);
         let point = self.location_to_point(rich_location);
@@ -189,17 +181,7 @@ impl Lifetimes {
             BTreeMap::new()
         }
     }
-    pub fn get_origin_live_on_entry_at_start(&self, location: mir::Location) -> Vec<Region> {
-        let rich_location = RichLocation::Start(location);
-        let point = self.location_to_point(rich_location);
-        let borrowck_out_facts = self.borrowck_out_facts();
-        if let Some(origins) = borrowck_out_facts.origin_live_on_entry.get(&point) {
-            origins.clone()
-        } else {
-            Vec::new()
-        }
-    }
-    pub fn get_origin_live_on_entry(&self, location: RichLocation) -> Vec<Region> {
+    pub(super) fn get_origin_live_on_entry(&self, location: RichLocation) -> Vec<Region> {
         let point = self.location_to_point(location);
         let borrowck_out_facts = self.borrowck_out_facts();
         if let Some(origins) = borrowck_out_facts.origin_live_on_entry.get(&point) {
