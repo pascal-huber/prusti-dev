@@ -395,6 +395,7 @@ impl IntoLow for vir_mid::Statement {
             }
             Self::Assign(statement) => {
                 let mut statements = Vec::new();
+                // TODO: check for reborrow
                 lowerer.encode_assign_method_call(
                     &mut statements,
                     statement.target,
