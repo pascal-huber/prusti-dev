@@ -79,7 +79,6 @@ impl Lifetimes {
         let subset_lifetimes_count: u32 = subset_lifetimes.len().try_into().unwrap();
         original_lifetimes_count + subset_lifetimes_count
     }
-
     fn borrowck_in_facts(&self) -> Ref<AllInputFacts> {
         Ref::map(self.facts.input_facts.borrow(), |facts| {
             facts.as_ref().unwrap()
@@ -98,6 +97,21 @@ impl Lifetimes {
     }
     pub(super) fn debug_borrowck_out_facts(&self) {
         eprintln!("{:?}", self.borrowck_out_facts());
+    }
+    pub fn get_opaque_lifetimes_with_inclusions_names(&self) -> BTreeMap<String, BTreeSet<String>> {
+        let opaque_lifetimes = self.get_opaque_lifetimes_with_inclusions();
+        let mut result = BTreeMap::new();
+        for lifetime_with_inclusions in opaque_lifetimes {
+            result.insert(
+                lifetime_with_inclusions.lifetime.to_text(),
+                lifetime_with_inclusions
+                    .included_in
+                    .iter()
+                    .map(|x| x.to_text())
+                    .collect(),
+            );
+        }
+        result
     }
     pub(super) fn get_opaque_lifetimes_with_inclusions(&self) -> Vec<LifetimeWithInclusions> {
         let borrowck_in_facts = self.borrowck_in_facts();
@@ -122,6 +136,16 @@ impl Lifetimes {
             .loan_issued_at
             .iter()
             .map(|(region, _, _)| *region)
+            .collect()
+    }
+    pub fn get_subset_base_at_start(&self, location: mir::Location) -> Vec<(Region, Region)> {
+        let rich_location = RichLocation::Start(location);
+        let point = self.location_to_point(rich_location);
+        let borrowck_in_facts = self.borrowck_in_facts();
+        borrowck_in_facts
+            .subset_base
+            .iter()
+            .flat_map(|&(r1, r2, p)| if p == point { Some((r1, r2)) } else { None })
             .collect()
     }
     pub(super) fn get_subset_base(&self, location: RichLocation) -> Vec<(Region, Region)> {

@@ -362,6 +362,7 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
             vir_mid::BinaryOpKind::Or => vir_low::BinaryOpKind::Or,
             vir_mid::BinaryOpKind::Implies => vir_low::BinaryOpKind::Implies,
             vir_mid::BinaryOpKind::LifetimeIntersection => unreachable!(),
+            vir_mid::BinaryOpKind::LifetimeIncludes => unreachable!(),
         })
     }
 

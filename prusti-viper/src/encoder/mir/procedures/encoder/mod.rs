@@ -22,6 +22,7 @@ use crate::encoder::{
     mir_encoder::PRECONDITION_LABEL,
     Encoder,
 };
+
 use log::debug;
 use prusti_common::config;
 use prusti_interface::environment::{
@@ -38,7 +39,10 @@ use rustc_hir::def_id::DefId;
 use rustc_middle::{mir, ty, ty::subst::SubstsRef};
 use rustc_mir_dataflow::{move_paths::LookupResult, on_all_drop_children_bits, MoveDataParamEnv};
 use rustc_span::Span;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    cmp,
+    collections::{BTreeMap, BTreeSet},
+};
 use vir_crate::{
     common::{
         expression::{BinaryOperationHelpers, UnaryOperationHelpers},
@@ -80,7 +84,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let move_env = self::initialisation::create_move_data_param_env(tcx, mir, def_id);
     let init_data = InitializationData::new(tcx, mir, &move_env);
     let locals_without_explicit_allocation: BTreeSet<_> = mir.vars_and_temps_iter().collect();
-    let rd_perm = lifetimes.lifetime_count();
+    let rd_perm = cmp::max(1, lifetimes.lifetime_count());
     let specification_blocks = SpecificationBlocks::build(tcx, mir, &procedure);
     let initialization = compute_definitely_initialized(def_id, mir, encoder.env().tcx());
     let allocation = compute_definitely_allocated(def_id, mir);
@@ -140,14 +144,18 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let (allocate_returns, deallocate_returns) = self.encode_returns()?;
         let (assume_preconditions, assert_postconditions) =
             self.encode_functional_specifications()?;
+        let (assume_lifetime_preconditions, assert_lifetime_postconditions) =
+            self.encode_lifetime_specifications()?;
         let mut procedure_builder = ProcedureBuilder::new(
             name,
             allocate_parameters,
             allocate_returns,
             assume_preconditions,
+            assume_lifetime_preconditions,
             deallocate_parameters,
             deallocate_returns,
             assert_postconditions,
+            assert_lifetime_postconditions,
         );
         self.encode_body(&mut procedure_builder)?;
         self.encode_implicit_allocations(&mut procedure_builder)?;
@@ -1245,6 +1253,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 destination,
                 cleanup,
             )? {
+                // TODO: Remove unnecessary nesting
                 if let ty::TyKind::FnDef(called_def_id, call_substs) = ty.kind() {
                     self.encode_function_call(
                         block_builder,
@@ -1347,6 +1356,28 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 .env()
                 .resolve_method_call(self.def_id, called_def_id, call_substs);
 
+        let mut lifetimes_to_exhale_inhale: BTreeSet<String> = BTreeSet::new();
+
+        // TODO: is this really the way? - the lifetimes here are newly introduced
+        // lifetimes_to_exhale_inhale = call_substs
+        //     .iter()
+        //     .filter_map(|generic| match generic.unpack() {
+        //         ty::subst::GenericArgKind::Lifetime(region) => Some(region.to_text()),
+        //         _ => None,
+        //     })
+        //     .collect();
+
+        // Get lifetimes to exhale and inhale from move-arguments
+        for arg in args {
+            if let mir::Operand::Move(place) = arg {
+                let place_high = self.encoder.encode_place_high(self.mir, *place)?;
+                let lifetime_name = self.get_lifetime_name(place_high);
+                if let Some(lifetime_name) = lifetime_name {
+                    lifetimes_to_exhale_inhale.insert(lifetime_name);
+                }
+            }
+        }
+
         let old_label = self.fresh_old_label();
         block_builder.add_statement(self.encoder.set_statement_error_ctxt(
             vir_high::Statement::old_label_no_pos(old_label.clone()),
@@ -1367,6 +1398,25 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 statement,
                 span,
                 ErrorCtxt::ProcedureCall,
+                self.def_id,
+            )?);
+        }
+        block_builder.add_statement(self.encoder.set_statement_error_ctxt(
+            vir_high::Statement::comment("Exhale Lifetimes.".to_string()),
+            span,
+            ErrorCtxt::LifetimeEncoding,
+            self.def_id,
+        )?);
+        for lifetime in &lifetimes_to_exhale_inhale {
+            block_builder.add_statement(self.encoder.set_statement_error_ctxt(
+                vir_high::Statement::exhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
+                    vir_high::ty::LifetimeConst {
+                        name: lifetime.clone(),
+                    },
+                    self.rd_perm,
+                )),
+                self.mir.span,
+                ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
                 self.def_id,
             )?);
         }
@@ -1437,6 +1487,24 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     ErrorCtxt::ProcedureCall,
                     self.def_id,
                 )?);
+
+                // TODO: inhale LifetimeTokens back here
+                for lifetime in &lifetimes_to_exhale_inhale {
+                    post_call_block_builder.add_statement(self.encoder.set_statement_error_ctxt(
+                        vir_high::Statement::inhale_no_pos(
+                            vir_high::Predicate::lifetime_token_no_pos(
+                                vir_high::ty::LifetimeConst {
+                                    name: lifetime.clone(),
+                                },
+                                self.rd_perm,
+                            ),
+                        ),
+                        self.mir.span,
+                        ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+                        self.def_id,
+                    )?);
+                }
+
                 for expression in postcondition_expressions {
                     let assume_statement = self.encoder.set_statement_error_ctxt(
                         vir_high::Statement::assume_no_pos(expression),
@@ -1496,6 +1564,27 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         ErrorCtxt::ProcedureCall,
                         self.def_id,
                     )?);
+
+                    // TODO: inhale LifetimeToken here too in case of panic
+                    // TODO: remove redundant code
+                    for lifetime in &lifetimes_to_exhale_inhale {
+                        cleanup_block_builder.add_statement(
+                            self.encoder.set_statement_error_ctxt(
+                                vir_high::Statement::inhale_no_pos(
+                                    vir_high::Predicate::lifetime_token_no_pos(
+                                        vir_high::ty::LifetimeConst {
+                                            name: lifetime.clone(),
+                                        },
+                                        self.rd_perm,
+                                    ),
+                                ),
+                                self.mir.span,
+                                ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+                                self.def_id,
+                            )?,
+                        );
+                    }
+
                     cleanup_block_builder.build();
                     block_builder.set_successor_jump(vir_high::Successor::NonDetChoice(
                         fresh_destination_label,
