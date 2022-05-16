@@ -133,7 +133,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let (allocate_returns, deallocate_returns) = self.encode_returns()?;
         let (assume_preconditions, assert_postconditions) =
             self.encode_functional_specifications()?;
-        let (assume_lifetime_preconditions, assert_lifetime_postconditions) = self.encode_lifetime_specifications()?;
+        let (assume_lifetime_preconditions, assert_lifetime_postconditions) =
+            self.encode_lifetime_specifications()?;
         let mut procedure_builder = ProcedureBuilder::new(
             name,
             allocate_parameters,

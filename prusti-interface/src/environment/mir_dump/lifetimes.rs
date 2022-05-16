@@ -17,9 +17,9 @@ pub struct Lifetimes {
 }
 
 pub struct LifetimeWithInclusions {
-    pub lifetime: Region,
+    lifetime: Region,
     loan: Loan,
-    pub included_in: Vec<Region>,
+    included_in: Vec<Region>,
 }
 
 impl super::graphviz::ToText for super::lifetimes::LifetimeWithInclusions {
@@ -87,7 +87,6 @@ impl Lifetimes {
         let subset_lifetimes_count: u32 = subset_lifetimes.len().try_into().unwrap();
         original_lifetimes_count + subset_lifetimes_count
     }
-
     fn borrowck_in_facts(&self) -> Ref<AllInputFacts> {
         Ref::map(self.facts.input_facts.borrow(), |facts| {
             facts.as_ref().unwrap()
@@ -107,7 +106,22 @@ impl Lifetimes {
     pub(super) fn debug_borrowck_out_facts(&self) {
         eprintln!("{:?}", self.borrowck_out_facts());
     }
-    pub fn get_opaque_lifetimes_with_inclusions(&self) -> Vec<LifetimeWithInclusions> {
+    pub fn get_opaque_lifetimes_with_inclusions_names(&self) -> BTreeMap<String, BTreeSet<String>> {
+        let opaque_lifetimes = self.get_opaque_lifetimes_with_inclusions();
+        let mut result = BTreeMap::new();
+        for lifetime_with_inclusions in opaque_lifetimes {
+            result.insert(
+                lifetime_with_inclusions.lifetime.to_text(),
+                lifetime_with_inclusions
+                    .included_in
+                    .iter()
+                    .map(|x| x.to_text())
+                    .collect(),
+            );
+        }
+        result
+    }
+    pub(super) fn get_opaque_lifetimes_with_inclusions(&self) -> Vec<LifetimeWithInclusions> {
         let borrowck_in_facts = self.borrowck_in_facts();
         let mut opaque_lifetimes = Vec::new();
         for &(placeholder, loan) in &borrowck_in_facts.placeholder {

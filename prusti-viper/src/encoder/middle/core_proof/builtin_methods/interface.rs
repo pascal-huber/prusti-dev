@@ -746,8 +746,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 let root_address = self.encode_assign_operand_address(operand_counter)?;
 
                 if let vir_mid::ty::Type::Reference(reference) = ty {
-                    let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-                    pres.push(expr! { acc(OwnedNonAliased<ty>(place, root_address, value, lifetime)) });
+                    let lifetime =
+                        self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+                    pres.push(
+                        expr! { acc(OwnedNonAliased<ty>(place, root_address, value, lifetime)) },
+                    );
                 } else {
                     pres.push(expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) });
                 }

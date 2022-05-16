@@ -93,8 +93,9 @@ pub(super) trait LifetimesEncoder {
         old_original_lifetimes: &BTreeSet<String>,
         new_original_lifetimes: &BTreeSet<String>,
     ) -> BTreeSet<String>;
-    fn encode_lifetime_specifications(&mut self)
-        -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)>;
+    fn encode_lifetime_specifications(
+        &mut self,
+    ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)>;
     fn identical_lifetimes(
         &mut self,
         start: vir_high::ty::LifetimeConst,
@@ -102,11 +103,7 @@ pub(super) trait LifetimesEncoder {
         relations: &BTreeMap<vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst>,
         equal_lifetimes: &mut BTreeSet<vir_high::ty::LifetimeConst>,
     ) -> BTreeSet<vir_high::ty::LifetimeConst>;
-    fn get_opaque_lifetime_conditions(
-        &mut self,
-    ) -> SpannedEncodingResult<BTreeMap<String, BTreeSet<String>>>;
-    fn get_lifetime_name(&mut self, variable: vir_high::Expression)
-        -> Option<String>;
+    fn get_lifetime_name(&mut self, variable: vir_high::Expression) -> Option<String>;
     fn lifetimes_to_inhale(
         &mut self,
         first_location: &mir::Location,
@@ -452,7 +449,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
 
         // Inhale Opaque lifetimes
         let opaque_conditions: BTreeMap<String, BTreeSet<String>> =
-            self.get_opaque_lifetime_conditions()?;
+            self.lifetimes.get_opaque_lifetimes_with_inclusions_names();
         let mut opaque_lifetimes: BTreeSet<vir_high::ty::LifetimeConst> = BTreeSet::new();
         for (lifetime, condition) in opaque_conditions {
             let lifetime_const = vir_high::ty::LifetimeConst { name: lifetime };
@@ -466,7 +463,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                         .collect(),
                 ),
                 self.mir.span,
-                ErrorCtxt::UnexpectedInhaleLifetimePrecondition, // TODO: other errorctxt
+                ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
                 self.def_id,
             )?;
             preconditions.push(assume_statement);
@@ -492,13 +489,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             .cloned()
             .collect();
         for k in &uninitialized_lifetimes {
-            // println!("uninitialized:");
-            // dbg!(&k);
             let mut identical_to_k =
                 self.identical_lifetimes(k.clone(), None, &lifetime_subsets, &mut BTreeSet::new());
             identical_to_k.remove(k);
             if identical_to_k.len() > 1 {
-                unimplemented!()
+                unreachable!() // TODO: right?
             }
             let assign_statement = self.encoder.set_statement_error_ctxt(
                 vir_high::Statement::lifetime_take_no_pos(
@@ -553,23 +548,19 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         }
     }
 
-    fn get_opaque_lifetime_conditions(
-        &mut self,
-    ) -> SpannedEncodingResult<BTreeMap<String, BTreeSet<String>>> {
-        let mut conditions = BTreeMap::new();
-        let opaque_lifetimes = self.lifetimes.get_opaque_lifetimes_with_inclusions();
-        for lifetime_with_inclusions in opaque_lifetimes {
-            conditions.insert(
-                lifetime_with_inclusions.lifetime.to_text(),
-                lifetime_with_inclusions
-                    .included_in
-                    .iter()
-                    .map(|x| x.to_text())
-                    .collect(),
-            );
-        }
-        Ok(conditions)
-    }
+    // fn get_opaque_lifetime_conditions(
+    //     &mut self,
+    // ) -> SpannedEncodingResult<BTreeMap<String, BTreeSet<String>>> {
+    //     let mut conditions = BTreeMap::new();
+    //     let lifetime_with_inclusions = self.lifetimes.get_opaque_lifetimes_with_inclusions_text();
+    //     for (lifetime, inclusions) in opaque_lifetimes {
+    //         conditions.insert(
+    //             lifetime,
+    //             inclusions,
+    //         );
+    //     }
+    //     Ok(conditions)
+    // }
 
     fn get_lifetime_name(&mut self, expression: vir_high::Expression) -> Option<String> {
         if let vir_high::Expression::Local(vir_high::Local {
@@ -592,10 +583,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>> {
         let mut lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> = self
             .lifetimes
-            .get_opaque_lifetimes_with_inclusions()
-            .iter()
+            .get_opaque_lifetimes_with_inclusions_names()
+            .keys()
             .map(|x| vir_high::ty::LifetimeConst {
-                name: x.lifetime.to_text(),
+                name: x.to_string(),
             })
             .collect();
 
