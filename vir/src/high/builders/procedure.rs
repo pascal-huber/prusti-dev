@@ -48,12 +48,14 @@ impl ProcedureBuilder {
         deallocate_parameters: Vec<vir_high::Statement>,
         deallocate_returns: Vec<vir_high::Statement>,
         assert_postconditions: Vec<vir_high::Statement>,
+        assert_lifetime_postconditions: Vec<vir_high::Statement>,
     ) -> Self {
         let mut pre_statements = allocate_parameters;
         pre_statements.extend(assume_preconditions);
         pre_statements.extend(assume_lifetime_preconditions);
         pre_statements.extend(allocate_returns);
         let mut post_statements = assert_postconditions;
+        post_statements.extend(assert_lifetime_postconditions);
         post_statements.extend(deallocate_parameters);
         post_statements.extend(deallocate_returns);
         Self {

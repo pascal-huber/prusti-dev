@@ -133,7 +133,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let (allocate_returns, deallocate_returns) = self.encode_returns()?;
         let (assume_preconditions, assert_postconditions) =
             self.encode_functional_specifications()?;
-        let assume_lifetime_preconditions = self.encode_lifetime_specifications()?;
+        let (assume_lifetime_preconditions, assert_lifetime_postconditions) = self.encode_lifetime_specifications()?;
         let mut procedure_builder = ProcedureBuilder::new(
             name,
             allocate_parameters,
@@ -143,6 +143,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             deallocate_parameters,
             deallocate_returns,
             assert_postconditions,
+            assert_lifetime_postconditions,
         );
         self.encode_body(&mut procedure_builder)?;
         self.encode_implicit_allocations(&mut procedure_builder)?;
@@ -1408,19 +1409,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         for arg in args {
             if let mir::Operand::Move(place) = arg {
                 let place_high = self.encoder.encode_place_high(self.mir, *place)?;
-                if let vir_high::Expression::Local(vir_high::Local {
-                    variable:
-                        vir_high::VariableDecl {
-                            name: _,
-                            ty:
-                                vir_high::ty::Type::Reference(vir_high::ty::Reference {
-                                    lifetime, ..
-                                }),
-                        },
-                    ..
-                }) = place_high
-                {
-                    lifetimes_to_exhale_inhale.insert(lifetime.name.clone());
+                let lifetime_name = self.get_lifetime_name(place_high);
+                if let Some(lifetime_name) = lifetime_name {
+                    lifetimes_to_exhale_inhale.insert(lifetime_name);
                 }
             }
         }

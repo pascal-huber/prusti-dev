@@ -94,7 +94,7 @@ pub(super) trait LifetimesEncoder {
         new_original_lifetimes: &BTreeSet<String>,
     ) -> BTreeSet<String>;
     fn encode_lifetime_specifications(&mut self)
-        -> SpannedEncodingResult<Vec<vir_high::Statement>>;
+        -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)>;
     fn identical_lifetimes(
         &mut self,
         start: vir_high::ty::LifetimeConst,
@@ -105,6 +105,8 @@ pub(super) trait LifetimesEncoder {
     fn get_opaque_lifetime_conditions(
         &mut self,
     ) -> SpannedEncodingResult<BTreeMap<String, BTreeSet<String>>>;
+    fn get_lifetime_name(&mut self, variable: vir_high::Expression)
+        -> Option<String>;
     fn lifetimes_to_inhale(
         &mut self,
         first_location: &mir::Location,
@@ -422,7 +424,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
 
     fn encode_lifetime_specifications(
         &mut self,
-    ) -> SpannedEncodingResult<Vec<vir_high::Statement>> {
+    ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)> {
         let (first_bb, _) = rustc_middle::mir::traversal::reverse_postorder(self.mir)
             .into_iter()
             .next()
@@ -436,11 +438,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         let mut preconditions = vec![vir_high::Statement::comment(
             "Assume lifetime preconditions.".to_string(),
         )];
+        let mut postconditions = vec![vir_high::Statement::comment(
+            "Assert lifetime postconditions.".to_string(),
+        )];
         let lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> =
             self.lifetimes_to_inhale(&first_location)?;
         for lifetime in lifetimes_to_inhale {
-            let inhale_statement = self.encode_inhale_lifetime_token(lifetime)?;
+            let inhale_statement = self.encode_inhale_lifetime_token(lifetime.clone())?;
+            let exhale_statement = self.encode_exhale_lifetime_token(lifetime)?;
             preconditions.push(inhale_statement);
+            postconditions.push(exhale_statement);
         }
 
         // Inhale Opaque lifetimes
@@ -514,7 +521,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             )?;
             preconditions.push(assign_statement);
         }
-        Ok(preconditions)
+        Ok((preconditions, postconditions))
     }
 
     fn identical_lifetimes(
@@ -562,6 +569,21 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             );
         }
         Ok(conditions)
+    }
+
+    fn get_lifetime_name(&mut self, expression: vir_high::Expression) -> Option<String> {
+        if let vir_high::Expression::Local(vir_high::Local {
+            variable:
+                vir_high::VariableDecl {
+                    name: _,
+                    ty: vir_high::ty::Type::Reference(vir_high::ty::Reference { lifetime, .. }),
+                },
+            ..
+        }) = expression
+        {
+            return Some(lifetime.name);
+        }
+        None
     }
 
     fn lifetimes_to_inhale(
