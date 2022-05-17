@@ -842,6 +842,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()> {
         use vir_low::macros::*;
+        // TODO: check here if reborrow, if yes, change ty to reference type and all the
+        // rest should happen automatically
         let ty = value.place.get_type();
         var_decls! {
             target_place: Place,
@@ -2332,6 +2334,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()> {
         if let vir_mid::Rvalue::Ref(vir_mid::ast::rvalue::Ref{ place: vir_mid::Expression::Deref(deref), .. }) = value.clone() {
+            // TODO: that is too strict - place can be something other than a deref but contain a deref - add "contains_deref" function to place
             // TODO: handle reborrow
             // println!("--> deref");
             // dbg!(&deref);
