@@ -760,6 +760,7 @@ impl<'v, 'tcx> Encoder<'v, 'tcx> {
                 }
             }
         }
+        // println!("end of process_encoding_queue");
     }
 
     pub fn encode_spec_func_name(&self, def_id: ProcedureDefId, kind: SpecFunctionKind) -> String {

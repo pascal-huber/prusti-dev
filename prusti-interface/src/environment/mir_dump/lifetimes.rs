@@ -148,6 +148,16 @@ impl Lifetimes {
             .flat_map(|&(r1, r2, p)| if p == point { Some((r1, r2)) } else { None })
             .collect()
     }
+    pub fn get_subset_base_at_mid(&self, location: mir::Location) -> Vec<(Region, Region)> {
+        let rich_location = RichLocation::Mid(location);
+        let point = self.location_to_point(rich_location);
+        let borrowck_in_facts = self.borrowck_in_facts();
+        borrowck_in_facts
+            .subset_base
+            .iter()
+            .flat_map(|&(r1, r2, p)| if p == point { Some((r1, r2)) } else { None })
+            .collect()
+    }
     pub(super) fn get_subset_base(&self, location: RichLocation) -> Vec<(Region, Region)> {
         let point = self.location_to_point(location);
         let borrowck_in_facts = self.borrowck_in_facts();
