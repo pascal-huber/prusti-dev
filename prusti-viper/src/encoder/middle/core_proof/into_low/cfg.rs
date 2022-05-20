@@ -126,7 +126,7 @@ impl IntoLow for vir_mid::Statement {
                     statement.expression.to_procedure_bool_expression(lowerer)?,
                     statement.position,
                 )])
-            },
+            }
             Self::FoldOwned(statement) => {
                 let ty = statement.place.get_type();
                 lowerer.mark_owned_non_aliased_as_unfolded(ty)?;
@@ -554,15 +554,9 @@ impl IntoLow for vir_mid::Statement {
                     vir_low::ty::Type::Bool,
                 );
                 let statement = if statement.assert {
-                    Statement::assert(
-                        included_expr,
-                        statement.position,
-                    )
+                    Statement::assert(included_expr, statement.position)
                 } else {
-                    Statement::assume(
-                        included_expr,
-                        statement.position,
-                    )
+                    Statement::assume(included_expr, statement.position)
                 };
                 Ok(vec![statement])
             }

@@ -373,13 +373,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         location: mir::Location,
         lifetime_lhs: String,
         lifetime_rhs: String,
-    ) -> SpannedEncodingResult<()>{
+    ) -> SpannedEncodingResult<()> {
         let lhs = vir_high::ty::LifetimeConst { name: lifetime_lhs };
         let rhs = vir_high::ty::LifetimeConst { name: lifetime_rhs };
         let assert_statement = vir_high::Statement::lifetime_included_no_pos(
-                true, // assert, not assume
-                lhs,
-                vec![rhs]
+            true, // assert, not assume
+            lhs,
+            vec![rhs],
         );
         block_builder.add_statement(self.set_statement_error(
             location,
