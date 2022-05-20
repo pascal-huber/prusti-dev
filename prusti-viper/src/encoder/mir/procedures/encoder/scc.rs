@@ -19,29 +19,13 @@ impl Graph {
         }
     }
 
-    pub fn edges<'a>(&'a self, vertex: usize) -> impl Iterator<Item = usize> + 'a {
+    pub fn edges<'a>(&'a self, vertex: usize) -> impl Iterator<Item = usize> + '_ {
         self.neighbors[&vertex].iter().cloned()
     }
 
     pub fn add_edge(&mut self, from: usize, to: usize) {
         assert!(to < self.len());
         self.neighbors.get_mut(&from).unwrap().insert(to);
-    }
-
-    pub fn add_edges(&mut self, from: usize, to: impl IntoIterator<Item = usize>) {
-        let limit = self.len();
-
-        self.neighbors
-            .get_mut(&from)
-            .unwrap()
-            .extend(to.into_iter().filter(|x| {
-                assert!(*x < limit);
-                true
-            }));
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.neighbors.is_empty()
     }
 
     pub fn len(&self) -> usize {

@@ -14,7 +14,6 @@ use crate::encoder::{
         panics::MirPanicsEncoderInterface,
         places::PlacesEncoderInterface,
         predicates::MirPredicateEncoderInterface,
-        procedures::encoder::scc::*,
         pure::{PureFunctionEncoderInterface, SpecificationEncoderInterface},
         spans::SpanInterface,
         specifications::SpecificationsInterface,
@@ -32,7 +31,7 @@ use prusti_interface::environment::{
         initialization::{compute_definitely_initialized, DefinitelyInitializedAnalysisResult},
     },
     mir_dump::{graphviz::ToText, lifetimes::Lifetimes},
-    Environment, Procedure,
+    Procedure,
 };
 use rustc_data_structures::graph::WithStartNode;
 use rustc_hash::FxHashSet;
@@ -1404,7 +1403,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 _ => None,
             })
             .collect();
-        let mut opaque_lifetimes: BTreeMap<String, BTreeSet<String>> =
+        let opaque_lifetimes: BTreeMap<String, BTreeSet<String>> =
             self.lifetimes.get_opaque_lifetimes_with_inclusions_names();
 
         dbg!(&subst_lifetimes);
@@ -1439,7 +1438,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             derived_from.push(self.encode_lft_variable(name.to_string())?);
         }
         let function_lifetime_take = vir_high::Statement::lifetime_take_no_pos(
-            function_call_lifetime.clone(),
+            function_call_lifetime,
             derived_from,
             self.rd_perm,
         );
@@ -1466,12 +1465,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             ErrorCtxt::LifetimeEncoding,
             self.def_id,
         )?);
-        let conditions_to_assert: BTreeSet<(String, String)> = BTreeSet::new();
         for (lifetime_lhs, lifetime_rhs) in subset_base {
             if lifetimes_to_exhale_inhale.contains(&lifetime_lhs)
                 || lifetimes_to_exhale_inhale.contains(&lifetime_rhs)
             {
-                // conditions_to_assert.insert()
                 self.encode_lft_assert_subset(block_builder, location, lifetime_lhs, lifetime_rhs)?;
             }
         }

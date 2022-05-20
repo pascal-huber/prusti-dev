@@ -121,7 +121,6 @@ pub(super) trait LifetimesEncoder {
     ) -> BTreeMap<String, String>;
     fn lifetimes_to_inhale(
         &mut self,
-        first_location: &mir::Location,
     ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>>;
     fn lifetimes_to_exhale_inhale_function(
         &mut self,
@@ -490,10 +489,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
 
         // Precondition: Inhale LifetimeTokens
         let mut preconditions = vec![vir_high::Statement::comment(
-            "Assume lifetime preconditions.".to_string(),
+            "Lifetime preconditions.".to_string(),
         )];
         let lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> =
-            self.lifetimes_to_inhale(&first_location)?;
+            self.lifetimes_to_inhale()?;
         for lifetime in &lifetimes_to_inhale {
             let inhale_statement = self.encode_inhale_lifetime_token(lifetime.clone())?;
             preconditions.push(inhale_statement);
@@ -501,7 +500,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
 
         // Postcondition: Exhale (inhaled) LifetimeTokens
         let mut postconditions = vec![vir_high::Statement::comment(
-            "Assert lifetime postconditions.".to_string(),
+            "Lifetime postconditions.".to_string(),
         )];
         for lifetime in lifetimes_to_inhale {
             let exhale_statement = self.encode_exhale_lifetime_token(lifetime)?;
@@ -527,13 +526,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                         .collect(),
                 ),
                 self.mir.span,
-                ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+                ErrorCtxt::LifetimeEncoding,
                 self.def_id,
             )?;
             preconditions.push(assume_statement);
         }
 
-        // Precondition: LifetimeTake for subset
+        // Precondition: LifetimeTake for subset lifetimes
         let lifetime_subsets: BTreeSet<(String, String)> = self
             .lifetimes
             .get_subset_base_at_start(first_location)
@@ -559,42 +558,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             )?;
             preconditions.push(statement);
         }
-
-        // // let mut cyclic_subset_relations: Vec<vir_high::ty::LifetimeConst> = Vec::new();
-        // let subset_lifetimes: BTreeSet<vir_high::ty::LifetimeConst> =
-        //     lifetime_subsets.clone().keys().cloned().collect();
-        // let uninitialized_lifetimes: BTreeSet<vir_high::ty::LifetimeConst> = subset_lifetimes
-        //     .difference(&opaque_lifetimes)
-        //     .cloned()
-        //     .collect();
-        // for k in &uninitialized_lifetimes {
-        //     let mut identical_to_k =
-        //         self.identical_lifetimes(k.clone(), None, &lifetime_subsets, &mut BTreeSet::new());
-        //     identical_to_k.remove(k);
-        //     if identical_to_k.len() > 1 {
-        //         unreachable!() // TODO: right?
-        //     }
-        //     let assign_statement = self.encoder.set_statement_error_ctxt(
-        //         vir_high::Statement::lifetime_take_no_pos(
-        //             vir_high::VariableDecl {
-        //                 name: k.name.clone(),
-        //                 ty: vir_high::ty::Type::Lifetime,
-        //             },
-        //             identical_to_k
-        //                 .iter()
-        //                 .map(|x| vir_high::VariableDecl {
-        //                     name: x.name.clone(),
-        //                     ty: vir_high::ty::Type::Lifetime,
-        //                 })
-        //                 .collect(),
-        //             self.rd_perm,
-        //         ),
-        //         self.mir.span,
-        //         ErrorCtxt::UnexpectedInhaleLifetimePrecondition, // TODO: other errorctxt
-        //         self.def_id,
-        //     )?;
-        //     preconditions.push(assign_statement);
-        // }
         Ok((preconditions, postconditions))
     }
 
@@ -619,7 +582,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         relations: BTreeSet<(String, String)>,
     ) -> BTreeMap<String, String> {
         let unique_lifetimes: BTreeSet<String> = relations
-            .clone()
             .iter()
             .flat_map(|(x, y)| [x, y])
             .cloned()
@@ -636,8 +598,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         let graph = {
             let mut g = Graph::new(n);
             for (k, v) in relations {
-                let ki = lft_enumarate.get(&k[..]).unwrap().clone();
-                g.add_edge(ki, lft_enumarate.get(&v[..]).unwrap().clone());
+                g.add_edge(
+                    *lft_enumarate.get(&k[..]).unwrap(),
+                    *lft_enumarate.get(&v[..]).unwrap(),
+                );
             }
             g
         };
@@ -648,7 +612,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             identical_lifetimes.insert(
                 component
                     .iter()
-                    .map(|x| lft_enumarate_rev.get(&x).unwrap())
+                    .map(|x| lft_enumarate_rev.get(x).unwrap())
                     .cloned()
                     .collect(),
             );
@@ -678,7 +642,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
 
     fn lifetimes_to_inhale(
         &mut self,
-        first_location: &mir::Location,
     ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>> {
         Ok(self
             .lifetimes
