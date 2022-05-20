@@ -35,6 +35,7 @@ impl<'v, 'tcx: 'v> MidCoreProofEncoderInterface<'tcx> for super::super::super::E
         self.mid_core_proof_encoder_state
             .encoded_programs
             .push(program);
+        // println!("end of encode_lifetimes_core_proof");
         Ok(())
     }
     fn take_core_proof_programs(&mut self) -> Vec<vir_low::Program> {

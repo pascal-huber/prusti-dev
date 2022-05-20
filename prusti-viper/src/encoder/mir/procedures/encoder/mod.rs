@@ -2,6 +2,7 @@ use self::{
     initialisation::InitializationData, lifetimes::LifetimesEncoder,
     specification_blocks::SpecificationBlocks,
 };
+use crate::encoder::mir::procedures::encoder::scc::*;
 use super::MirProcedureEncoderInterface;
 use crate::encoder::{
     errors::{ErrorCtxt, SpannedEncodingError, SpannedEncodingResult, WithSpan},
@@ -23,6 +24,7 @@ use crate::encoder::{
     Encoder,
 };
 
+use prusti_interface::environment::Environment;
 use log::debug;
 use prusti_common::config;
 use prusti_interface::environment::{
@@ -60,6 +62,7 @@ use vir_crate::{
 mod elaborate_drops;
 mod initialisation;
 mod lifetimes;
+mod scc;
 mod loops;
 mod specification_blocks;
 
@@ -159,6 +162,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         );
         self.encode_body(&mut procedure_builder)?;
         self.encode_implicit_allocations(&mut procedure_builder)?;
+        // println!("end of encode");
         Ok(procedure_builder.build())
     }
 
@@ -444,26 +448,40 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> =
             self.lifetimes.get_origin_contains_loan_at_mid(location);
         while location.statement_index < terminator_index {
+            // println!("encoding");
+            // dbg!(&location);
+            // println!("   1. lifetimes");
             self.encode_lft_for_statement(
                 &mut block_builder,
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
             )?;
+            // println!("   2. statement");
             self.encode_statement(
                 &mut block_builder,
                 location,
                 &statements[location.statement_index],
             )?;
             location.statement_index += 1;
+            // println!("   3. end");
         }
         if let Some(terminator) = terminator {
-            self.encode_terminator(&mut block_builder, location, terminator)?;
+            // println!("terminator");
+            self.encode_terminator(
+                &mut block_builder,
+                location,
+                terminator,
+                &mut original_lifetimes,
+                &mut derived_lifetimes,
+            )?;
+            // println!("   1. end");
         }
         if let Some(statement) = self.loop_invariant_encoding.remove(&bb) {
             block_builder.add_statement(statement);
         }
         block_builder.build();
+        // println!("end of basic block");
         Ok(())
     }
 
@@ -932,6 +950,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
         terminator: &mir::Terminator<'tcx>,
+        original_lifetimes: &mut BTreeSet<String>,
+        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         block_builder.add_comment(format!("{:?} {:?}", location, terminator.kind));
         let span = self.encoder.get_span_of_location(self.mir, location);
@@ -991,6 +1011,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     destination,
                     cleanup,
                     *fn_span,
+                    original_lifetimes,
+                    derived_lifetimes,
                 )?;
                 // The encoding of the call is expected to set the successor.
                 return Ok(());
@@ -1241,6 +1263,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         destination: &Option<(mir::Place<'tcx>, mir::BasicBlock)>,
         cleanup: &Option<mir::BasicBlock>,
         _fn_span: Span,
+        original_lifetimes: &mut BTreeSet<String>,
+        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         if let ty::TyKind::FnDef(def_id, _substs) = ty.kind() {
             let full_called_function_name = self.encoder.env().tcx().def_path_str(*def_id);
@@ -1264,6 +1288,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         args,
                         destination,
                         cleanup,
+                        original_lifetimes,
+                        derived_lifetimes,
                     )?;
                 } else {
                     // Other kind of calls?
@@ -1347,6 +1373,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         args: &[mir::Operand<'tcx>],
         destination: &Option<(mir::Place<'tcx>, mir::BasicBlock)>,
         cleanup: &Option<mir::BasicBlock>,
+        original_lifetimes: &mut BTreeSet<String>,
+        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         // The called method might be a trait method.
         // We try to resolve it to the concrete implementation
@@ -1356,7 +1384,187 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 .env()
                 .resolve_method_call(self.def_id, called_def_id, call_substs);
 
-        let mut lifetimes_to_exhale_inhale: BTreeSet<String> = BTreeSet::new();
+        println!("terminator:");
+        // create lifetimes
+        // TODO: move this outside
+        self.encode_lft_for_terminator(
+            block_builder,
+            location,
+            original_lifetimes,
+            derived_lifetimes,
+        )?;
+
+        // Lifetime info to encode function call
+        let subst_lifetimes: Vec<String> = call_substs
+            .iter()
+            .filter_map(|generic| match generic.unpack() {
+                ty::subst::GenericArgKind::Lifetime(region) => Some(region.to_text()),
+                _ => None,
+            })
+            .collect();
+        let subset_base = self.lifetimes
+            .get_subset_base_at_mid(location);
+        let mut opaque_lifetimes: BTreeMap<String, BTreeSet<String>> = self
+            .lifetimes
+            .get_opaque_lifetimes_with_inclusions_names();
+
+        dbg!(&subst_lifetimes);
+        dbg!(&subset_base);
+        dbg!(&opaque_lifetimes);
+
+        // find static lifetime
+        let mut lifetimes_to_exhale_inhale: Vec<String> = Vec::new();
+        for (lifetime, derived_from) in opaque_lifetimes {
+            if derived_from.is_empty() {
+                lifetimes_to_exhale_inhale.push(lifetime.to_text());
+            }
+        }
+        dbg!(&lifetimes_to_exhale_inhale);
+
+        // find argument lifetimes
+        for subst in call_substs {
+            if let ty::subst::GenericArgKind::Lifetime(region) = subst.unpack() {
+                lifetimes_to_exhale_inhale.push(region.to_text());
+            }
+        }
+
+        // get called info
+        dbg!(&lifetimes_to_exhale_inhale);
+        let called_env = Environment::new(self.encoder.env().tcx());
+        let called_procedure = Procedure::new(self.encoder.env(), called_def_id);
+        let called_mir = called_procedure.get_mir();
+        let mut called_arg_lifetimes: Vec<String> = Vec::new();
+        let called_lifetimes = if let Some(facts) = self.encoder
+            .env()
+            .try_get_local_mir_borrowck_facts(called_def_id.expect_local())
+        {
+            Lifetimes::new(facts)
+        } else {
+            return Err(SpannedEncodingError::internal(
+                format!("failed to obtain borrow information for {:?}", called_def_id),
+                called_procedure.get_span(),
+            ));
+        };
+        let (called_first_bb, _) = rustc_middle::mir::traversal::reverse_postorder(called_mir)
+            .into_iter()
+            .next()
+            .unwrap();
+        let called_first_location = mir::Location {
+            block: called_first_bb,
+            statement_index: 0,
+        };
+        let called_subset_base = called_lifetimes
+            .get_subset_base_at_mid(called_first_location);
+        dbg!(&called_subset_base);
+
+        // 1. get the lifetimes of the arguments
+        let mut called_arg_lifetimes: BTreeMap<String, String> = BTreeMap::new();
+        for arg in called_mir.args_iter() {
+            let ty_kind = called_mir.local_decls[arg].ty.kind();
+            if let rustc_middle::ty::TyKind::Ref(region, _, _) = ty_kind {
+                called_arg_lifetimes.insert(arg.to_text(), region.to_text());
+            }
+        }
+        dbg!(&called_arg_lifetimes);
+
+        // 2. get identical lifetimes
+        let mut called_lifetime_subsets: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for (lft_x, lft_y) in called_subset_base {
+            if called_lifetime_subsets.contains_key(&lft_x.to_text()){
+                let set =  called_lifetime_subsets.get_mut(&lft_x.to_text()).unwrap();
+                set.insert(lft_y.to_text());
+            } else {
+                let set = [lft_y.to_text()].into();
+                called_lifetime_subsets.insert(lft_x.to_text(), set );
+            }
+        }
+        dbg!(&called_lifetime_subsets);
+
+
+        // let mut called_identical_lifetimes : BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        // for (k,v) in &mut called_arg_lifetimes {
+            // let mut identical_to_k =
+            //     self.identical_lifetimes_x(
+            //         v.clone(),
+            //         None,
+            //         &called_lifetime_subsets,
+            //         &mut BTreeSet::new()
+            //     );
+
+
+            // println!("----");
+            // dbg!(&k);
+            // dbg!(&v);
+            // dbg!(&identical_to_k);
+            // identical_to_k.remove(&v[..]);
+            // assert!(identical_to_k.len() == 1); // TODO: too naive assumption?
+            // let lifetime = identical_to_k.iter().next().unwrap().to_string();
+            // called_identical_lifetimes.insert(v.to_string(), lifetime.to_string());
+            // called_identical_lifetimes.insert(lifetime, v.to_string());
+        // }
+
+
+        // compute identical lifetimes
+        //  - translate lifetime names to usize
+        //  - create graph
+        //  - compute scc
+        //  - read result
+        // enumerate lifetimes
+        let mut lft_enumarate : BTreeMap<String, usize> = BTreeMap::new();
+        let mut lft_enumarate_rev : BTreeMap<usize, String> = BTreeMap::new();
+        for (i, (e,_)) in called_lifetime_subsets.iter().enumerate() {
+            lft_enumarate.insert(e.to_string(), i);
+            lft_enumarate_rev.insert(i, e.to_string());
+        }
+        let graph = {
+            let mut g = Graph::new(called_lifetime_subsets.len());
+            for (k, v) in called_lifetime_subsets {
+                let ki = lft_enumarate.get(&k[..]).unwrap().clone();
+                for vv in v {
+                    g.add_edge( ki, lft_enumarate.get(&vv[..]).unwrap().clone());
+                }
+            }
+            g
+        };
+        let mut called_identical_lifetimes: BTreeSet<BTreeSet<String>> = BTreeSet::new();
+        for component in Tarjan::walk(&graph) {
+            called_identical_lifetimes.insert(component
+                .iter()
+                .map(|x| lft_enumarate_rev.get(&x).unwrap())
+                .cloned()
+                .collect());
+        }
+        dbg!(&called_identical_lifetimes);
+
+        // 3. get opaque conditions of called
+        let mut called_opaque_lifetimes: BTreeMap<String, BTreeSet<String>> =
+            called_lifetimes
+            .get_opaque_lifetimes_with_inclusions_names();
+        let mut called_original_conditions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut called_static_lifetime: String = "".to_string();
+        let mut called_function_lifetime: String = "".to_string();
+        for (i, (k, v)) in called_opaque_lifetimes.iter().enumerate() {
+            if i == 0 {
+                // TODO: too naive?
+                called_function_lifetime = k.to_string();
+            } else if v.is_empty() {
+                called_static_lifetime = k.to_string();
+            } else {
+                called_original_conditions.insert(k.clone(), v.clone());
+            }
+        }
+        let mut called_translated_conditions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for (lifetime, condition) in called_original_conditions {
+            called_translated_conditions.insert(lifetime)
+        }
+        dbg!(called_static_lifetime);
+        dbg!(called_function_lifetime);
+
+
+        // inhale_exhale
+        // - static lifetime
+        // - argument lifetimes
+        // - function lifetime
 
         // TODO: is this really the way? - the lifetimes here are newly introduced
         // lifetimes_to_exhale_inhale = call_substs
@@ -1368,15 +1576,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         //     .collect();
 
         // Get lifetimes to exhale and inhale from move-arguments
-        for arg in args {
-            if let mir::Operand::Move(place) = arg {
-                let place_high = self.encoder.encode_place_high(self.mir, *place)?;
-                let lifetime_name = self.get_lifetime_name(place_high);
-                if let Some(lifetime_name) = lifetime_name {
-                    lifetimes_to_exhale_inhale.insert(lifetime_name);
-                }
-            }
-        }
+        // for arg in args {
+        //     if let mir::Operand::Move(place) = arg {
+        //         let place_high = self.encoder.encode_place_high(self.mir, *place)?;
+        //         let lifetime_name = self.get_lifetime_name(place_high);
+        //         if let Some(lifetime_name) = lifetime_name {
+        //             lifetimes_to_exhale_inhale.insert(lifetime_name);
+        //         }
+        //     }
+        // }
 
         let old_label = self.fresh_old_label();
         block_builder.add_statement(self.encoder.set_statement_error_ctxt(

@@ -57,6 +57,7 @@ impl<'v, 'tcx: 'v> MirProcedureEncoderInterface<'tcx> for super::super::super::E
             "The procedure was encoed twice: {:?}",
             proc_def_id
         );
+        // println!("end of encode_procedure_core_proof_high");
         Ok(procedure)
     }
     fn get_span_of_location(&self, mir: &mir::Body<'tcx>, location: mir::Location) -> Span {

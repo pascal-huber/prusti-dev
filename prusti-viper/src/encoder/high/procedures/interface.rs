@@ -22,6 +22,7 @@ impl<'v, 'tcx: 'v> HighProcedureEncoderInterface<'tcx> for super::super::super::
         debug!("procedure_high:\n{}", procedure_high);
         let procedure =
             super::inference::infer_shape_operations(self, proc_def_id, procedure_high)?;
+        // println!("end of encode_procedure_core_proof");
         Ok(procedure)
     }
 }

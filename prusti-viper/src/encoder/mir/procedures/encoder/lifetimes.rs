@@ -15,6 +15,13 @@ pub(super) trait LifetimesEncoder {
         original_lifetimes: &mut BTreeSet<String>,
         derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()>;
+    fn encode_lft_for_terminator(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        original_lifetimes: &mut BTreeSet<String>,
+        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
+    ) -> SpannedEncodingResult<()>;
     fn encode_lft_for_block(
         &mut self,
         target: mir::BasicBlock,
@@ -96,6 +103,13 @@ pub(super) trait LifetimesEncoder {
     fn encode_lifetime_specifications(
         &mut self,
     ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)>;
+    fn identical_lifetimes_x(
+        &mut self,
+        start: String,
+        current: Option<String>,
+        relations: &BTreeMap<String, BTreeSet<String>>,
+        equal_lifetimes: &mut BTreeSet<String>,
+    ) -> BTreeSet<String>;
     fn identical_lifetimes(
         &mut self,
         start: vir_high::ty::LifetimeConst,
@@ -134,6 +148,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<()> {
         let new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
         block_builder.add_comment(format!("Prepare lifetimes for statement {:?}", location));
+        self.encode_lft(
+            block_builder,
+            location,
+            original_lifetimes,
+            derived_lifetimes,
+            &new_derived_lifetimes,
+        )?;
+        Ok(())
+    }
+
+    fn encode_lft_for_terminator(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        original_lifetimes: &mut BTreeSet<String>,
+        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
+    ) -> SpannedEncodingResult<()> {
+        let new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
+        // dbg!(&new_derived_lifetimes);
+        block_builder.add_comment(format!("Prepare lifetimes for terminator {:?}", location));
         self.encode_lft(
             block_builder,
             location,
@@ -527,6 +561,71 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         }
         Ok((preconditions, postconditions))
     }
+
+    fn identical_lifetimes_x(
+        &mut self,
+        start: String,
+        current: Option<String>,
+        relations: &BTreeMap<String, BTreeSet<String>>,
+        visited: &mut BTreeSet<String>,
+    ) -> BTreeSet<String> {
+        BTreeSet::new()
+    }
+
+    // fn identical_lifetimes_x(
+    //     &mut self,
+    //     start: String,
+    //     current: Option<String>,
+    //     relations: &BTreeMap<String, BTreeSet<String>>,
+    //     visited: &mut BTreeSet<String>,
+    // ) -> BTreeSet<String> {
+    //     if let Some(current) = current {
+    //         if start == current {
+    //             visited.clone() // found a cycle
+    //         } else if relations.contains_key(&current) {
+    //             // continue search
+    //             let next_lifetimes: BTreeSet<String> = relations.get(&current).unwrap().clone();
+    //             let mut result = BTreeSet::new();
+    //             for next in next_lifetimes {
+    //                 // if visited.contains(&next[..]){
+    //                 //     continue;
+    //                 // }
+    //                 if next == start {
+    //                     continue;
+    //                 }
+    //                 let mut visited_new = visited.clone();
+    //                 visited_new.insert(current.clone());
+    //                 let mut identical_lifetimes = self.identical_lifetimes_x(
+    //                     current.clone(),
+    //                     Some(next.clone()),
+    //                     relations,
+    //                     &mut visited_new,
+    //                 );
+    //                 result.append(&mut identical_lifetimes);
+    //             }
+    //             result
+    //         } else {
+    //             BTreeSet::new() // no cylce found
+    //         }
+    //     } else if relations.contains_key(&start) {
+    //         let next_lifetimes: BTreeSet<String> = relations.get(&start).unwrap().clone();
+    //         let mut result = BTreeSet::new();
+    //         for next in next_lifetimes {
+    //             let mut visited_new = visited.clone();
+    //             // visited_new.insert(start.clone());
+    //             let mut identical_lifetimes = self.identical_lifetimes_x(
+    //                 start.clone(),
+    //                 Some(next.clone()),
+    //                 relations,
+    //                 &mut visited_new,
+    //             );
+    //             result.append(&mut identical_lifetimes);
+    //         }
+    //         result
+    //     } else {
+    //         BTreeSet::new() // TODO: unreachable?
+    //     }
+    // }
 
     fn identical_lifetimes(
         &mut self,
