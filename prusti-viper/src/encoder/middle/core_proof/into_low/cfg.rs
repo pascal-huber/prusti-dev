@@ -87,10 +87,46 @@ impl IntoLow for vir_mid::Statement {
                 statement.expression.to_procedure_bool_expression(lowerer)?,
                 statement.position,
             )]),
-            Self::Assert(statement) => Ok(vec![Statement::assert(
-                statement.expression.to_procedure_bool_expression(lowerer)?,
-                statement.position,
-            )]),
+            Self::Assert(statement) => {
+                // // TODO: is this "the way" - it feels wrong... ?
+                // dbg!(&statement.expression);
+                // if let vir_mid::Expression::BinaryOp(vir_mid::BinaryOp{op_kind, left, right, position}) = statement.expression {
+                //     if op_kind == vir_mid::BinaryOpKind::LifetimeIncludes {
+                //         // if statement.rhs.is_empty() {
+                //         //     return Ok(vec![]); // static lifetime
+                //         // }
+                //         lowerer.encode_lifetime_included()?;
+                //         let lhs = lowerer.encode_lifetime_const_into_variable(left)?;
+                //         let mut rhs: Vec<vir_low::VariableDecl> = Vec::new();
+                //         for lft in right {
+                //             let var = lowerer.encode_lifetime_const_into_variable(lft)?;
+                //             rhs.push(var);
+                //         }
+                //         // lowerer.encode_lifetime_included()?;
+                //         // let intersection = if rhs.len() > 1 {
+                //         //     lowerer.encode_lifetime_intersection(&rhs)?
+                //         // } else {
+                //         //     let lifetime = rhs.first().unwrap().clone();
+                //         //     lifetime.into()
+                //         // };
+                //         // let arguments: Vec<vir_low::Expression> = vec![lhs.into(), intersection];
+                //         // return Ok(vec![Statement::assert(
+                //         //     // statement.expression.to_procedure_bool_expression(lowerer)?,
+                //         //     vir_low::Expression::domain_function_call(
+                //         //         "Lifetime",
+                //         //         "included$",
+                //         //         arguments,
+                //         //         vir_low::ty::Type::Bool,
+                //         //     ),
+                //         //     statement.position,
+                //         // )]);
+                //     }
+                // }
+                Ok(vec![Statement::assert(
+                    statement.expression.to_procedure_bool_expression(lowerer)?,
+                    statement.position,
+                )])
+            },
             Self::FoldOwned(statement) => {
                 let ty = statement.place.get_type();
                 lowerer.mark_owned_non_aliased_as_unfolded(ty)?;
@@ -511,16 +547,24 @@ impl IntoLow for vir_mid::Statement {
                     lifetime.into()
                 };
                 let arguments: Vec<vir_low::Expression> = vec![lhs.into(), intersection];
-                let assume_statement = Statement::assume(
-                    vir_low::Expression::domain_function_call(
-                        "Lifetime",
-                        "included$",
-                        arguments,
-                        vir_low::ty::Type::Bool,
-                    ),
-                    statement.position,
+                let included_expr = vir_low::Expression::domain_function_call(
+                    "Lifetime",
+                    "included$",
+                    arguments,
+                    vir_low::ty::Type::Bool,
                 );
-                Ok(vec![assume_statement])
+                let statement = if statement.assert {
+                    Statement::assert(
+                        included_expr,
+                        statement.position,
+                    )
+                } else {
+                    Statement::assume(
+                        included_expr,
+                        statement.position,
+                    )
+                };
+                Ok(vec![statement])
             }
             Self::OpenFracRef(statement) => {
                 let place = statement.place.get_parent_ref().unwrap();

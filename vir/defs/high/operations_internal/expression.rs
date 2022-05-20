@@ -30,13 +30,13 @@ impl BinaryOpKind {
             | BinaryOpKind::LeCmp
             | BinaryOpKind::And
             | BinaryOpKind::Or
+            | BinaryOpKind::LifetimeIncludes
             | BinaryOpKind::Implies => &Type::Bool,
             BinaryOpKind::Add
             | BinaryOpKind::Sub
             | BinaryOpKind::Mul
             | BinaryOpKind::Div
             | BinaryOpKind::Mod
-            | BinaryOpKind::LifetimeIncludes
             | BinaryOpKind::LifetimeIntersection => argument_type,
         }
     }

@@ -71,6 +71,13 @@ pub(super) trait LifetimesEncoder {
         old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
         new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()>;
+    fn encode_lft_assert_subset(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        lifetime_lhs: String,
+        lifetime_rhs: String,
+    ) -> SpannedEncodingResult<()>;
     fn encode_lft_variable(
         &self,
         variable_name: String,
@@ -360,6 +367,28 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         Ok(())
     }
 
+    fn encode_lft_assert_subset(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        lifetime_lhs: String,
+        lifetime_rhs: String,
+    ) -> SpannedEncodingResult<()>{
+        let lhs = vir_high::ty::LifetimeConst { name: lifetime_lhs };
+        let rhs = vir_high::ty::LifetimeConst { name: lifetime_rhs };
+        let assert_statement = vir_high::Statement::lifetime_included_no_pos(
+                true, // assert, not assume
+                lhs,
+                vec![rhs]
+        );
+        block_builder.add_statement(self.set_statement_error(
+            location,
+            ErrorCtxt::LifetimeEncoding,
+            assert_statement,
+        )?);
+        Ok(())
+    }
+
     fn encode_lft_variable(
         &self,
         variable_name: String,
@@ -499,6 +528,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             opaque_lifetimes.insert(lifetime_const.clone());
             let assume_statement = self.encoder.set_statement_error_ctxt(
                 vir_high::Statement::lifetime_included_no_pos(
+                    false, // assume, not assert
                     lifetime_const,
                     condition
                         .iter()

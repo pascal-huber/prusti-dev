@@ -382,13 +382,13 @@ impl Typed for BinaryOp {
             | BinaryOpKind::LeCmp
             | BinaryOpKind::And
             | BinaryOpKind::Or
+            | BinaryOpKind::LifetimeIncludes
             | BinaryOpKind::Implies => &Type::Bool,
             BinaryOpKind::Add
             | BinaryOpKind::Sub
             | BinaryOpKind::Mul
             | BinaryOpKind::Div
             | BinaryOpKind::Mod
-            | BinaryOpKind::LifetimeIncludes
             | BinaryOpKind::LifetimeIntersection => {
                 let ty1 = self.left.get_type();
                 let ty2 = self.right.get_type();

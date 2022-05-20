@@ -265,6 +265,7 @@ pub struct LifetimeReturn {
 
 #[display(fmt = "lifetime_included({}, {})", lhs, "display::cjoin(rhs)")]
 pub struct LifetimeIncluded {
+    pub assert: bool, // TODO: this is nasty
     pub lhs: LifetimeConst,
     pub rhs: Vec<LifetimeConst>,
     pub position: Position,
