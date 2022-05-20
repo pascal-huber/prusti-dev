@@ -1,6 +1,9 @@
 use crate::encoder::{
     errors::{ErrorCtxt, SpannedEncodingResult},
-    mir::{errors::ErrorInterface, procedures::encoder::ProcedureEncoder},
+    mir::{
+        errors::ErrorInterface,
+        procedures::encoder::{scc::*, ProcedureEncoder},
+    },
 };
 use prusti_interface::environment::mir_dump::graphviz::ToText;
 use rustc_middle::mir;
@@ -110,27 +113,15 @@ pub(super) trait LifetimesEncoder {
     fn encode_lifetime_specifications(
         &mut self,
     ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)>;
-    fn identical_lifetimes_x(
-        &mut self,
-        start: String,
-        current: Option<String>,
-        relations: &BTreeMap<String, BTreeSet<String>>,
-        equal_lifetimes: &mut BTreeSet<String>,
-    ) -> BTreeSet<String>;
+    fn get_lifetime_name(&mut self, variable: vir_high::Expression) -> Option<String>;
     fn identical_lifetimes(
         &mut self,
-        start: vir_high::ty::LifetimeConst,
-        current: Option<vir_high::ty::LifetimeConst>,
-        relations: &BTreeMap<vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst>,
-        equal_lifetimes: &mut BTreeSet<vir_high::ty::LifetimeConst>,
-    ) -> BTreeSet<vir_high::ty::LifetimeConst>;
-    fn get_lifetime_name(&mut self, variable: vir_high::Expression) -> Option<String>;
+        existing_lifetimes: BTreeSet<String>,
+        relations: BTreeSet<(String, String)>,
+    ) -> BTreeMap<String, String>;
     fn lifetimes_to_inhale(
         &mut self,
         first_location: &mir::Location,
-    ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>>;
-    fn lifetimes_to_exhale(
-        &mut self,
     ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>>;
     fn lifetimes_to_exhale_inhale_function(
         &mut self,
@@ -497,34 +488,34 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
 
-        // Inhale LifetimeTokens
+        // Precondition: Inhale LifetimeTokens
         let mut preconditions = vec![vir_high::Statement::comment(
             "Assume lifetime preconditions.".to_string(),
         )];
         let lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> =
             self.lifetimes_to_inhale(&first_location)?;
-        for lifetime in lifetimes_to_inhale {
+        for lifetime in &lifetimes_to_inhale {
             let inhale_statement = self.encode_inhale_lifetime_token(lifetime.clone())?;
             preconditions.push(inhale_statement);
         }
 
-        // Exhale LifetimeTokens
+        // Postcondition: Exhale (inhaled) LifetimeTokens
         let mut postconditions = vec![vir_high::Statement::comment(
             "Assert lifetime postconditions.".to_string(),
         )];
-        let lifetimes_to_exhale: BTreeSet<vir_high::ty::LifetimeConst> =
-            self.lifetimes_to_exhale()?;
-        for lifetime in lifetimes_to_exhale {
+        for lifetime in lifetimes_to_inhale {
             let exhale_statement = self.encode_exhale_lifetime_token(lifetime)?;
             postconditions.push(exhale_statement);
         }
 
-        // Inhale Opaque lifetimes
+        // Precondition: Assume opaque lifetime conditions
         let opaque_conditions: BTreeMap<String, BTreeSet<String>> =
             self.lifetimes.get_opaque_lifetimes_with_inclusions_names();
         let mut opaque_lifetimes: BTreeSet<vir_high::ty::LifetimeConst> = BTreeSet::new();
-        for (lifetime, condition) in opaque_conditions {
-            let lifetime_const = vir_high::ty::LifetimeConst { name: lifetime };
+        for (lifetime, condition) in &opaque_conditions {
+            let lifetime_const = vir_high::ty::LifetimeConst {
+                name: lifetime.to_string(),
+            };
             opaque_lifetimes.insert(lifetime_const.clone());
             let assume_statement = self.encoder.set_statement_error_ctxt(
                 vir_high::Statement::lifetime_included_no_pos(
@@ -542,148 +533,69 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             preconditions.push(assume_statement);
         }
 
-        // Inhale conditions of subset_base and detect cycles
-        let lifetime_subsets: BTreeMap<vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst> =
-            self.lifetimes
-                .get_subset_base_at_start(first_location)
-                .iter()
-                .map(|(r1, r2)| {
-                    (
-                        vir_high::ty::LifetimeConst { name: r1.to_text() },
-                        vir_high::ty::LifetimeConst { name: r2.to_text() },
-                    )
-                })
-                .collect();
-        // let mut cyclic_subset_relations: Vec<vir_high::ty::LifetimeConst> = Vec::new();
-        let subset_lifetimes: BTreeSet<vir_high::ty::LifetimeConst> =
-            lifetime_subsets.clone().keys().cloned().collect();
-        let uninitialized_lifetimes: BTreeSet<vir_high::ty::LifetimeConst> = subset_lifetimes
-            .difference(&opaque_lifetimes)
-            .cloned()
+        // Precondition: LifetimeTake for subset
+        let lifetime_subsets: BTreeSet<(String, String)> = self
+            .lifetimes
+            .get_subset_base_at_start(first_location)
+            .iter()
+            .map(|(r1, r2)| (r1.to_text(), r2.to_text()))
             .collect();
-        for k in &uninitialized_lifetimes {
-            let mut identical_to_k =
-                self.identical_lifetimes(k.clone(), None, &lifetime_subsets, &mut BTreeSet::new());
-            identical_to_k.remove(k);
-            if identical_to_k.len() > 1 {
-                unreachable!() // TODO: right?
-            }
-            let assign_statement = self.encoder.set_statement_error_ctxt(
+        let identical_lifetimes = self.identical_lifetimes(
+            opaque_conditions.keys().cloned().collect(),
+            lifetime_subsets,
+        );
+        for (new_lifetime, existing_lifetime) in identical_lifetimes {
+            let encoded_target = self.encode_lft_variable(new_lifetime)?;
+            let encoded_source = self.encode_lft_variable(existing_lifetime)?;
+            let statement = self.encoder.set_statement_error_ctxt(
                 vir_high::Statement::lifetime_take_no_pos(
-                    vir_high::VariableDecl {
-                        name: k.name.clone(),
-                        ty: vir_high::ty::Type::Lifetime,
-                    },
-                    identical_to_k
-                        .iter()
-                        .map(|x| vir_high::VariableDecl {
-                            name: x.name.clone(),
-                            ty: vir_high::ty::Type::Lifetime,
-                        })
-                        .collect(),
+                    encoded_target,
+                    vec![encoded_source],
                     self.rd_perm,
                 ),
                 self.mir.span,
-                ErrorCtxt::UnexpectedInhaleLifetimePrecondition, // TODO: other errorctxt
+                ErrorCtxt::LifetimeEncoding,
                 self.def_id,
             )?;
-            preconditions.push(assign_statement);
+            preconditions.push(statement);
         }
+
+        // // let mut cyclic_subset_relations: Vec<vir_high::ty::LifetimeConst> = Vec::new();
+        // let subset_lifetimes: BTreeSet<vir_high::ty::LifetimeConst> =
+        //     lifetime_subsets.clone().keys().cloned().collect();
+        // let uninitialized_lifetimes: BTreeSet<vir_high::ty::LifetimeConst> = subset_lifetimes
+        //     .difference(&opaque_lifetimes)
+        //     .cloned()
+        //     .collect();
+        // for k in &uninitialized_lifetimes {
+        //     let mut identical_to_k =
+        //         self.identical_lifetimes(k.clone(), None, &lifetime_subsets, &mut BTreeSet::new());
+        //     identical_to_k.remove(k);
+        //     if identical_to_k.len() > 1 {
+        //         unreachable!() // TODO: right?
+        //     }
+        //     let assign_statement = self.encoder.set_statement_error_ctxt(
+        //         vir_high::Statement::lifetime_take_no_pos(
+        //             vir_high::VariableDecl {
+        //                 name: k.name.clone(),
+        //                 ty: vir_high::ty::Type::Lifetime,
+        //             },
+        //             identical_to_k
+        //                 .iter()
+        //                 .map(|x| vir_high::VariableDecl {
+        //                     name: x.name.clone(),
+        //                     ty: vir_high::ty::Type::Lifetime,
+        //                 })
+        //                 .collect(),
+        //             self.rd_perm,
+        //         ),
+        //         self.mir.span,
+        //         ErrorCtxt::UnexpectedInhaleLifetimePrecondition, // TODO: other errorctxt
+        //         self.def_id,
+        //     )?;
+        //     preconditions.push(assign_statement);
+        // }
         Ok((preconditions, postconditions))
-    }
-
-    fn identical_lifetimes_x(
-        &mut self,
-        start: String,
-        current: Option<String>,
-        relations: &BTreeMap<String, BTreeSet<String>>,
-        visited: &mut BTreeSet<String>,
-    ) -> BTreeSet<String> {
-        BTreeSet::new()
-    }
-
-    // fn identical_lifetimes_x(
-    //     &mut self,
-    //     start: String,
-    //     current: Option<String>,
-    //     relations: &BTreeMap<String, BTreeSet<String>>,
-    //     visited: &mut BTreeSet<String>,
-    // ) -> BTreeSet<String> {
-    //     if let Some(current) = current {
-    //         if start == current {
-    //             visited.clone() // found a cycle
-    //         } else if relations.contains_key(&current) {
-    //             // continue search
-    //             let next_lifetimes: BTreeSet<String> = relations.get(&current).unwrap().clone();
-    //             let mut result = BTreeSet::new();
-    //             for next in next_lifetimes {
-    //                 // if visited.contains(&next[..]){
-    //                 //     continue;
-    //                 // }
-    //                 if next == start {
-    //                     continue;
-    //                 }
-    //                 let mut visited_new = visited.clone();
-    //                 visited_new.insert(current.clone());
-    //                 let mut identical_lifetimes = self.identical_lifetimes_x(
-    //                     current.clone(),
-    //                     Some(next.clone()),
-    //                     relations,
-    //                     &mut visited_new,
-    //                 );
-    //                 result.append(&mut identical_lifetimes);
-    //             }
-    //             result
-    //         } else {
-    //             BTreeSet::new() // no cylce found
-    //         }
-    //     } else if relations.contains_key(&start) {
-    //         let next_lifetimes: BTreeSet<String> = relations.get(&start).unwrap().clone();
-    //         let mut result = BTreeSet::new();
-    //         for next in next_lifetimes {
-    //             let mut visited_new = visited.clone();
-    //             // visited_new.insert(start.clone());
-    //             let mut identical_lifetimes = self.identical_lifetimes_x(
-    //                 start.clone(),
-    //                 Some(next.clone()),
-    //                 relations,
-    //                 &mut visited_new,
-    //             );
-    //             result.append(&mut identical_lifetimes);
-    //         }
-    //         result
-    //     } else {
-    //         BTreeSet::new() // TODO: unreachable?
-    //     }
-    // }
-
-    fn identical_lifetimes(
-        &mut self,
-        start: vir_high::ty::LifetimeConst,
-        current: Option<vir_high::ty::LifetimeConst>,
-        relations: &BTreeMap<vir_high::ty::LifetimeConst, vir_high::ty::LifetimeConst>,
-        equal_lifetimes: &mut BTreeSet<vir_high::ty::LifetimeConst>,
-    ) -> BTreeSet<vir_high::ty::LifetimeConst> {
-        if let Some(current) = current {
-            if start == current {
-                // found a cycle
-                equal_lifetimes.clone()
-            } else if relations.contains_key(&current) {
-                // cycle still possible, let me check
-                let next: vir_high::ty::LifetimeConst = relations.get(&current).unwrap().clone();
-                equal_lifetimes.insert(next.clone());
-                self.identical_lifetimes(start, Some(next), relations, equal_lifetimes)
-            } else {
-                // cycle not possible, delete all
-                BTreeSet::new()
-            }
-        } else if relations.contains_key(&start) {
-            let next: vir_high::ty::LifetimeConst = relations.get(&start).unwrap().clone();
-            equal_lifetimes.insert(next.clone());
-            self.identical_lifetimes(start, Some(next), relations, equal_lifetimes)
-        } else {
-            BTreeSet::new() // TODO: unreachable?
-        }
     }
 
     fn get_lifetime_name(&mut self, expression: vir_high::Expression) -> Option<String> {
@@ -701,36 +613,72 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         None
     }
 
+    fn identical_lifetimes(
+        &mut self,
+        existing_lifetimes: BTreeSet<String>,
+        relations: BTreeSet<(String, String)>,
+    ) -> BTreeMap<String, String> {
+        let unique_lifetimes: BTreeSet<String> = relations
+            .clone()
+            .iter()
+            .flat_map(|(x, y)| [x, y])
+            .cloned()
+            .collect();
+        let n = unique_lifetimes.len(); // rather naive upper bound
+        let mut lft_enumarate: BTreeMap<String, usize> = BTreeMap::new();
+        let mut lft_enumarate_rev: BTreeMap<usize, String> = BTreeMap::new();
+
+        for (i, e) in unique_lifetimes.iter().enumerate() {
+            lft_enumarate.insert(e.to_string(), i);
+            lft_enumarate_rev.insert(i, e.to_string());
+        }
+
+        let graph = {
+            let mut g = Graph::new(n);
+            for (k, v) in relations {
+                let ki = lft_enumarate.get(&k[..]).unwrap().clone();
+                g.add_edge(ki, lft_enumarate.get(&v[..]).unwrap().clone());
+            }
+            g
+        };
+
+        // compute strongly connected components
+        let mut identical_lifetimes: BTreeSet<BTreeSet<String>> = BTreeSet::new();
+        for component in Tarjan::walk(&graph) {
+            identical_lifetimes.insert(
+                component
+                    .iter()
+                    .map(|x| lft_enumarate_rev.get(&x).unwrap())
+                    .cloned()
+                    .collect(),
+            );
+        }
+
+        // put data in correct shape
+        let mut identical_lifetimes_map: BTreeMap<String, String> = BTreeMap::new();
+        for component in identical_lifetimes {
+            let existing_component_lifetims: BTreeSet<String> = component
+                .iter()
+                .cloned()
+                .filter(|lft| existing_lifetimes.contains(&lft[..]))
+                .collect();
+            let non_existing_component_lifetims: BTreeSet<String> = component
+                .iter()
+                .cloned()
+                .filter(|lft| !existing_lifetimes.contains(&lft[..]))
+                .collect();
+            for lifetime in non_existing_component_lifetims {
+                let identical_existing_lifetime =
+                    existing_component_lifetims.iter().next().unwrap().clone();
+                identical_lifetimes_map.insert(lifetime, identical_existing_lifetime);
+            }
+        }
+        identical_lifetimes_map
+    }
+
     fn lifetimes_to_inhale(
         &mut self,
         first_location: &mir::Location,
-    ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>> {
-        let mut lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> = self
-            .lifetimes
-            .get_opaque_lifetimes_with_inclusions_names()
-            .keys()
-            .map(|x| vir_high::ty::LifetimeConst {
-                name: x.to_string(),
-            })
-            .collect();
-
-        let lifetime_subsets_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> = self
-            .lifetimes
-            .get_subset_base_at_start(*first_location)
-            .iter()
-            .flat_map(|(r1, r2)| {
-                [
-                    vir_high::ty::LifetimeConst { name: r1.to_text() },
-                    vir_high::ty::LifetimeConst { name: r2.to_text() },
-                ]
-            })
-            .collect();
-        lifetimes_to_inhale.extend(lifetime_subsets_to_inhale);
-        Ok(lifetimes_to_inhale)
-    }
-
-    fn lifetimes_to_exhale(
-        &mut self,
     ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>> {
         Ok(self
             .lifetimes

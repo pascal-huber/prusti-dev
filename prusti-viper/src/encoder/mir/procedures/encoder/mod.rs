@@ -14,6 +14,7 @@ use crate::encoder::{
         panics::MirPanicsEncoderInterface,
         places::PlacesEncoderInterface,
         predicates::MirPredicateEncoderInterface,
+        procedures::encoder::scc::*,
         pure::{PureFunctionEncoderInterface, SpecificationEncoderInterface},
         spans::SpanInterface,
         specifications::SpecificationsInterface,
@@ -61,6 +62,7 @@ mod elaborate_drops;
 mod initialisation;
 mod lifetimes;
 mod loops;
+mod scc;
 mod specification_blocks;
 
 pub(super) fn encode_procedure<'v, 'tcx: 'v>(
