@@ -449,34 +449,27 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> =
             self.lifetimes.get_origin_contains_loan_at_mid(location);
         while location.statement_index < terminator_index {
-            // println!("encoding");
-            // dbg!(&location);
-            // println!("   1. lifetimes");
             self.encode_lft_for_statement(
                 &mut block_builder,
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
             )?;
-            // println!("   2. statement");
             self.encode_statement(
                 &mut block_builder,
                 location,
                 &statements[location.statement_index],
             )?;
             location.statement_index += 1;
-            // println!("   3. end");
         }
         if let Some(terminator) = terminator {
-            // println!("terminator");
-            self.encode_terminator(
+            self.encode_lft_for_statement(
                 &mut block_builder,
                 location,
-                terminator,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
             )?;
-            // println!("   1. end");
+            self.encode_terminator(&mut block_builder, location, terminator)?;
         }
         if let Some(statement) = self.loop_invariant_encoding.remove(&bb) {
             block_builder.add_statement(statement);
@@ -951,8 +944,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
         terminator: &mir::Terminator<'tcx>,
-        original_lifetimes: &mut BTreeSet<String>,
-        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         block_builder.add_comment(format!("{:?} {:?}", location, terminator.kind));
         let span = self.encoder.get_span_of_location(self.mir, location);
@@ -1012,8 +1003,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     destination,
                     cleanup,
                     *fn_span,
-                    original_lifetimes,
-                    derived_lifetimes,
                 )?;
                 // The encoding of the call is expected to set the successor.
                 return Ok(());
@@ -1264,8 +1253,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         destination: &Option<(mir::Place<'tcx>, mir::BasicBlock)>,
         cleanup: &Option<mir::BasicBlock>,
         _fn_span: Span,
-        original_lifetimes: &mut BTreeSet<String>,
-        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         if let ty::TyKind::FnDef(def_id, _substs) = ty.kind() {
             let full_called_function_name = self.encoder.env().tcx().def_path_str(*def_id);
@@ -1289,8 +1276,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         args,
                         destination,
                         cleanup,
-                        original_lifetimes,
-                        derived_lifetimes,
                     )?;
                 } else {
                     // Other kind of calls?
@@ -1374,8 +1359,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         args: &[mir::Operand<'tcx>],
         destination: &Option<(mir::Place<'tcx>, mir::BasicBlock)>,
         cleanup: &Option<mir::BasicBlock>,
-        original_lifetimes: &mut BTreeSet<String>,
-        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
         // The called method might be a trait method.
         // We try to resolve it to the concrete implementation
@@ -1385,17 +1368,19 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 .env()
                 .resolve_method_call(self.def_id, called_def_id, call_substs);
 
-        println!("terminator:");
-        // create lifetimes
-        // TODO: move this outside
-        self.encode_lft_for_terminator(
-            block_builder,
-            location,
-            original_lifetimes,
-            derived_lifetimes,
-        )?;
+        // find static lifetime to exhale
+        let mut lifetimes_to_exhale_inhale: Vec<String> = Vec::new();
+        let opaque_lifetimes: BTreeMap<String, BTreeSet<String>> =
+            self.lifetimes.get_opaque_lifetimes_with_inclusions_names();
+        for (lifetime, derived_from) in opaque_lifetimes {
+            if derived_from.is_empty() {
+                lifetimes_to_exhale_inhale.push(lifetime.to_text());
+            }
+        }
+        assert_eq!(lifetimes_to_exhale_inhale.len(), 1); // there must be exactly one static lifetime
 
-        // Lifetime info to encode function call
+        // find generic argument lifetimes
+        // TODO: get the lifetime from args if not found here
         let subst_lifetimes: Vec<String> = call_substs
             .iter()
             .filter_map(|generic| match generic.unpack() {
@@ -1403,28 +1388,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 _ => None,
             })
             .collect();
-        let opaque_lifetimes: BTreeMap<String, BTreeSet<String>> =
-            self.lifetimes.get_opaque_lifetimes_with_inclusions_names();
-
-        dbg!(&subst_lifetimes);
-        dbg!(&opaque_lifetimes);
-
-        // find static lifetime to exhale
-        let mut lifetimes_to_exhale_inhale: Vec<String> = Vec::new();
-        for (lifetime, derived_from) in opaque_lifetimes {
-            if derived_from.is_empty() {
-                lifetimes_to_exhale_inhale.push(lifetime.to_text());
-            }
+        for lifetime in subst_lifetimes {
+            lifetimes_to_exhale_inhale.push(lifetime);
         }
-
-        // find generic argument lifetimes
-        // TODO: get the lifetime from args if not found here
-        for subst in call_substs {
-            if let ty::subst::GenericArgKind::Lifetime(region) = subst.unpack() {
-                lifetimes_to_exhale_inhale.push(region.to_text());
-            }
-        }
-        dbg!(&lifetimes_to_exhale_inhale);
 
         // construct function lifetime
         *self.function_call_ctr += 1;
@@ -1450,21 +1416,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         lifetimes_to_exhale_inhale.push(function_call_lifetime_name);
 
         // encode subset_base conditions which contain a lifetime which we are going to exhale
+        // FIXME: Ideally, before a function call, assert *exactly* what is assumed in the function.
+        //   In this case, that is the opaque lifetimes conditions. Finding the right lifetimes
+        //   which correspond to the the lifetimes in the function seems to be hard.
         let subset_base: Vec<(String, String)> = self
             .lifetimes
             .get_subset_base_at_mid(location)
             .iter()
             .map(|(x, y)| (x.to_text(), y.to_text()))
             .collect();
-        dbg!(&subset_base);
-        block_builder.add_statement(self.encoder.set_statement_error_ctxt(
-            vir_high::Statement::comment(
-                "Assert Lifetime Conditions before function call.".to_string(),
-            ),
-            span,
-            ErrorCtxt::LifetimeEncoding,
-            self.def_id,
-        )?);
         for (lifetime_lhs, lifetime_rhs) in subset_base {
             if lifetimes_to_exhale_inhale.contains(&lifetime_lhs)
                 || lifetimes_to_exhale_inhale.contains(&lifetime_rhs)
@@ -1473,12 +1433,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             }
         }
 
-        block_builder.add_statement(self.encoder.set_statement_error_ctxt(
-            vir_high::Statement::comment("End of Assert Lifetime Conditions.".to_string()),
-            span,
-            ErrorCtxt::LifetimeEncoding,
-            self.def_id,
-        )?);
         let old_label = self.fresh_old_label();
         block_builder.add_statement(self.encoder.set_statement_error_ctxt(
             vir_high::Statement::old_label_no_pos(old_label.clone()),
@@ -1502,12 +1456,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 self.def_id,
             )?);
         }
-        block_builder.add_statement(self.encoder.set_statement_error_ctxt(
-            vir_high::Statement::comment("Exhale Lifetimes.".to_string()),
-            span,
-            ErrorCtxt::LifetimeEncoding,
-            self.def_id,
-        )?);
         for lifetime in &lifetimes_to_exhale_inhale {
             block_builder.add_statement(self.encoder.set_statement_error_ctxt(
                 vir_high::Statement::exhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
@@ -1517,7 +1465,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     self.rd_perm,
                 )),
                 self.mir.span,
-                ErrorCtxt::UnexpectedInhaleLifetimePrecondition,
+                ErrorCtxt::LifetimeEncoding,
                 self.def_id,
             )?);
         }

@@ -18,13 +18,6 @@ pub(super) trait LifetimesEncoder {
         original_lifetimes: &mut BTreeSet<String>,
         derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()>;
-    fn encode_lft_for_terminator(
-        &mut self,
-        block_builder: &mut BasicBlockBuilder,
-        location: mir::Location,
-        original_lifetimes: &mut BTreeSet<String>,
-        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
-    ) -> SpannedEncodingResult<()>;
     fn encode_lft_for_block(
         &mut self,
         target: mir::BasicBlock,
@@ -145,26 +138,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<()> {
         let new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
         block_builder.add_comment(format!("Prepare lifetimes for statement {:?}", location));
-        self.encode_lft(
-            block_builder,
-            location,
-            original_lifetimes,
-            derived_lifetimes,
-            &new_derived_lifetimes,
-        )?;
-        Ok(())
-    }
-
-    fn encode_lft_for_terminator(
-        &mut self,
-        block_builder: &mut BasicBlockBuilder,
-        location: mir::Location,
-        original_lifetimes: &mut BTreeSet<String>,
-        derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
-    ) -> SpannedEncodingResult<()> {
-        let new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
-        // dbg!(&new_derived_lifetimes);
-        block_builder.add_comment(format!("Prepare lifetimes for terminator {:?}", location));
         self.encode_lft(
             block_builder,
             location,
