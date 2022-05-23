@@ -112,6 +112,9 @@ impl CollectPermissionChanges for vir_high::Statement {
             vir_high::Statement::LifetimeReturn(statement) => {
                 statement.collect(encoder, consumed_permissions, produced_permissions)
             }
+            vir_high::Statement::LifetimeIncluded(statement) => {
+                statement.collect(encoder, consumed_permissions, produced_permissions)
+            }
         }
     }
 }
@@ -151,6 +154,7 @@ fn extract_managed_predicate_place(
             Ok(Some(Permission::Owned(predicate.place.clone())))
         }
         vir_high::Predicate::MemoryBlockStackDrop(_)
+        | vir_high::Predicate::LifetimeToken(_)
         | vir_high::Predicate::MemoryBlockHeap(_)
         | vir_high::Predicate::MemoryBlockHeapDrop(_) => {
             // Unmanaged predicates.
@@ -571,6 +575,17 @@ impl CollectPermissionChanges for vir_high::LifetimeTake {
 }
 
 impl CollectPermissionChanges for vir_high::LifetimeReturn {
+    fn collect<'v, 'tcx>(
+        &self,
+        _encoder: &mut Encoder<'v, 'tcx>,
+        _consumed_permissions: &mut Vec<Permission>,
+        _produced_permissions: &mut Vec<Permission>,
+    ) -> SpannedEncodingResult<()> {
+        Ok(())
+    }
+}
+
+impl CollectPermissionChanges for vir_high::LifetimeIncluded {
     fn collect<'v, 'tcx>(
         &self,
         _encoder: &mut Encoder<'v, 'tcx>,

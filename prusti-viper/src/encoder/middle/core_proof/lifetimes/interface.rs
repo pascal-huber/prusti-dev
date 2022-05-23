@@ -49,6 +49,10 @@ pub(in super::super) trait LifetimesInterface {
         &mut self,
         lifetime: vir_mid::ty::LifetimeConst,
     ) -> SpannedEncodingResult<vir_low::VariableDecl>;
+    fn encode_lifetime_intersection(
+        &mut self,
+        lifetimes: &[vir_low::VariableDecl],
+    ) -> SpannedEncodingResult<vir_low::Expression>;
     fn encode_lifetime_token(
         &mut self,
         lifetime: vir_low::VariableDecl,
@@ -260,6 +264,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<vir_low::VariableDecl> {
         let lifetime_variable = vir_mid::VariableDecl::new(lifetime.name, vir_mid::Type::Lifetime);
         lifetime_variable.to_procedure_snapshot(self)
+    }
+
+    fn encode_lifetime_intersection(
+        &mut self,
+        lifetimes: &[vir_low::VariableDecl],
+    ) -> SpannedEncodingResult<vir_low::Expression> {
+        self.encode_lifetime_token_predicate()?;
+        self.encode_lifetime_intersect(lifetimes.len())?;
+        use vir_low::macros::*;
+        let mut arguments: Vec<vir_low::Expression> = Vec::new();
+        for lifetime in lifetimes {
+            arguments.push(lifetime.clone().into());
+        }
+        let function_call = vir_low::Expression::domain_function_call(
+            "Lifetime",
+            format!("intersect${}", lifetimes.len()),
+            arguments,
+            ty!(Lifetime),
+        );
+        Ok(function_call)
     }
 
     fn encode_lifetime_token(
