@@ -467,7 +467,7 @@ impl IntoLow for vir_mid::Statement {
                         statement.target.to_procedure_snapshot(lowerer)?,
                     )];
                     Ok(vec![Statement::method_call(
-                        String::from("lft_tok_sep_take"),
+                        format!("lft_tok_sep_take${}", statement.value.len()),
                         arguments,
                         target,
                         statement.position,
@@ -490,7 +490,7 @@ impl IntoLow for vir_mid::Statement {
                         statement.rd_perm,
                     ));
                     Ok(vec![Statement::method_call(
-                        String::from("lft_tok_sep_take"),
+                        format!("lft_tok_sep_return${}", statement.value.len()),
                         arguments,
                         vec![],
                         statement.position,
@@ -498,6 +498,38 @@ impl IntoLow for vir_mid::Statement {
                 } else {
                     Ok(vec![])
                 }
+            }
+            Self::LifetimeIncluded(statement) => {
+                if statement.rhs.is_empty() {
+                    return Ok(vec![]); // static lifetime
+                }
+                lowerer.encode_lifetime_included()?;
+                let lhs = lowerer.encode_lifetime_const_into_variable(statement.lhs)?;
+                let mut rhs: Vec<vir_low::VariableDecl> = Vec::new();
+                for lft in statement.rhs {
+                    let var = lowerer.encode_lifetime_const_into_variable(lft)?;
+                    rhs.push(var);
+                }
+                lowerer.encode_lifetime_included()?;
+                let intersection = if rhs.len() > 1 {
+                    lowerer.encode_lifetime_intersection(&rhs)?
+                } else {
+                    let lifetime = rhs.first().unwrap().clone();
+                    lifetime.into()
+                };
+                let arguments: Vec<vir_low::Expression> = vec![lhs.into(), intersection];
+                let included_expr = vir_low::Expression::domain_function_call(
+                    "Lifetime",
+                    "included$",
+                    arguments,
+                    vir_low::ty::Type::Bool,
+                );
+                let statement = if statement.assert {
+                    Statement::assert(included_expr, statement.position)
+                } else {
+                    Statement::assume(included_expr, statement.position)
+                };
+                Ok(vec![statement])
             }
             Self::OpenFracRef(statement) => {
                 let place = statement.place.get_parent_ref().unwrap();
@@ -620,6 +652,13 @@ impl IntoLow for vir_mid::Predicate {
         use vir_low::macros::*;
         use vir_mid::Predicate;
         let result = match self {
+            Predicate::LifetimeToken(predicate) => {
+                lowerer.encode_lifetime_token_predicate()?;
+                let lifetime = lowerer.encode_lifetime_const_into_variable(predicate.lifetime)?;
+                let perm_amount = vir_low::Expression::fractional_permission(predicate.rd_perm);
+                expr! { acc(LifetimeToken([lifetime.into()]), [perm_amount])}
+                    .set_default_position(predicate.position)
+            }
             Predicate::MemoryBlockStack(predicate) => {
                 lowerer.encode_memory_block_predicate()?;
                 let place = lowerer.encode_expression_as_place_address(&predicate.place)?;
