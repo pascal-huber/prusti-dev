@@ -559,6 +559,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     encoded_rvalue,
                     self.register_error(location, ErrorCtxt::Assign),
                 );
+                // dbg!(&assign_statement);
                 block_builder.add_statement(self.set_statement_error(
                     location,
                     ErrorCtxt::Assign,

@@ -155,15 +155,20 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
             self.lower_statement(statement, &mut state)?;
         }
         let successor_blocks = self.current_successors()?;
-        assert!(
-            !successor_blocks.is_empty() || state.is_empty(),
-            "some predicates are leaked"
-        );
+        // println!("---");
+        // dbg!(&successor_blocks);
+        // dbg!(&state.is_empty());
+        // assert!(
+        //     !successor_blocks.is_empty() || state.is_empty(),
+        //     "some predicates are leaked"
+        // );
         if config::dump_debug_info() {
             self.state_at_exit
                 .insert(self.current_label.clone().unwrap(), state.clone());
         }
         for successor in successor_blocks {
+            // println!("update_state_at_entry for:");
+            // dbg!(&successor);
             self.update_state_at_entry(successor, state.clone())?;
         }
         Ok(())
