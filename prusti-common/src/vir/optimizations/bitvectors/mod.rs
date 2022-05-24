@@ -192,7 +192,6 @@ impl ExprFolder for Fixer {
                     | vir_poly::BinaryOpKind::Mul
                     | vir_poly::BinaryOpKind::Div
                     | vir_poly::BinaryOpKind::Mod => {
-                        // TODO: is this okay? Perm / Int = Perm
                         (left, right) = ensure_int(left, right);
                     }
                     vir_poly::BinaryOpKind::And
