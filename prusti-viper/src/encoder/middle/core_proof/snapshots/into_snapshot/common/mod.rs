@@ -315,41 +315,67 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
         mut expect_math_bool: bool,
     ) -> SpannedEncodingResult<vir_low::Expression> {
 
-        // if mathematical type e.g. MPerm, then just return direct translation without calling recursive to_snapshot
-        if let box vir_mid::Expression::Local(local) = &op.left {
-            if let vir_mid::Type::MPerm = local.get_type() {
-                expect_math_bool = false;
-            }
-        }
-
-        let expect_math_bool_args = expect_math_bool
+        let mut expect_math_bool_args = expect_math_bool
             && matches!(
                 op.op_kind,
                 vir_mid::BinaryOpKind::And
                     | vir_mid::BinaryOpKind::Or
                     | vir_mid::BinaryOpKind::Implies
             );
-        let ty = if expect_math_bool_args {
-            &vir_mid::Type::MBool
-        } else {
-            op.get_type()
-        };
+
+        // FIXME: Binary Operations with MPerm can be valid even if the rhs is an integer value
+        let mut ty: Option<&vir_mid::Type> = None;
+        if let box vir_mid::Expression::Local(local) = &op.left {
+            if let box vir_mid::Expression::Constant(constant) = &op.right {
+                if let vir_mid::Type::MPerm = local.get_type() {
+                    // NOTE: LtCmp and GtCmp seem to work with some minor modifications
+                    expect_math_bool = false;
+                    expect_math_bool_args = false;
+                    ty = Some(&vir_mid::Type::MPerm);
+
+                    if op.op_kind == vir_mid::BinaryOpKind::Div {
+                        let left_snapshot =
+                            self.expression_to_snapshot(lowerer, &op.left, expect_math_bool_args)?;
+                        let value = self.constant_value_to_snapshot(lowerer, &constant.value)?;
+                        let right_snapshot = vir_low::Expression::constant_no_pos(
+                            value,
+                            vir_low::ty::Type::Int,
+                        );
+                        return Ok(vir_low::Expression::binary_op(
+                            vir_low::BinaryOpKind::Div,
+                            left_snapshot,
+                            right_snapshot,
+                            op.position,
+                        ))
+                    }
+                }
+            }
+        }
+
+        if ty.is_none(){
+            ty = if expect_math_bool_args {
+                Some(&vir_mid::Type::MBool)
+            } else{
+                Some(op.get_type())
+            };
+        }
 
         let left_snapshot =
             self.expression_to_snapshot(lowerer, &op.left, expect_math_bool_args)?;
         let right_snapshot =
             self.expression_to_snapshot(lowerer, &op.right, expect_math_bool_args)?;
         let arg_type = op.left.get_type();
-        assert_eq!(arg_type, op.right.get_type());
+        // is this the case for MPerm?
+        // assert_eq!(arg_type, op.right.get_type());
         let result = lowerer.construct_binary_op_snapshot(
             op.op_kind,
-            ty,
+            ty.unwrap(),
             arg_type,
             left_snapshot,
             right_snapshot,
             op.position,
         )?;
-        self.ensure_bool_expression(lowerer, ty, result, expect_math_bool)
+        self.ensure_bool_expression(lowerer, ty.unwrap(), result, expect_math_bool)
     }
 
     fn binary_op_kind_to_snapshot(

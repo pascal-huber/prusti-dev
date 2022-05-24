@@ -159,6 +159,8 @@ impl Typed for BinaryOp {
             | BinaryOpKind::Mod => {
                 let ty1 = self.left.get_type();
                 let ty2 = self.right.get_type();
+                println!("-- get_type --");
+                dbg!(&ty1);
                 assert_eq!(ty1, ty2, "expr: {:?}", self);
                 ty1
             }
