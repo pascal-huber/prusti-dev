@@ -103,7 +103,7 @@ pub(super) trait LifetimesEncoder {
         old_original_lifetimes: &BTreeSet<String>,
         new_original_lifetimes: &BTreeSet<String>,
     ) -> BTreeSet<String>;
-    fn get_lifetime_token_permission(&self, denominator: u32) -> vir_high::Expression;
+    fn get_lifetime_token_permission(&self, denominator: usize) -> vir_high::Expression;
     fn none_permission(&self) -> vir_high::Expression;
     fn full_permission(&self) -> vir_high::Expression;
     fn encode_lifetime_specifications(
@@ -304,7 +304,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                 vir_high::Statement::lifetime_return_no_pos(
                     encoded_target,
                     lifetimes,
-                    self.rd_perm,
+                    self.get_lifetime_token_permission(self.lifetime_count),
                 ),
             )?);
         }
@@ -329,7 +329,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             block_builder.add_statement(self.set_statement_error(
                 location,
                 ErrorCtxt::LifetimeEncoding,
-                vir_high::Statement::lifetime_take_no_pos(encoded_target, lifetimes, self.rd_perm),
+                vir_high::Statement::lifetime_take_no_pos(encoded_target, lifetimes,
+                                                          self.get_lifetime_token_permission(self.lifetime_count),
+                ),
             )?);
         }
         Ok(())
@@ -453,7 +455,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             .collect()
     }
 
-    fn get_lifetime_token_permission(&self, denominator: u32) -> vir_high::Expression {
+    fn get_lifetime_token_permission(&self, denominator: usize) -> vir_high::Expression {
         // FIXME: make this usize from the beginning
         // let den: usize = denominator.try_into().unwrap();
         // dbg!(&den);
@@ -594,7 +596,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                 vir_high::Statement::lifetime_take_no_pos(
                     encoded_target,
                     vec![encoded_source],
-                    self.rd_perm,
+                    self.get_lifetime_token_permission(self.lifetime_count),
                 ),
                 self.mir.span,
                 ErrorCtxt::LifetimeEncoding,

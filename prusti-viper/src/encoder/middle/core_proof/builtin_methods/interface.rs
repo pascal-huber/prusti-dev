@@ -177,7 +177,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 self.encode_place_arguments(arguments, &value.place)?;
                 let lifetime = self.encode_lifetime_const_into_variable(value.lifetime.clone())?;
                 arguments.push(lifetime.into());
-                let perm_amount = vir_low::Expression::fractional_permission(value.rd_perm);
+                let perm_amount = value.lifetime_token_permission.to_procedure_snapshot(self)?;
                 arguments.push(perm_amount);
             }
             vir_mid::Rvalue::AddressOf(value) => {

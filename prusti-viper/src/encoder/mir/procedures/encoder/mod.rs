@@ -84,7 +84,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let specification_blocks = SpecificationBlocks::build(tcx, mir, &procedure);
     let initialization = compute_definitely_initialized(def_id, mir, encoder.env().tcx());
     let allocation = compute_definitely_allocated(def_id, mir);
-    let rd_perm = lifetimes.lifetime_count();
+    let lifetime_count = lifetimes.lifetime_count();
     let lifetime_token_permission = None;
     let function_call_ctr: usize = 0;
     let mut procedure_encoder = ProcedureEncoder {
@@ -104,7 +104,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         check_panics: config::check_panics(),
         locals_without_explicit_allocation,
         fresh_id_generator: 0,
-        rd_perm,
+        lifetime_count,
         lifetime_token_permission,
         function_call_ctr,
     };
@@ -135,7 +135,7 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     /// the entire body of the function.
     locals_without_explicit_allocation: BTreeSet<mir::Local>,
     fresh_id_generator: usize,
-    rd_perm: u32,
+    lifetime_count: usize,
     lifetime_token_permission: Option<vir_high::VariableDecl>,
     function_call_ctr: usize,
 }
@@ -563,7 +563,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     encoded_place,
                     vir_high::ty::LifetimeConst::new(region_name),
                     is_mut,
-                    self.rd_perm,
+                    self.get_lifetime_token_permission(self.lifetime_count),
                     encoded_target.clone(),
                 );
                 let assign_statement = vir_high::Statement::assign(
@@ -727,7 +727,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         ErrorCtxt::CloseMutRef,
                         vir_high::Statement::close_mut_ref_no_pos(
                             lifetime.clone(),
-                            self.rd_perm,
+                            self.get_lifetime_token_permission(self.lifetime_count),
                             place,
                         ),
                     )?);
@@ -737,7 +737,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         ErrorCtxt::CloseFracRef,
                         vir_high::Statement::close_frac_ref_no_pos(
                             lifetime.clone(),
-                            self.rd_perm,
+                            self.get_lifetime_token_permission(self.lifetime_count),
                             place,
                             permission.unwrap(),
                         ),
@@ -771,7 +771,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         ErrorCtxt::OpenMutRef,
                         vir_high::Statement::open_mut_ref_no_pos(
                             lifetime.clone(),
-                            self.rd_perm,
+                            self.get_lifetime_token_permission(self.lifetime_count),
                             place,
                         ),
                     )?);
@@ -785,7 +785,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         vir_high::Statement::open_frac_ref_no_pos(
                             lifetime.clone(),
                             permission,
-                            self.rd_perm,
+                            self.get_lifetime_token_permission(self.lifetime_count),
                             place,
                         ),
                     )?);
@@ -1626,7 +1626,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let function_lifetime_take = vir_high::Statement::lifetime_take_no_pos(
             function_call_lifetime,
             derived_from,
-            self.rd_perm,
+            self.get_lifetime_token_permission(self.lifetime_count),
         );
         block_builder.add_statement(self.set_statement_error(
             location,
@@ -1682,7 +1682,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     vir_high::ty::LifetimeConst {
                         name: lifetime.clone(),
                     },
-                    self.get_lifetime_token_permission(self.rd_perm),
+                    self.get_lifetime_token_permission(self.lifetime_count),
                 )),
                 self.mir.span,
                 ErrorCtxt::LifetimeEncoding,
@@ -1762,7 +1762,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         vir_high::ty::LifetimeConst {
                             name: lifetime.clone(),
                         },
-                        self.get_lifetime_token_permission(self.rd_perm),
+                        self.get_lifetime_token_permission(self.lifetime_count),
                     )?;
                     post_call_block_builder.add_statement(statement);
                 }
@@ -1832,7 +1832,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                             vir_high::ty::LifetimeConst {
                                 name: lifetime.clone(),
                             },
-                            self.get_lifetime_token_permission(self.rd_perm),
+                            self.get_lifetime_token_permission(self.lifetime_count),
                         )?;
                         cleanup_block_builder.add_statement(statement);
                     }

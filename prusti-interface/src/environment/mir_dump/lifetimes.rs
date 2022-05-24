@@ -68,21 +68,19 @@ impl Lifetimes {
             })
             .collect()
     }
-    pub fn lifetime_count(&self) -> u32 {
-        let original_lifetimes_count: u32 = self.get_original_lifetimes().len().try_into().unwrap();
+    pub fn lifetime_count(&self) -> usize {
+        let original_lifetimes_count = self.get_original_lifetimes().len();
         let borrowck_in_facts = self.borrowck_in_facts();
         let subset_lifetimes: BTreeSet<Region> = borrowck_in_facts
             .subset_base
             .iter()
             .flat_map(|&(r1, r2, _)| [r1, r2])
             .collect();
-        let opaque_lifetimes_count: u32 = self
+        let opaque_lifetimes_count = self
             .get_opaque_lifetimes_with_inclusions_names()
             .keys()
-            .count()
-            .try_into()
-            .unwrap();
-        let subset_lifetimes_count: u32 = subset_lifetimes.len().try_into().unwrap();
+            .count();
+        let subset_lifetimes_count = subset_lifetimes.len();
         original_lifetimes_count + subset_lifetimes_count + opaque_lifetimes_count
     }
     pub fn get_opaque_lifetimes_with_inclusions_names(&self) -> BTreeMap<String, BTreeSet<String>> {
