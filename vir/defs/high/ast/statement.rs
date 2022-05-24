@@ -36,7 +36,6 @@ pub enum Statement {
     Dead(Dead),
     LifetimeTake(LifetimeTake),
     LifetimeReturn(LifetimeReturn),
-    LifetimeIncluded(LifetimeIncluded),
     OpenMutRef(OpenMutRef),
     OpenFracRef(OpenFracRef),
     CloseMutRef(CloseMutRef),
@@ -269,16 +268,6 @@ pub struct LifetimeReturn {
     pub target: VariableDecl,
     pub value: Vec<VariableDecl>,
     pub lifetime_token_permission: Expression,
-    pub position: Position,
-}
-
-// TODO: Make LifetimeIncluded an Expression and use Assert/Assume Statement
-//   We should use BuiltinFuncApp for this: https://github.com/viperproject/prusti-dev/blob/master/vir/defs/high/ast/expression.rs#L244-L252
-#[display(fmt = "lifetime_included({}, {})", lhs, "display::cjoin(rhs)")]
-pub struct LifetimeIncluded {
-    pub assert: bool,
-    pub lhs: LifetimeConst,
-    pub rhs: Vec<LifetimeConst>,
     pub position: Position,
 }
 

@@ -145,7 +145,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let name = self.encoder.encode_item_name(self.def_id);
         let (allocate_parameters, deallocate_parameters) = self.encode_parameters()?;
         let (allocate_returns, deallocate_returns) = self.encode_returns()?;
-        self.lifetime_token_permission = Some(self.fresh_ghost_variable("positive_perm_amount", vir_high::Type::MPerm));
+        self.lifetime_token_permission =
+            Some(self.fresh_ghost_variable("positive_perm_amount", vir_high::Type::MPerm));
         let (assume_preconditions, assert_postconditions) =
             self.encode_functional_specifications()?;
         let (assume_lifetime_preconditions, assert_lifetime_postconditions) =

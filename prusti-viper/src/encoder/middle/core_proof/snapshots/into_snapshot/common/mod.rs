@@ -3,6 +3,7 @@ use crate::encoder::{
     errors::SpannedEncodingResult,
     high::types::HighTypeEncoderInterface,
     middle::core_proof::{
+        lifetimes::*,
         references::ReferencesInterface,
         snapshots::{SnapshotDomainsInterface, SnapshotValuesInterface},
     },
@@ -314,7 +315,6 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
         op: &vir_mid::BinaryOp,
         mut expect_math_bool: bool,
     ) -> SpannedEncodingResult<vir_low::Expression> {
-
         let mut expect_math_bool_args = expect_math_bool
             && matches!(
                 op.op_kind,
@@ -334,29 +334,31 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
                         expect_math_bool_args = false;
                         ty = Some(&vir_mid::Type::MPerm);
                         if op.op_kind == vir_mid::BinaryOpKind::Div {
-                            let left_snapshot =
-                                self.expression_to_snapshot(lowerer, &op.left, expect_math_bool_args)?;
-                            let value = self.constant_value_to_snapshot(lowerer, &constant.value)?;
-                            let right_snapshot = vir_low::Expression::constant_no_pos(
-                                value,
-                                vir_low::ty::Type::Int,
-                            );
+                            let left_snapshot = self.expression_to_snapshot(
+                                lowerer,
+                                &op.left,
+                                expect_math_bool_args,
+                            )?;
+                            let value =
+                                self.constant_value_to_snapshot(lowerer, &constant.value)?;
+                            let right_snapshot =
+                                vir_low::Expression::constant_no_pos(value, vir_low::ty::Type::Int);
                             return Ok(vir_low::Expression::perm_binary_op(
                                 vir_low::ast::expression::PermBinaryOpKind::Div,
                                 left_snapshot,
                                 right_snapshot,
                                 op.position,
-                            ))
+                            ));
                         }
                     }
                 }
             }
         }
 
-        if ty.is_none(){
+        if ty.is_none() {
             ty = if expect_math_bool_args {
                 Some(&vir_mid::Type::MBool)
-            } else{
+            } else {
                 Some(op.get_type())
             };
         }
@@ -490,6 +492,33 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
             BuiltinFunc::SeqLen => {
                 let value = seq(ContainerOpKind::SeqLen)?;
                 lowerer.construct_constant_snapshot(app.get_type(), value, app.position)
+            }
+            BuiltinFunc::LifetimeIncluded => {
+                assert_eq!(args.len(), 2);
+                lowerer.encode_lifetime_included()?;
+                Ok(vir_low::Expression::domain_function_call(
+                    "Lifetime",
+                    "included$",
+                    args,
+                    vir_low::ty::Type::Bool,
+                ))
+            }
+            BuiltinFunc::LifetimeIntersect => {
+                assert!(!args.is_empty());
+                lowerer.encode_lifetime_intersect(args.len())?;
+                let intersect_expr = if args.len() >= 2 {
+                    vir_low::Expression::domain_function_call(
+                        "Lifetime",
+                        format!("intersect${}", args.len()),
+                        args,
+                        vir_low::ty::Type::Domain(vir_low::ty::Domain {
+                            name: "Lifetime".to_string(),
+                        }),
+                    )
+                } else {
+                    args.get(0).unwrap().clone()
+                };
+                Ok(intersect_expr)
             }
             BuiltinFunc::EmptySeq | BuiltinFunc::SingleSeq => Ok(vir_low::Expression::seq(
                 ty_args[0].clone(),
