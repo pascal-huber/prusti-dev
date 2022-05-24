@@ -81,10 +81,11 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let move_env = self::initialisation::create_move_data_param_env(tcx, mir, def_id);
     let init_data = InitializationData::new(tcx, mir, &move_env);
     let locals_without_explicit_allocation: BTreeSet<_> = mir.vars_and_temps_iter().collect();
-    let rd_perm = lifetimes.lifetime_count();
     let specification_blocks = SpecificationBlocks::build(tcx, mir, &procedure);
     let initialization = compute_definitely_initialized(def_id, mir, encoder.env().tcx());
     let allocation = compute_definitely_allocated(def_id, mir);
+    let rd_perm = lifetimes.lifetime_count();
+    let lifetime_token_permission = None;
     let function_call_ctr: usize = 0;
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
@@ -104,6 +105,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         locals_without_explicit_allocation,
         fresh_id_generator: 0,
         rd_perm,
+        lifetime_token_permission,
         function_call_ctr,
     };
     procedure_encoder.encode()
@@ -134,6 +136,7 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     locals_without_explicit_allocation: BTreeSet<mir::Local>,
     fresh_id_generator: usize,
     rd_perm: u32,
+    lifetime_token_permission: Option<vir_high::VariableDecl>,
     function_call_ctr: usize,
 }
 
@@ -142,6 +145,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let name = self.encoder.encode_item_name(self.def_id);
         let (allocate_parameters, deallocate_parameters) = self.encode_parameters()?;
         let (allocate_returns, deallocate_returns) = self.encode_returns()?;
+        self.lifetime_token_permission = Some(self.fresh_ghost_variable("positive_perm_amount", vir_high::Type::MPerm));
         let (assume_preconditions, assert_postconditions) =
             self.encode_functional_specifications()?;
         let (assume_lifetime_preconditions, assert_lifetime_postconditions) =
