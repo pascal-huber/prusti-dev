@@ -456,14 +456,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
     }
 
     fn get_lifetime_token_permission(&self, denominator: usize) -> vir_high::Expression {
-        // FIXME: make this usize from the beginning
-        // let den: usize = denominator.try_into().unwrap();
-        // dbg!(&den);
-        let den = denominator;
+        let denominator_expr = vir_high::Expression::constant_no_pos(
+            // TODO: check if conversion from usize to ConstantValue is safe
+            vir_high::expression::ConstantValue::BigInt(denominator.to_string()),
+            vir_high::ty::Type::MPerm,
+        );
         vir_high::Expression::binary_op_no_pos(
             vir_high::BinaryOpKind::Div,
             self.lifetime_token_permission.clone().unwrap().into(),
-            den.into(),
+            denominator_expr
         )
     }
 
@@ -667,7 +668,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         // put data in correct shape
         let mut identical_lifetimes_map: BTreeMap<String, String> = BTreeMap::new();
         for component in identical_lifetimes {
-            dbg!(&component);
             let existing_component_lifetims: BTreeSet<String> = component
                 .iter()
                 .cloned()
