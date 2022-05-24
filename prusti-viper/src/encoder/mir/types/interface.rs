@@ -211,8 +211,6 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
             .get(ty)
         {
             *ty
-        } else if ty == &vir_high::Type::Int(vir_high::ty::Int::U32) {
-            self.env().tcx().mk_ty(ty::TyKind::Uint(ty::UintTy::U32))
         } else {
             unreachable!("failed to decode: {}", ty)
         }

@@ -341,8 +341,8 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
                             value,
                             vir_low::ty::Type::Int,
                         );
-                        return Ok(vir_low::Expression::binary_op(
-                            vir_low::BinaryOpKind::Div,
+                        return Ok(vir_low::Expression::perm_binary_op(
+                            vir_low::ast::expression::PermBinaryOpKind::Div,
                             left_snapshot,
                             right_snapshot,
                             op.position,
