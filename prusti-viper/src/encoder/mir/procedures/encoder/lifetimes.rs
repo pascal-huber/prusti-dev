@@ -478,13 +478,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
 
-        // construct positive permission amount for inhaling LifetimeTokens
-        // let positive_permission_amount = self.encode_per
         let mut preconditions = vec![vir_high::Statement::comment(
             "Lifetime preconditions.".to_string(),
         )];
-        let lifetime_token_permission =
-            self.fresh_ghost_variable("positive_perm_amount", vir_high::Type::MPerm);
+        // Make sure the lifetime_token_permissino is > none and < write
         let none_permission = self.none_permission();
         let full_permission = self.full_permission();
         preconditions.push(
@@ -492,7 +489,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                 vir_high::Statement::assume_no_pos(
                     vir_high::Expression::binary_op_no_pos(
                         vir_high::BinaryOpKind::GtCmp,
-                        lifetime_token_permission.clone().into(),
+                        self.lifetime_token_permission.clone().unwrap().into(),
                         none_permission.into(),
                     ),
                 ),
@@ -506,7 +503,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                 vir_high::Statement::assume_no_pos(
                     vir_high::Expression::binary_op_no_pos(
                         vir_high::BinaryOpKind::LtCmp,
-                        lifetime_token_permission.clone().into(),
+                        self.lifetime_token_permission.clone().unwrap().into(),
                         full_permission.into(),
                     ),
                 ),
