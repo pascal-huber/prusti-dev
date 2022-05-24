@@ -233,6 +233,7 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
             vir_mid::Type::MFloat64 => unimplemented!(),
             vir_mid::Type::Bool => vir_low::Type::Bool,
             vir_mid::Type::Int(_) => vir_low::Type::Int,
+            vir_mid::Type::MPerm => vir_low::Type::Perm,
             _ => unimplemented!("constant: {:?}", constant),
         };
         let argument = vir_low::Expression::Constant(vir_low::expression::Constant {
@@ -246,6 +247,7 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
                 | vir_mid::Type::MInt
                 | vir_mid::Type::MFloat32
                 | vir_mid::Type::MFloat64
+                | vir_mid::Type::MPerm
         );
         if is_already_math_type || (constant.ty == vir_mid::Type::Bool && expect_math_bool) {
             Ok(argument)
@@ -310,8 +312,16 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
         &mut self,
         lowerer: &mut Lowerer<'p, 'v, 'tcx>,
         op: &vir_mid::BinaryOp,
-        expect_math_bool: bool,
+        mut expect_math_bool: bool,
     ) -> SpannedEncodingResult<vir_low::Expression> {
+
+        // if mathematical type e.g. MPerm, then just return direct translation without calling recursive to_snapshot
+        if let box vir_mid::Expression::Local(local) = &op.left {
+            if let vir_mid::Type::MPerm = local.get_type() {
+                expect_math_bool = false;
+            }
+        }
+
         let expect_math_bool_args = expect_math_bool
             && matches!(
                 op.op_kind,
@@ -324,6 +334,7 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
         } else {
             op.get_type()
         };
+
         let left_snapshot =
             self.expression_to_snapshot(lowerer, &op.left, expect_math_bool_args)?;
         let right_snapshot =
