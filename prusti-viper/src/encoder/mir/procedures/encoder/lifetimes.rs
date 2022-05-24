@@ -103,6 +103,8 @@ pub(super) trait LifetimesEncoder {
         old_original_lifetimes: &BTreeSet<String>,
         new_original_lifetimes: &BTreeSet<String>,
     ) -> BTreeSet<String>;
+    fn none_permission(&self) -> vir_high::Expression;
+    fn full_permission(&self) -> vir_high::Expression;
     fn encode_lifetime_specifications(
         &mut self,
     ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)>;
@@ -449,6 +451,21 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             .collect()
     }
 
+    // TODO: Move this somewhere better
+    fn none_permission(&self) -> vir_high::Expression {
+        vir_high::Expression::constant_no_pos(
+            vir_high::expression::ConstantValue::Int(0),
+            vir_high::Type::MPerm,
+        )
+    }
+    // TODO: Move this somewhere better
+    fn full_permission(&self) -> vir_high::Expression {
+        vir_high::Expression::constant_no_pos(
+            vir_high::expression::ConstantValue::Int(1),
+            vir_high::Type::MPerm,
+        )
+    }
+
     fn encode_lifetime_specifications(
         &mut self,
     ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)> {
@@ -461,13 +478,49 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
 
-        // Precondition: Inhale LifetimeTokens
+        // construct positive permission amount for inhaling LifetimeTokens
+        // let positive_permission_amount = self.encode_per
         let mut preconditions = vec![vir_high::Statement::comment(
             "Lifetime preconditions.".to_string(),
         )];
+        let lifetime_token_permission =
+            self.fresh_ghost_variable("positive_perm_amount", vir_high::Type::MPerm);
+        let none_permission = self.none_permission();
+        let full_permission = self.full_permission();
+        preconditions.push(
+            self.encoder.set_statement_error_ctxt(
+                vir_high::Statement::assume_no_pos(
+                    vir_high::Expression::binary_op_no_pos(
+                        vir_high::BinaryOpKind::GtCmp,
+                        lifetime_token_permission.clone().into(),
+                        none_permission.into(),
+                    ),
+                ),
+                self.mir.span,
+                ErrorCtxt::LifetimeInhale,
+                self.def_id,
+            )?
+        );
+        preconditions.push(
+            self.encoder.set_statement_error_ctxt(
+                vir_high::Statement::assume_no_pos(
+                    vir_high::Expression::binary_op_no_pos(
+                        vir_high::BinaryOpKind::LtCmp,
+                        lifetime_token_permission.clone().into(),
+                        full_permission.into(),
+                    ),
+                ),
+                self.mir.span,
+                ErrorCtxt::LifetimeInhale,
+                self.def_id,
+            )?
+        );
+
+        // Precondition: Inhale LifetimeTokens
         let lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> =
             self.lifetimes_to_inhale()?;
         for lifetime in &lifetimes_to_inhale {
+            // TODO: not 1, but some positive permission (Expression?)
             let inhale_statement = self.encode_inhale_lifetime_token(lifetime.clone(), 1)?;
             preconditions.push(inhale_statement);
         }
@@ -595,20 +648,23 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         // put data in correct shape
         let mut identical_lifetimes_map: BTreeMap<String, String> = BTreeMap::new();
         for component in identical_lifetimes {
+            dbg!(&component);
             let existing_component_lifetims: BTreeSet<String> = component
                 .iter()
                 .cloned()
                 .filter(|lft| existing_lifetimes.contains(&lft[..]))
                 .collect();
-            let non_existing_component_lifetims: BTreeSet<String> = component
+            // TODO: typo!
+            let non_existing_component_lifetimes: BTreeSet<String> = component
                 .iter()
                 .cloned()
                 .filter(|lft| !existing_lifetimes.contains(&lft[..]))
                 .collect();
-            for lifetime in non_existing_component_lifetims {
-                let identical_existing_lifetime =
-                    existing_component_lifetims.iter().next().unwrap().clone();
-                identical_lifetimes_map.insert(lifetime, identical_existing_lifetime);
+            for lifetime in non_existing_component_lifetimes {
+                let identical_existing_lifetime = existing_component_lifetims.iter().next();
+                if let Some(identical_existing_lifetime) = identical_existing_lifetime {
+                    identical_lifetimes_map.insert(lifetime, identical_existing_lifetime.clone());
+                }
             }
         }
         identical_lifetimes_map

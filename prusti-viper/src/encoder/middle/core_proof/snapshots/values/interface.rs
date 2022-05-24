@@ -216,7 +216,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotValuesInterface for Lowerer<'p, 'v, 'tcx> {
         right: vir_low::Expression,
         position: vir_mid::Position,
     ) -> SpannedEncodingResult<vir_low::Expression> {
-        if ty == &vir_mid::Type::MBool {
+        // TODO: was add vir_mid::Type::Bool too brutal or wrong here? Or was MBool even wrong?
+        if ty == &vir_mid::Type::MBool || ty == &vir_mid::Type::Bool {
             Ok(vir_low::Expression::binary_op(
                 op.to_snapshot(self)?,
                 left,
