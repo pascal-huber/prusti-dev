@@ -15,10 +15,10 @@ pub enum Predicate {
     OwnedNonAliased(OwnedNonAliased),
 }
 
-#[display(fmt = "acc(LifetimeToken({}), {})", lifetime, rd_perm)]
+#[display(fmt = "acc(LifetimeToken({}), {})", lifetime, permission)]
 pub struct LifetimeToken {
     pub lifetime: LifetimeConst,
-    pub rd_perm: u32,
+    pub permission: Expression,
     pub position: Position,
 }
 

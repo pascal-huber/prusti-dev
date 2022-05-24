@@ -655,8 +655,8 @@ impl IntoLow for vir_mid::Predicate {
             Predicate::LifetimeToken(predicate) => {
                 lowerer.encode_lifetime_token_predicate()?;
                 let lifetime = lowerer.encode_lifetime_const_into_variable(predicate.lifetime)?;
-                let perm_amount = vir_low::Expression::fractional_permission(predicate.rd_perm);
-                expr! { acc(LifetimeToken([lifetime.into()]), [perm_amount])}
+                let permission = predicate.permission.to_procedure_snapshot(lowerer)?;
+                expr! { acc(LifetimeToken([lifetime.into()]), [permission])}
                     .set_default_position(predicate.position)
             }
             Predicate::MemoryBlockStack(predicate) => {

@@ -1682,7 +1682,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     vir_high::ty::LifetimeConst {
                         name: lifetime.clone(),
                     },
-                    self.rd_perm,
+                    self.get_lifetime_token_permission(self.rd_perm),
                 )),
                 self.mir.span,
                 ErrorCtxt::LifetimeEncoding,
@@ -1762,7 +1762,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         vir_high::ty::LifetimeConst {
                             name: lifetime.clone(),
                         },
-                        self.rd_perm,
+                        self.get_lifetime_token_permission(self.rd_perm),
                     )?;
                     post_call_block_builder.add_statement(statement);
                 }
@@ -1832,7 +1832,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                             vir_high::ty::LifetimeConst {
                                 name: lifetime.clone(),
                             },
-                            self.rd_perm,
+                            self.get_lifetime_token_permission(self.rd_perm),
                         )?;
                         cleanup_block_builder.add_statement(statement);
                     }

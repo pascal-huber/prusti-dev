@@ -103,6 +103,7 @@ pub(super) trait LifetimesEncoder {
         old_original_lifetimes: &BTreeSet<String>,
         new_original_lifetimes: &BTreeSet<String>,
     ) -> BTreeSet<String>;
+    fn get_lifetime_token_permission(&self, denominator: u32) -> vir_high::Expression;
     fn none_permission(&self) -> vir_high::Expression;
     fn full_permission(&self) -> vir_high::Expression;
     fn encode_lifetime_specifications(
@@ -123,11 +124,12 @@ pub(super) trait LifetimesEncoder {
     fn encode_inhale_lifetime_token(
         &mut self,
         lifetime_const: vir_high::ty::LifetimeConst,
-        rd_perm: u32,
+        permission_amount: vir_high::Expression,
     ) -> SpannedEncodingResult<vir_high::Statement>;
     fn encode_exhale_lifetime_token(
         &mut self,
         lifetime_const: vir_high::ty::LifetimeConst,
+        permission_amount: vir_high::Expression,
     ) -> SpannedEncodingResult<vir_high::Statement>;
 }
 
@@ -451,6 +453,18 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             .collect()
     }
 
+    fn get_lifetime_token_permission(&self, denominator: u32) -> vir_high::Expression {
+        // FIXME: make this usize from the beginning
+        // let den: usize = denominator.try_into().unwrap();
+        // dbg!(&den);
+        let den = denominator;
+        vir_high::Expression::binary_op_no_pos(
+            vir_high::BinaryOpKind::Div,
+            self.lifetime_token_permission.clone().unwrap().into(),
+            den.into(),
+        )
+    }
+
     // TODO: Move this somewhere better
     fn none_permission(&self) -> vir_high::Expression {
         vir_high::Expression::constant_no_pos(
@@ -518,7 +532,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             self.lifetimes_to_inhale()?;
         for lifetime in &lifetimes_to_inhale {
             // TODO: not 1, but some positive permission (Expression?)
-            let inhale_statement = self.encode_inhale_lifetime_token(lifetime.clone(), 1)?;
+            let inhale_statement = self.encode_inhale_lifetime_token(
+                lifetime.clone(),
+                self.lifetime_token_permission.clone().unwrap().into(),
+            )?;
             preconditions.push(inhale_statement);
         }
 
@@ -527,7 +544,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             "Lifetime postconditions.".to_string(),
         )];
         for lifetime in lifetimes_to_inhale {
-            let exhale_statement = self.encode_exhale_lifetime_token(lifetime)?;
+            let exhale_statement = self.encode_exhale_lifetime_token(
+                lifetime,
+                self.lifetime_token_permission.clone().unwrap().into(),
+            )?;
             postconditions.push(exhale_statement);
         }
 
@@ -651,7 +671,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                 .cloned()
                 .filter(|lft| existing_lifetimes.contains(&lft[..]))
                 .collect();
-            // TODO: typo!
             let non_existing_component_lifetimes: BTreeSet<String> = component
                 .iter()
                 .cloned()
@@ -661,6 +680,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                 let identical_existing_lifetime = existing_component_lifetims.iter().next();
                 if let Some(identical_existing_lifetime) = identical_existing_lifetime {
                     identical_lifetimes_map.insert(lifetime, identical_existing_lifetime.clone());
+                } else {
+                    // FIXME: Some programs produce lots of identical and seemingly useless lifetimes
+                    //   for example: main(){ let x: &mut u32 = &mut 0; }
+                    //   currently, we ignore them
                 }
             }
         }
@@ -689,12 +712,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
     fn encode_inhale_lifetime_token(
         &mut self,
         lifetime_const: vir_high::ty::LifetimeConst,
-        rd_perm: u32,
+        permission_amount: vir_high::Expression,
     ) -> SpannedEncodingResult<vir_high::Statement> {
         self.encoder.set_statement_error_ctxt(
             vir_high::Statement::inhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
                 lifetime_const,
-                rd_perm,
+                permission_amount,
             )),
             self.mir.span,
             ErrorCtxt::LifetimeInhale,
@@ -705,11 +728,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
     fn encode_exhale_lifetime_token(
         &mut self,
         lifetime_const: vir_high::ty::LifetimeConst,
+        permission_amount: vir_high::Expression,
     ) -> SpannedEncodingResult<vir_high::Statement> {
         self.encoder.set_statement_error_ctxt(
             vir_high::Statement::exhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
                 lifetime_const,
-                self.rd_perm,
+                permission_amount
             )),
             self.mir.span,
             ErrorCtxt::LifetimeExhale,
