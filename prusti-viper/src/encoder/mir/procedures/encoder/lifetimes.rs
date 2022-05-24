@@ -329,8 +329,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             block_builder.add_statement(self.set_statement_error(
                 location,
                 ErrorCtxt::LifetimeEncoding,
-                vir_high::Statement::lifetime_take_no_pos(encoded_target, lifetimes,
-                                                          self.get_lifetime_token_permission(self.lifetime_count),
+                vir_high::Statement::lifetime_take_no_pos(
+                    encoded_target,
+                    lifetimes,
+                    self.get_lifetime_token_permission(self.lifetime_count),
                 ),
             )?);
         }
@@ -344,13 +346,29 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         lifetime_lhs: String,
         lifetime_rhs: String,
     ) -> SpannedEncodingResult<()> {
-        let lhs = vir_high::ty::LifetimeConst { name: lifetime_lhs };
-        let rhs = vir_high::ty::LifetimeConst { name: lifetime_rhs };
-        let assert_statement = vir_high::Statement::lifetime_included_no_pos(
-            true, // assert, not assume
-            lhs,
-            vec![rhs],
-        );
+        let assert_statement = self.encoder.set_statement_error_ctxt(
+            vir_high::Statement::assume_no_pos(vir_high::Expression::builtin_func_app_no_pos(
+                vir_high::BuiltinFunc::LifetimeIncluded,
+                vec![], // NOTE: we ignore argument_types for LifetimeIncluded
+                vec![
+                    vir_high::VariableDecl {
+                        name: lifetime_lhs,
+                        ty: vir_high::ty::Type::Lifetime,
+                    }
+                    .into(),
+                    vir_high::VariableDecl {
+                        name: lifetime_rhs,
+                        ty: vir_high::ty::Type::Lifetime,
+                    }
+                    .into(),
+                ],
+                vir_high::ty::Type::Bool,
+            )),
+            self.mir.span,
+            ErrorCtxt::LifetimeEncoding,
+            self.def_id,
+        )?;
+
         block_builder.add_statement(self.set_statement_error(
             location,
             ErrorCtxt::LifetimeEncoding,
@@ -464,7 +482,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         vir_high::Expression::binary_op_no_pos(
             vir_high::BinaryOpKind::Div,
             self.lifetime_token_permission.clone().unwrap().into(),
-            denominator_expr
+            denominator_expr,
         )
     }
 
@@ -501,34 +519,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         // Make sure the lifetime_token_permissino is > none and < write
         let none_permission = self.none_permission();
         let full_permission = self.full_permission();
-        preconditions.push(
-            self.encoder.set_statement_error_ctxt(
-                vir_high::Statement::assume_no_pos(
-                    vir_high::Expression::binary_op_no_pos(
-                        vir_high::BinaryOpKind::GtCmp,
-                        self.lifetime_token_permission.clone().unwrap().into(),
-                        none_permission.into(),
-                    ),
-                ),
-                self.mir.span,
-                ErrorCtxt::LifetimeInhale,
-                self.def_id,
-            )?
-        );
-        preconditions.push(
-            self.encoder.set_statement_error_ctxt(
-                vir_high::Statement::assume_no_pos(
-                    vir_high::Expression::binary_op_no_pos(
-                        vir_high::BinaryOpKind::LtCmp,
-                        self.lifetime_token_permission.clone().unwrap().into(),
-                        full_permission.into(),
-                    ),
-                ),
-                self.mir.span,
-                ErrorCtxt::LifetimeInhale,
-                self.def_id,
-            )?
-        );
+        preconditions.push(self.encoder.set_statement_error_ctxt(
+            vir_high::Statement::assume_no_pos(vir_high::Expression::binary_op_no_pos(
+                vir_high::BinaryOpKind::GtCmp,
+                self.lifetime_token_permission.clone().unwrap().into(),
+                none_permission,
+            )),
+            self.mir.span,
+            ErrorCtxt::LifetimeInhale,
+            self.def_id,
+        )?);
+        preconditions.push(self.encoder.set_statement_error_ctxt(
+            vir_high::Statement::assume_no_pos(vir_high::Expression::binary_op_no_pos(
+                vir_high::BinaryOpKind::LtCmp,
+                self.lifetime_token_permission.clone().unwrap().into(),
+                full_permission,
+            )),
+            self.mir.span,
+            ErrorCtxt::LifetimeInhale,
+            self.def_id,
+        )?);
 
         // Precondition: Inhale LifetimeTokens
         let lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> =
@@ -557,26 +567,51 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         // Precondition: Assume opaque lifetime conditions
         let opaque_conditions: BTreeMap<String, BTreeSet<String>> =
             self.lifetimes.get_opaque_lifetimes_with_inclusions_names();
+        // TODO: is this BTreeSet needed?
         let mut opaque_lifetimes: BTreeSet<vir_high::ty::LifetimeConst> = BTreeSet::new();
         for (lifetime, condition) in &opaque_conditions {
             let lifetime_const = vir_high::ty::LifetimeConst {
                 name: lifetime.to_string(),
             };
             opaque_lifetimes.insert(lifetime_const.clone());
-            let assume_statement = self.encoder.set_statement_error_ctxt(
-                vir_high::Statement::lifetime_included_no_pos(
-                    false, // assume, not assert
-                    lifetime_const,
-                    condition
-                        .iter()
-                        .map(|lft| vir_high::ty::LifetimeConst { name: lft.clone() })
-                        .collect(),
-                ),
-                self.mir.span,
-                ErrorCtxt::LifetimeEncoding,
-                self.def_id,
-            )?;
-            preconditions.push(assume_statement);
+            let mut arguments: Vec<vir_high::Expression> = vec![];
+            for lifetime_cond in condition {
+                arguments.push(
+                    vir_high::VariableDecl {
+                        name: lifetime_cond.to_string(),
+                        ty: vir_high::ty::Type::Lifetime,
+                    }
+                    .into(),
+                );
+            }
+            if !arguments.is_empty() {
+                let assume_statement = self.encoder.set_statement_error_ctxt(
+                    vir_high::Statement::assume_no_pos(
+                        vir_high::Expression::builtin_func_app_no_pos(
+                            vir_high::BuiltinFunc::LifetimeIncluded,
+                            vec![], // NOTE: we ignore argument_types for LifetimeIncluded
+                            vec![
+                                vir_high::VariableDecl {
+                                    name: lifetime.to_string(),
+                                    ty: vir_high::ty::Type::Lifetime,
+                                }
+                                .into(),
+                                vir_high::Expression::builtin_func_app_no_pos(
+                                    vir_high::BuiltinFunc::LifetimeIntersect,
+                                    vec![], // NOTE: we ignore argument_types for LifetimeIntersect
+                                    arguments,
+                                    vir_high::ty::Type::Lifetime,
+                                ),
+                            ],
+                            vir_high::ty::Type::Bool,
+                        ),
+                    ),
+                    self.mir.span,
+                    ErrorCtxt::LifetimeEncoding,
+                    self.def_id,
+                )?;
+                preconditions.push(assume_statement);
+            }
         }
 
         // Precondition: LifetimeTake for subset lifetimes
@@ -735,7 +770,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         self.encoder.set_statement_error_ctxt(
             vir_high::Statement::exhale_no_pos(vir_high::Predicate::lifetime_token_no_pos(
                 lifetime_const,
-                permission_amount
+                permission_amount,
             )),
             self.mir.span,
             ErrorCtxt::LifetimeExhale,

@@ -230,8 +230,8 @@ pub struct FuncApp {
 
 #[derive(Copy)]
 pub enum BuiltinFunc {
-    // TODO: add this for intersect calls
-    // LifetimeIntersect,
+    LifetimeIncluded,
+    LifetimeIntersect,
     EmptyMap,
     UpdateMap,
     LookupMap,

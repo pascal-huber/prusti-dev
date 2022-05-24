@@ -219,7 +219,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotValuesInterface for Lowerer<'p, 'v, 'tcx> {
         // TODO: was add vir_mid::Type::Bool too brutal or wrong here? Or was MBool even wrong?
         // MPerm for example for division of MPerm by Int
         // Bool for LtCmp of MPerm and Int
-        if ty == &vir_mid::Type::MBool || ty == &vir_mid::Type::Bool || ty == &vir_mid::Type::MPerm {
+        if ty == &vir_mid::Type::MBool || ty == &vir_mid::Type::Bool || ty == &vir_mid::Type::MPerm
+        {
             Ok(vir_low::Expression::binary_op(
                 op.to_snapshot(self)?,
                 left,
