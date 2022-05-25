@@ -564,7 +564,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     encoded_place,
                     vir_high::ty::LifetimeConst::new(region_name),
                     is_mut,
-                    self.get_lifetime_token_permission(self.lifetime_count),
+                    self.lifetime_token_fractional_permission(self.lifetime_count),
                     encoded_target.clone(),
                 );
                 let assign_statement = vir_high::Statement::assign(
@@ -728,7 +728,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         ErrorCtxt::CloseMutRef,
                         vir_high::Statement::close_mut_ref_no_pos(
                             lifetime.clone(),
-                            self.get_lifetime_token_permission(self.lifetime_count),
+                            self.lifetime_token_fractional_permission(self.lifetime_count),
                             place,
                         ),
                     )?);
@@ -738,7 +738,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         ErrorCtxt::CloseFracRef,
                         vir_high::Statement::close_frac_ref_no_pos(
                             lifetime.clone(),
-                            self.get_lifetime_token_permission(self.lifetime_count),
+                            self.lifetime_token_fractional_permission(self.lifetime_count),
                             place,
                             permission.unwrap(),
                         ),
@@ -772,7 +772,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         ErrorCtxt::OpenMutRef,
                         vir_high::Statement::open_mut_ref_no_pos(
                             lifetime.clone(),
-                            self.get_lifetime_token_permission(self.lifetime_count),
+                            self.lifetime_token_fractional_permission(self.lifetime_count),
                             place,
                         ),
                     )?);
@@ -786,7 +786,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         vir_high::Statement::open_frac_ref_no_pos(
                             lifetime.clone(),
                             permission,
-                            self.get_lifetime_token_permission(self.lifetime_count),
+                            self.lifetime_token_fractional_permission(self.lifetime_count),
                             place,
                         ),
                     )?);
@@ -1602,7 +1602,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             for arg in args {
                 if let mir::Operand::Move(place) = arg {
                     let place_high = self.encoder.encode_place_high(self.mir, *place)?;
-                    let lifetime_name = self.get_lifetime_name(place_high);
+                    let lifetime_name = self.lifetime_name(place_high);
                     if let Some(lifetime_name) = lifetime_name {
                         subst_lifetimes.push(lifetime_name);
                     }
@@ -1627,7 +1627,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let function_lifetime_take = vir_high::Statement::lifetime_take_no_pos(
             function_call_lifetime,
             derived_from,
-            self.get_lifetime_token_permission(self.lifetime_count),
+            self.lifetime_token_fractional_permission(self.lifetime_count),
         );
         block_builder.add_statement(self.set_statement_error(
             location,
@@ -1683,7 +1683,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     vir_high::ty::LifetimeConst {
                         name: lifetime.clone(),
                     },
-                    self.get_lifetime_token_permission(self.lifetime_count),
+                    self.lifetime_token_fractional_permission(self.lifetime_count),
                 )),
                 self.mir.span,
                 ErrorCtxt::LifetimeEncoding,
@@ -1763,7 +1763,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         vir_high::ty::LifetimeConst {
                             name: lifetime.clone(),
                         },
-                        self.get_lifetime_token_permission(self.lifetime_count),
+                        self.lifetime_token_fractional_permission(self.lifetime_count),
                     )?;
                     post_call_block_builder.add_statement(statement);
                 }
@@ -1833,7 +1833,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                             vir_high::ty::LifetimeConst {
                                 name: lifetime.clone(),
                             },
-                            self.get_lifetime_token_permission(self.lifetime_count),
+                            self.lifetime_token_fractional_permission(self.lifetime_count),
                         )?;
                         cleanup_block_builder.add_statement(statement);
                     }

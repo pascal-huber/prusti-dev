@@ -103,17 +103,17 @@ pub(super) trait LifetimesEncoder {
         old_original_lifetimes: &BTreeSet<String>,
         new_original_lifetimes: &BTreeSet<String>,
     ) -> BTreeSet<String>;
-    fn get_lifetime_token_permission(&self, denominator: usize) -> vir_high::Expression;
+    fn lifetime_token_fractional_permission(&self, denominator: usize) -> vir_high::Expression;
     fn encode_lifetime_specifications(
         &mut self,
     ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)>;
-    fn get_lifetime_name(&mut self, variable: vir_high::Expression) -> Option<String>;
-    fn identical_lifetimes(
+    fn lifetime_name(&mut self, variable: vir_high::Expression) -> Option<String>;
+    fn identical_lifetimes_map(
         &mut self,
         existing_lifetimes: BTreeSet<String>,
         relations: BTreeSet<(String, String)>,
     ) -> BTreeMap<String, String>;
-    fn lifetimes_to_inhale(
+    fn opaque_lifetimes(
         &mut self,
     ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>>;
     fn encode_inhale_lifetime_token(
@@ -299,7 +299,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                 vir_high::Statement::lifetime_return_no_pos(
                     encoded_target,
                     lifetimes,
-                    self.get_lifetime_token_permission(self.lifetime_count),
+                    self.lifetime_token_fractional_permission(self.lifetime_count),
                 ),
             )?);
         }
@@ -327,7 +327,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                 vir_high::Statement::lifetime_take_no_pos(
                     encoded_target,
                     lifetimes,
-                    self.get_lifetime_token_permission(self.lifetime_count),
+                    self.lifetime_token_fractional_permission(self.lifetime_count),
                 ),
             )?);
         }
@@ -467,7 +467,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             .collect()
     }
 
-    fn get_lifetime_token_permission(&self, denominator: usize) -> vir_high::Expression {
+    fn lifetime_token_fractional_permission(&self, denominator: usize) -> vir_high::Expression {
         let denominator_expr = vir_high::Expression::constant_no_pos(
             vir_high::expression::ConstantValue::BigInt(denominator.to_string()),
             vir_high::ty::Type::MPerm,
@@ -520,7 +520,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
 
         // Precondition: Inhale LifetimeTokens
         let lifetimes_to_inhale: BTreeSet<vir_high::ty::LifetimeConst> =
-            self.lifetimes_to_inhale()?;
+            self.opaque_lifetimes()?;
         for lifetime in &lifetimes_to_inhale {
             // TODO: not 1, but some positive permission (Expression?)
             let inhale_statement = self.encode_inhale_lifetime_token(
@@ -599,7 +599,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             .iter()
             .map(|(r1, r2)| (r1.to_text(), r2.to_text()))
             .collect();
-        let identical_lifetimes = self.identical_lifetimes(
+        let identical_lifetimes = self.identical_lifetimes_map(
             opaque_conditions.keys().cloned().collect(),
             lifetime_subsets,
         );
@@ -610,7 +610,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                 vir_high::Statement::lifetime_take_no_pos(
                     encoded_target,
                     vec![encoded_source],
-                    self.get_lifetime_token_permission(self.lifetime_count),
+                    self.lifetime_token_fractional_permission(self.lifetime_count),
                 ),
                 self.mir.span,
                 ErrorCtxt::LifetimeEncoding,
@@ -621,7 +621,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         Ok((preconditions, postconditions))
     }
 
-    fn get_lifetime_name(&mut self, expression: vir_high::Expression) -> Option<String> {
+    fn lifetime_name(&mut self, expression: vir_high::Expression) -> Option<String> {
         if let vir_high::Expression::Local(vir_high::Local {
             variable:
                 vir_high::VariableDecl {
@@ -636,7 +636,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         None
     }
 
-    fn identical_lifetimes(
+    fn identical_lifetimes_map(
         &mut self,
         existing_lifetimes: BTreeSet<String>,
         relations: BTreeSet<(String, String)>,
@@ -705,7 +705,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
         identical_lifetimes_map
     }
 
-    fn lifetimes_to_inhale(
+    fn opaque_lifetimes(
         &mut self,
     ) -> SpannedEncodingResult<BTreeSet<vir_high::ty::LifetimeConst>> {
         Ok(self
