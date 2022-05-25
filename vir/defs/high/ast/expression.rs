@@ -261,3 +261,12 @@ pub struct Downcast {
     pub field: FieldDecl,
     pub position: Position,
 }
+
+impl Expression {
+    pub fn none_permission() -> Self {
+        Self::constant_no_pos(ConstantValue::Int(0), Type::MPerm)
+    }
+    pub fn full_permission() -> Self {
+        Self::constant_no_pos(ConstantValue::Int(1), Type::MPerm)
+    }
+}

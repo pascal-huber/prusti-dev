@@ -363,13 +363,11 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
                     | vir_mid::BinaryOpKind::Or
                     | vir_mid::BinaryOpKind::Implies
             );
-
         let ty = if expect_math_bool_args {
             &vir_mid::Type::MBool
         } else {
             op.get_type()
         };
-
         let left_snapshot =
             self.expression_to_snapshot(lowerer, &op.left, expect_math_bool_args)?;
         let right_snapshot =

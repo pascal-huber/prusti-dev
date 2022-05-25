@@ -460,7 +460,6 @@ impl IntoLow for vir_mid::Statement {
                             lifetime.to_procedure_snapshot(lowerer)?,
                         ));
                     }
-
                     let perm_amount = statement
                         .lifetime_token_permission
                         .to_procedure_snapshot(lowerer)?;
