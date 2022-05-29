@@ -2,8 +2,11 @@ use super::{
     super::ast::{
         expression::{
             visitors::{
-                default_fold_expression, default_fold_quantifier, default_walk_expression,
-                default_walk_local, ExpressionFolder, ExpressionWalker,
+                default_fold_expression, default_fold_quantifier, default_walk_addr_of,
+                default_walk_builtin_func_app, default_walk_constant, default_walk_constructor,
+                default_walk_deref, default_walk_expression, default_walk_func_app,
+                default_walk_local, default_walk_seq, default_walk_variant, ExpressionFolder,
+                ExpressionWalker,
             },
             *,
         },
@@ -93,7 +96,7 @@ impl Expression {
         }
     }
 
-    // TODO: find out if I need a "#[must_use]"
+    #[must_use]
     pub fn find_deref(&self) -> Option<Deref> {
         pub struct ExprFinder {
             expr: Option<Deref>,
@@ -112,18 +115,75 @@ impl Expression {
         finder.expr
     }
 
-    // TODO: find out if I need a "#[must_use]"
+    #[must_use]
     pub fn find_reference_type(&self) -> Option<ty::Reference> {
         struct DefaultReferenceFinder {
             reference: Option<ty::Reference>,
         }
         impl ExpressionWalker for DefaultReferenceFinder {
-            // TODO: walk Expressions other than Local with a ty
+            // TODO: Do I need all these?
+            // NOTE: Quantifiers omitted?
+            fn walk_constructor(&mut self, constructor: &Constructor) {
+                if let Type::Reference(reference) = &constructor.ty {
+                    self.reference = Some(reference.clone())
+                } else {
+                    default_walk_constructor(self, constructor)
+                }
+            }
+            fn walk_deref(&mut self, deref: &Deref) {
+                if let Type::Reference(reference) = &deref.ty {
+                    self.reference = Some(reference.clone())
+                } else {
+                    default_walk_deref(self, deref)
+                }
+            }
+            fn walk_addr_of(&mut self, addr_of: &AddrOf) {
+                if let Type::Reference(reference) = &addr_of.ty {
+                    self.reference = Some(reference.clone())
+                } else {
+                    default_walk_addr_of(self, addr_of)
+                }
+            }
+            fn walk_constant(&mut self, constant: &Constant) {
+                if let Type::Reference(reference) = &constant.ty {
+                    self.reference = Some(reference.clone())
+                } else {
+                    default_walk_constant(self, constant)
+                }
+            }
+            fn walk_seq(&mut self, seq: &Seq) {
+                if let Type::Reference(reference) = &seq.ty {
+                    self.reference = Some(reference.clone())
+                } else {
+                    default_walk_seq(self, seq)
+                }
+            }
+            fn walk_func_app(&mut self, func_app: &FuncApp) {
+                if let Type::Reference(reference) = &func_app.return_type {
+                    self.reference = Some(reference.clone())
+                } else {
+                    default_walk_func_app(self, func_app)
+                }
+            }
+            fn walk_builtin_func_app(&mut self, builtin_func_app: &BuiltinFuncApp) {
+                if let Type::Reference(reference) = &builtin_func_app.return_type {
+                    self.reference = Some(reference.clone())
+                } else {
+                    default_walk_builtin_func_app(self, builtin_func_app)
+                }
+            }
             fn walk_local(&mut self, local: &Local) {
                 if let Type::Reference(reference) = &local.variable.ty {
                     self.reference = Some(reference.clone())
                 } else {
                     default_walk_local(self, local)
+                }
+            }
+            fn walk_variant(&mut self, variant: &Variant) {
+                if let Type::Reference(reference) = &variant.ty {
+                    self.reference = Some(reference.clone())
+                } else {
+                    default_walk_variant(self, variant)
                 }
             }
         }
@@ -132,6 +192,7 @@ impl Expression {
         finder.reference
     }
 
+    #[must_use]
     pub fn erase_lifetime(self) -> Expression {
         struct DefaultLifetimeEraser {}
         impl ExpressionFolder for DefaultLifetimeEraser {
