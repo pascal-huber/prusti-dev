@@ -930,8 +930,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             )?;
             // let validity =
             //     self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?; // TODO: right snapshot?
-            dbg!(&current_snapshot);
-            dbg!(&final_snapshot);
+            // dbg!(&current_snapshot);
+            // dbg!(&final_snapshot);
             expr! {
                 wand(
                     (acc(DeadLifetimeToken(operand_lifetime))) --* (
@@ -1116,10 +1116,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
 }
 
 pub(in super::super) trait BuiltinMethodsInterface {
-    fn get_deref_lifetime_and_base(
+    fn get_deref_reference_lifetime_and_base(
         &mut self,
         expr: vir_mid::Rvalue,
-    ) -> SpannedEncodingResult<Option<(vir_mid::ty::LifetimeConst, vir_mid::Expression)>>;
+    ) -> Option<(vir_mid::ty::LifetimeConst, vir_mid::Expression)>;
     fn encode_write_address_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
     fn encode_move_place_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
     fn encode_copy_place_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
@@ -2481,35 +2481,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     }
 
     // TODO: make this a recursive function on expression and cover nested Derefs
-    fn get_deref_lifetime_and_base(
+    fn get_deref_reference_lifetime_and_base(
         &mut self,
         expr: vir_mid::Rvalue,
-    ) -> SpannedEncodingResult<Option<(vir_mid::ty::LifetimeConst, vir_mid::Expression)>> {
-        if let vir_mid::Rvalue::Ref(vir_mid::ast::rvalue::Ref {
-            place: vir_mid::Expression::Deref(deref),
-            ..
-        }) = expr
-        {
-            if let vir_mid::Deref {
-                base: box deref_base,
-                ..
-            } = &deref
-            {
-                if let vir_mid::Expression::Local(vir_mid::Local {
-                    variable: vir_mid::VariableDecl { name: _, ty },
-                    ..
-                }) = &deref_base
-                {
-                    if let vir_mid::ty::Type::Reference(vir_mid::ty::Reference {
-                        lifetime, ..
-                    }) = ty
-                    {
-                        return Ok(Some((lifetime.clone(), deref_base.clone())));
-                    }
+    ) -> Option<(vir_mid::ty::LifetimeConst, vir_mid::Expression)> {
+        if let vir_mid::Rvalue::Ref(vir_mid::ast::rvalue::Ref { place, .. }) = &expr {
+            let deref = place.clone().find_deref();
+            if let Some(deref) = deref {
+                let reference = deref.base.find_reference_type();
+                if let Some(reference) = reference {
+                    return Some((reference.lifetime.clone(), *deref.base.clone()));
                 }
             }
         }
-        Ok(None)
+        return None;
     }
 
     fn encode_assign_method_call(
@@ -2520,7 +2505,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()> {
         let deref_lifetime_and_base: Option<(vir_mid::ty::LifetimeConst, vir_mid::Expression)> =
-            self.get_deref_lifetime_and_base(value.clone())?;
+            self.get_deref_reference_lifetime_and_base(value.clone());
         let deref_base = if deref_lifetime_and_base.is_some() {
             Some(deref_lifetime_and_base.clone().unwrap().1)
         } else {

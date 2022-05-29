@@ -3,7 +3,7 @@ use super::{
         expression::{
             visitors::{
                 default_fold_expression, default_fold_quantifier, default_walk_expression,
-                ExpressionFolder, ExpressionWalker,
+                default_walk_local, ExpressionFolder, ExpressionWalker,
             },
             *,
         },
@@ -92,6 +92,46 @@ impl Expression {
             _ => false,
         }
     }
+
+    // TODO: find out if I need a "#[must_use]"
+    pub fn find_deref(&self) -> Option<Deref> {
+        pub struct ExprFinder {
+            expr: Option<Deref>,
+        }
+        impl ExpressionWalker for ExprFinder {
+            fn walk_expression(&mut self, expr: &Expression) {
+                if let Expression::Deref(deref) = expr {
+                    self.expr = Some(deref.clone());
+                } else {
+                    default_walk_expression(self, expr)
+                }
+            }
+        }
+        let mut finder = ExprFinder { expr: None };
+        finder.walk_expression(self);
+        finder.expr
+    }
+
+    // TODO: find out if I need a "#[must_use]"
+    pub fn find_reference_type(&self) -> Option<ty::Reference> {
+        struct DefaultReferenceFinder {
+            reference: Option<ty::Reference>,
+        }
+        impl ExpressionWalker for DefaultReferenceFinder {
+            // TODO: walk Expressions other than Local with a ty
+            fn walk_local(&mut self, local: &Local) {
+                if let Type::Reference(reference) = &local.variable.ty {
+                    self.reference = Some(reference.clone())
+                } else {
+                    default_walk_local(self, local)
+                }
+            }
+        }
+        let mut finder = DefaultReferenceFinder { reference: None };
+        finder.walk_expression(self);
+        finder.reference
+    }
+
     pub fn erase_lifetime(self) -> Expression {
         struct DefaultLifetimeEraser {}
         impl ExpressionFolder for DefaultLifetimeEraser {

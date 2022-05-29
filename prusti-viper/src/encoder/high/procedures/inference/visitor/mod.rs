@@ -158,6 +158,8 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
         // println!("---");
         // dbg!(&successor_blocks);
         // dbg!(&state.is_empty());
+        // FIXME: Fix leaked predicates. Can be triggered with an if-else where each branch
+        //   assigns a reference to a common variable.
         // assert!(
         //     !successor_blocks.is_empty() || state.is_empty(),
         //     "some predicates are leaked"
