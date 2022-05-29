@@ -702,18 +702,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         is_reborrow: bool,
     ) -> SpannedEncodingResult<()> {
         use vir_low::macros::*;
-        // NOTE: simply changing the ty for reborrow was not enough?
-        // if is_reborrow {
-        //     vir_mid::ty::Type::Reference(vir_mid::ty::Reference {
-        //         lifetime: vir_mid::ty::LifetimeConst {
-        //             name: "xyz".to_string(),
-        //         },
-        //         uniqueness: vir_mid::ty::Uniqueness::Unique,
-        //         target_type: box value.place.get_type().clone(),
-        //     })
-        // } else {
-        //     value.place.get_type().clone()
-        // };
         let ty = value.place.get_type();
         var_decls! {
             target_place: Place,
@@ -758,8 +746,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 result_value.clone().into(),
                 position,
             )?;
-            let validity =
-                self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?; // TODO: right snapshot?
+            let validity = self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?;
             expr! {
                 wand(
                     (acc(DeadLifetimeToken(operand_lifetime))) --* (
