@@ -103,12 +103,6 @@ trait Private {
         value: &vir_mid::Rvalue,
         reborrow: bool,
     ) -> SpannedEncodingResult<()>;
-    // fn encode_reborrow_method(
-    //     &mut self,
-    //     method_name: &str,
-    //     ty: &vir_mid::Type,
-    //     value: &vir_mid::Rvalue,
-    // ) -> SpannedEncodingResult<()>;
     fn encode_consume_operand_method(
         &mut self,
         method_name: &str,
@@ -338,7 +332,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 var_decls! {
                     old_lifetime: Lifetime
                 }
-                parameters.push(old_lifetime.clone());
+                parameters.push(old_lifetime);
             }
 
             var_decls! { result_value: {ty.to_snapshot(self)?} };
@@ -411,159 +405,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         }
         Ok(())
     }
-
-    // method reborrow$T(lft: Lifetime, old_lft: Lifetime, rd: Perm, object: Ref)
-    // requires rd > none DONE
-    // requires included(lft, old_lft) DONE
-    // --> requires acc(MutRef$T(old_lft, object)) DONE
-    // requires acc(LifetimeToken(lft), rd) DONE
-    // ensures acc(LifetimeToken(lft), rd) DONE
-    // --> ensures acc(MutRef$T(lft, object)) DONE
-    // --> ensures acc(DeadLifetimeToken(lft)) --* acc(MutRef$T(old_lft, object))
-
-    // method assign$ref$Unique$I32$ref_$I32(target_place: Place, target_address: Address, operand_place: Place, operand_address: Address, operand_value: Snap$I32, operand_lifetime: Lifetime, lifetime_perm: Perm) returns (result_value: Snap$ref$Unique$I32)
-    // requires acc(MemoryBlock(compute_address(target_place, target_address), caller_for$size$ref$Unique$I32$()), write)
-    // requires none < lifetime_perm
-    // ?-> requires lifetime_perm < write
-    // --> requires acc(OwnedNonAliased$I32(operand_place, operand_address, operand_value), write)
-    // requires acc(LifetimeToken(operand_lifetime), lifetime_perm)
-    // ensures acc(LifetimeToken(operand_lifetime), lifetime_perm)
-    // --> ensures acc(OwnedNonAliased$ref$Unique$I32(target_place, target_address, result_value, operand_lifetime), write)
-    // --> ensures acc(DeadLifetimeToken(operand_lifetime), write) --* acc(OwnedNonAliased$I32(operand_place, operand_address, destructor$Snap$ref$Unique$I32$$target_final(result_value)), write) && valid$Snap$I32(destructor$Snap$ref$Unique$I32$$target_final(result_value)) && acc(DeadLifetimeToken(operand_lifetime), write)
-
-    // fn encode_reborrow_method(
-    //     &mut self,
-    //     method_name: &str,
-    //     ty: &vir_mid::Type,
-    //     value: &vir_mid::Rvalue,
-    // ) -> SpannedEncodingResult<()> {
-    //     if !self
-    //         .builtin_methods_state
-    //         .encoded_reborrow_methods
-    //         .contains(method_name)
-    //     {
-    //         use vir_low::macros::*;
-    //
-    //         var_decls! {
-    //             lifetime_perm: Perm,
-    //             new_lifetime: Lifetime,
-    //             old_lifetime: Lifetime,
-    //             operand_place: Place,
-    //             operand_address: Address,
-    //             snapshot: {ty.to_snapshot(self)?}
-    //         };
-    //         var_decls! { result_value: {ty.to_snapshot(self)?} };
-    //         // target_place: Place,
-    //         // target_address: Address,
-    //         // operand_place: Place,
-    //         // operand_address: Address,
-    //         // operand_value: { ty.to_snapshot(self)? },
-    //         // operand_lifetime: Lifetime,
-    //
-    //         // let value: &vir_mid::ast::rvalue::Ref;
-    //         // let result_value: vir_low::VariableDecl;
-    //
-    //         // Position
-    //         let span = self.encoder.get_type_definition_span_mid(ty)?;
-    //         let position = self.register_error(
-    //             span,
-    //             ErrorCtxt::UnexpectedBuiltinMethod(BuiltinMethodKind::MovePlace),
-    //         );
-    //         let type_decl = self.encoder.get_type_decl_mid(ty)?;
-    //         let target_type = &type_decl.unwrap_reference().target_type;
-    //
-    //         // Result type
-    //         let result_type: &vir_mid::Type = ty;
-    //
-    //         // Value
-    //         let current_snapshot =
-    //             self.reference_target_current_snapshot(ty, snapshot.clone().into(), position)?;
-    //         let final_snapshot =
-    //             self.reference_target_final_snapshot(ty, snapshot.clone().into(), position)?;
-    //
-    //         // Parameters
-    //         let mut parameters: Vec<vir_low::VariableDecl> = Vec::new();
-    //         parameters.push(new_lifetime.clone());
-    //         parameters.push(old_lifetime.clone());
-    //         parameters.push(operand_place.clone());
-    //         parameters.push(operand_address.clone());
-    //         parameters.push(snapshot); // ???
-    //         parameters.push(lifetime_perm.clone());
-    //
-    //         // Preconditions
-    //         let mut pres: Vec<vir_low::Expression> = Vec::new();
-    //         pres.push(expr! {
-    //             [vir_low::Expression::no_permission()] < lifetime_perm
-    //         });
-    //         // TODO: make sure included$ is encoded here
-    //         pres.push(
-    //             vir_low::Expression::domain_function_call(
-    //                 "Lifetime".to_string(),
-    //                 "included$".to_string(),
-    //                 vec![ new_lifetime.clone().into(), old_lifetime.clone().into() ],
-    //                 vir_low::Type::Bool,
-    //             )
-    //         );
-    //         pres.push(
-    //             expr! { acc(LifetimeToken([new_lifetime.clone().into()])) }
-    //         );
-    //
-    //         pres.push(
-    //             expr! {
-    //             acc(UniqueRef<target_type>(
-    //                 old_lifetime,
-    //                 [operand_place.clone().into()],
-    //                 [operand_address.clone().into()],
-    //                 [current_snapshot.clone()],
-    //                 [final_snapshot.clone()]
-    //             ))
-    //         });
-    //
-    //         // Postconditions
-    //         let mut posts: Vec<vir_low::Expression> = Vec::new();
-    //         posts.push(
-    //             expr! { acc(LifetimeToken([new_lifetime.clone().into()])) }
-    //         );
-    //         posts.push(
-    //             expr! {
-    //             acc(UniqueRef<target_type>(
-    //                 new_lifetime,
-    //                 [operand_place.clone().into()],
-    //                 [operand_address.clone().into()],
-    //                 [current_snapshot.clone()],
-    //                 [final_snapshot.clone()]
-    //             ))
-    //         });
-    //         let restoration = expr! {
-    //             wand(
-    //                 (acc(DeadLifetimeToken(new_lifetime))) --* (
-    //                     (acc(UniqueRef<target_type>([operand_place.clone().into()], [operand_address.clone().into()], [current_snapshot.clone()])))
-    //                 )
-    //             )
-    //         };
-    //         // TODO: what is this?
-    //         // && [validity] &&
-    //         // // DeadLifetimeToken is duplicable and does not get consumed.
-    //         // (acc(DeadLifetimeToken(operand_lifetime)))
-    //         posts.push(restoration);
-    //
-    //         // do it
-    //         let method = vir_low::MethodDecl::new(
-    //             method_name,
-    //             parameters,
-    //             vec![result_value],
-    //             pres,
-    //             posts,
-    //             None,
-    //         );
-    //         self.declare_method(method)?;
-    //         self.builtin_methods_state
-    //             .encoded_reborrow_methods
-    //             .insert(method_name.to_string());
-    //         return Ok(());
-    //     }
-    //     Ok(())
-    // }
 
     fn encode_consume_operand_method(
         &mut self,
@@ -1119,7 +960,10 @@ pub(in super::super) trait BuiltinMethodsInterface {
     fn get_deref_reference_lifetime_and_base(
         &mut self,
         expr: vir_mid::Rvalue,
-    ) -> Option<(vir_mid::ty::LifetimeConst, vir_mid::Expression)>;
+    ) -> (
+        Option<vir_mid::ty::LifetimeConst>,
+        Option<vir_mid::Expression>,
+    );
     fn encode_write_address_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
     fn encode_move_place_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
     fn encode_copy_place_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()>;
@@ -2484,17 +2328,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     fn get_deref_reference_lifetime_and_base(
         &mut self,
         expr: vir_mid::Rvalue,
-    ) -> Option<(vir_mid::ty::LifetimeConst, vir_mid::Expression)> {
+    ) -> (
+        Option<vir_mid::ty::LifetimeConst>,
+        Option<vir_mid::Expression>,
+    ) {
         if let vir_mid::Rvalue::Ref(vir_mid::ast::rvalue::Ref { place, .. }) = &expr {
             let deref = place.clone().find_deref();
             if let Some(deref) = deref {
                 let reference = deref.base.find_reference_type();
                 if let Some(reference) = reference {
-                    return Some((reference.lifetime.clone(), *deref.base.clone()));
+                    return (Some(reference.lifetime), Some(*deref.base));
                 }
             }
         }
-        return None;
+        (None, None)
     }
 
     fn encode_assign_method_call(
@@ -2504,18 +2351,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         value: vir_mid::Rvalue,
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()> {
-        let deref_lifetime_and_base: Option<(vir_mid::ty::LifetimeConst, vir_mid::Expression)> =
+        let (deref_lifetime, deref_base) =
             self.get_deref_reference_lifetime_and_base(value.clone());
-        let deref_base = if deref_lifetime_and_base.is_some() {
-            Some(deref_lifetime_and_base.clone().unwrap().1)
-        } else {
-            None
-        };
-        let deref_lifetime = if deref_lifetime_and_base.is_some() {
-            Some(deref_lifetime_and_base.clone().unwrap().0)
-        } else {
-            None
-        };
         let is_reborrow = deref_lifetime.is_some();
         let method_name = self.encode_assign_method_name(target.get_type(), &value, is_reborrow)?;
         self.encode_assign_method(&method_name, target.get_type(), &value, is_reborrow)?;
@@ -2525,8 +2362,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
         // Add lifetime arguments for reborrow
         if is_reborrow {
-            let lifetime =
-                self.encode_lifetime_const_into_variable(deref_lifetime.clone().unwrap())?;
+            let lifetime = self.encode_lifetime_const_into_variable(deref_lifetime.unwrap())?;
             arguments.push(lifetime.into());
         }
         self.encode_rvalue_arguments(&mut arguments, &value, deref_base)?;
