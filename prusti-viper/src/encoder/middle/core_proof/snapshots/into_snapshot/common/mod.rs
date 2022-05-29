@@ -178,8 +178,6 @@ pub(super) trait IntoSnapshotLowerer<'p, 'v: 'p, 'tcx: 'v> {
         self.ensure_bool_expression(lowerer, field.get_type(), result, expect_math_bool)
     }
 
-    // TODO: should I use this?
-    // TODO: why current_snapshot
     fn deref_to_snapshot(
         &mut self,
         lowerer: &mut Lowerer<'p, 'v, 'tcx>,

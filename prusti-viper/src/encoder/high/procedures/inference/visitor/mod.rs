@@ -155,9 +155,6 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
             self.lower_statement(statement, &mut state)?;
         }
         let successor_blocks = self.current_successors()?;
-        // println!("---");
-        // dbg!(&successor_blocks);
-        // dbg!(&state.is_empty());
         // FIXME: Fix leaked predicates. Can be triggered with an if-else where each branch
         //   assigns a reference to a common variable.
         // assert!(
@@ -169,8 +166,6 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
                 .insert(self.current_label.clone().unwrap(), state.clone());
         }
         for successor in successor_blocks {
-            // println!("update_state_at_entry for:");
-            // dbg!(&successor);
             self.update_state_at_entry(successor, state.clone())?;
         }
         Ok(())

@@ -179,11 +179,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<()> {
         match value {
             vir_mid::Rvalue::Ref(value) => {
-                // first 3 args are the same
                 self.encode_place_arguments(arguments, &value.place)?;
                 if deref_base.is_some() {
-                    // NOTE: to_procedure_snapshot creates "target_current"
-                    // thus we make this manually:
+                    // NOTE: to_procedure_snapshot creates "target_current" in "fn deref_to_snapshot"
+                    // thus we create "target_final" manually:
                     let base_snapshot = deref_base.clone().unwrap().to_procedure_snapshot(self)?;
                     let value_final = self.reference_target_final_snapshot(
                         deref_base.unwrap().get_type(),
@@ -326,15 +325,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 target_address: Address
             };
             let mut parameters = vec![target_place.clone(), target_address.clone()];
-
-            // For Reborrow, add old_lifetime parameter
             if is_reborrow {
                 var_decls! {
                     old_lifetime: Lifetime
                 }
                 parameters.push(old_lifetime);
             }
-
             var_decls! { result_value: {ty.to_snapshot(self)?} };
             let mut pres = vec![
                 expr! { acc(MemoryBlock((ComputeAddress::compute_address(target_place, target_address)), [size_of])) },
@@ -405,7 +401,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         }
         Ok(())
     }
-
     fn encode_consume_operand_method(
         &mut self,
         method_name: &str,
@@ -719,7 +714,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         // } else {
         //     value.place.get_type().clone()
         // };
-        let ty = &value.place.get_type().clone();
+        let ty = value.place.get_type();
         var_decls! {
             target_place: Place,
             target_address: Address,
@@ -732,12 +727,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             lifetime_perm: Perm
         };
         let predicate = if is_reborrow {
-            // let current_snapshot =
-            //     self.reference_target_current_snapshot(&ty_maybe_ref, operand_value_current.clone().into(), position)?;
-            // let final_snapshot =
-            //     self.reference_target_current_snapshot(&ty_maybe_ref, operand_value.clone().into(), position)?;
-            // let ty_value = &value.place.get_type().clone();
-            // let tyy = &ty_maybe_ref;
             expr! {
                 acc(UniqueRef<ty>(
                     old_lifetime,
@@ -758,7 +747,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         let lifetime_token =
             self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
         let restoration = if is_reborrow {
-            let ty_value = &value.place.get_type().clone(); // ???
+            let ty_value = &value.place.get_type().clone();
             let current_snapshot = self.reference_target_current_snapshot(
                 result_type,
                 result_value.clone().into(),
@@ -771,8 +760,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             )?;
             let validity =
                 self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?; // TODO: right snapshot?
-            // dbg!(&current_snapshot);
-            // dbg!(&final_snapshot);
             expr! {
                 wand(
                     (acc(DeadLifetimeToken(operand_lifetime))) --* (
@@ -783,7 +770,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                             [current_snapshot],
                             [final_snapshot])
                         )) &&
-                        // TODO: what is this validity for?
+                        // TODO: what is this validity for? Do I need it for reborrow too?
                         [validity] &&
                         // DeadLifetimeToken is duplicable and does not get consumed.
                         (acc(DeadLifetimeToken(operand_lifetime)))
@@ -855,7 +842,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         }
         parameters.push(operand_lifetime);
         parameters.push(lifetime_perm);
-
         let method = vir_low::MethodDecl::new(
             method_name,
             parameters,
@@ -2324,7 +2310,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         Ok(())
     }
 
-    // TODO: make this a recursive function on expression and cover nested Derefs
     fn get_deref_reference_lifetime_and_base(
         &mut self,
         expr: vir_mid::Rvalue,
@@ -2359,14 +2344,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         let target_place = self.encode_expression_as_place(&target)?;
         let target_address = self.extract_root_address(&target)?;
         let mut arguments = vec![target_place, target_address];
-
-        // Add lifetime arguments for reborrow
         if is_reborrow {
             let lifetime = self.encode_lifetime_const_into_variable(deref_lifetime.unwrap())?;
             arguments.push(lifetime.into());
         }
         self.encode_rvalue_arguments(&mut arguments, &value, deref_base)?;
-
         let target_value_type = target.get_type().to_snapshot(self)?;
         let result_value = self.create_new_temporary_variable(target_value_type)?;
         statements.push(vir_low::Statement::method_call(
