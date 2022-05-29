@@ -101,7 +101,7 @@ trait Private {
         method_name: &str,
         ty: &vir_mid::Type,
         value: &vir_mid::Rvalue,
-        reborrow: bool,
+        is_reborrow: bool,
     ) -> SpannedEncodingResult<()>;
     fn encode_consume_operand_method(
         &mut self,
@@ -304,7 +304,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         method_name: &str,
         ty: &vir_mid::Type,
         value: &vir_mid::Rvalue,
-        reborrow: bool,
+        is_reborrow: bool,
     ) -> SpannedEncodingResult<()> {
         if !self
             .builtin_methods_state
@@ -328,7 +328,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut parameters = vec![target_place.clone(), target_address.clone()];
 
             // For Reborrow, add old_lifetime parameter
-            if reborrow {
+            if is_reborrow {
                 var_decls! {
                     old_lifetime: Lifetime
                 }
@@ -365,7 +365,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         ty,
                         result_value,
                         position,
-                        reborrow,
+                        is_reborrow,
                     )?;
                     return Ok(());
                 }
@@ -723,7 +723,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         var_decls! {
             target_place: Place,
             target_address: Address,
-            old_lifetime: Lifetime, // Only for reborrow
+            old_lifetime: Lifetime,
             operand_place: Place,
             operand_address: Address,
             operand_value_current: { ty.to_snapshot(self)? },
