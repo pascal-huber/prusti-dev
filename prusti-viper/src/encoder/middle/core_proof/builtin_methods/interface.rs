@@ -769,8 +769,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 result_value.clone().into(),
                 position,
             )?;
-            // let validity =
-            //     self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?; // TODO: right snapshot?
+            let validity =
+                self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?; // TODO: right snapshot?
             // dbg!(&current_snapshot);
             // dbg!(&final_snapshot);
             expr! {
@@ -784,7 +784,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                             [final_snapshot])
                         )) &&
                         // TODO: what is this validity for?
-                        // [validity] &&
+                        [validity] &&
                         // DeadLifetimeToken is duplicable and does not get consumed.
                         (acc(DeadLifetimeToken(operand_lifetime)))
                     )
@@ -821,6 +821,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         };
         let reference_target_address =
             self.reference_address(result_type, result_value.clone().into(), position)?;
+        // TODO: do I need this for reborrow?
         posts.push(expr! {
             operand_address == [reference_target_address]
         });
@@ -830,11 +831,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             result_value.clone().into(),
             position,
         )?;
-        if !is_reborrow {
-            posts.push(expr! {
-                operand_value_current == [reference_target_current_snapshot]
-            });
-        }
+        // TODO: do I need this for reborrow?
+        posts.push(expr! {
+            operand_value_current == [reference_target_current_snapshot]
+        });
         pres.push(expr! {
             [vir_low::Expression::no_permission()] < lifetime_perm
         });
