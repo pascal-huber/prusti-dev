@@ -94,6 +94,9 @@ impl CollectPermissionChanges for vir_high::Statement {
             vir_high::Statement::Dead(statement) => {
                 statement.collect(encoder, consumed_permissions, produced_permissions)
             }
+            vir_high::Statement::DeadInclusion(statement) => {
+                statement.collect(encoder, consumed_permissions, produced_permissions)
+            }
             vir_high::Statement::LifetimeTake(statement) => {
                 statement.collect(encoder, consumed_permissions, produced_permissions)
             }
@@ -550,6 +553,17 @@ impl CollectPermissionChanges for vir_high::EndLft {
 }
 
 impl CollectPermissionChanges for vir_high::Dead {
+    fn collect<'v, 'tcx>(
+        &self,
+        _encoder: &mut Encoder<'v, 'tcx>,
+        _consumed_permissions: &mut Vec<Permission>,
+        _produced_permissions: &mut Vec<Permission>,
+    ) -> SpannedEncodingResult<()> {
+        Ok(())
+    }
+}
+
+impl CollectPermissionChanges for vir_high::DeadInclusion {
     fn collect<'v, 'tcx>(
         &self,
         _encoder: &mut Encoder<'v, 'tcx>,

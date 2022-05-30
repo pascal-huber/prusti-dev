@@ -452,6 +452,19 @@ impl IntoLow for vir_mid::Statement {
                 // TODO: implement Dead statment in vir_low
                 Ok(vec![])
             }
+            Self::DeadInclusion(statement) => {
+                lowerer.encode_dead_inclusion_method()?;
+                lowerer.encode_dead_inclusion_method()?; // TODO: remove this again if success
+                Ok(vec![Statement::method_call(
+                    String::from("dead_inclusion"),
+                    vec![
+                        statement.target.to_procedure_snapshot(lowerer)?.into(),
+                        statement.value.to_procedure_snapshot(lowerer)?.into(),
+                    ],
+                    vec![],
+                    statement.position,
+                )])
+            }
             Self::LifetimeTake(statement) => {
                 if statement.value.len() == 1 {
                     let expr = vir_low::Expression::local_no_pos(

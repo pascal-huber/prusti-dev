@@ -23,6 +23,7 @@ impl Positioned for Statement {
             Self::NewLft(statement) => statement.position(),
             Self::EndLft(statement) => statement.position(),
             Self::Dead(statement) => statement.position(),
+            Self::DeadInclusion(statement) => statement.position(),
             Self::LifetimeTake(statement) => statement.position(),
             Self::LifetimeReturn(statement) => statement.position(),
             Self::OpenMutRef(statement) => statement.position(),
@@ -142,6 +143,12 @@ impl Positioned for EndLft {
 }
 
 impl Positioned for Dead {
+    fn position(&self) -> Position {
+        self.position
+    }
+}
+
+impl Positioned for DeadInclusion {
     fn position(&self) -> Position {
         self.position
     }

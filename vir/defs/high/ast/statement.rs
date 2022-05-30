@@ -34,6 +34,7 @@ pub enum Statement {
     NewLft(NewLft),
     EndLft(EndLft),
     Dead(Dead),
+    DeadInclusion(DeadInclusion),
     LifetimeTake(LifetimeTake),
     LifetimeReturn(LifetimeReturn),
     OpenMutRef(OpenMutRef),
@@ -242,6 +243,13 @@ pub struct EndLft {
 #[display(fmt = "dead({})", target)]
 pub struct Dead {
     pub target: Expression,
+    pub position: Position,
+}
+
+#[display(fmt = "dead_inclusion({}, {})", target, value)]
+pub struct DeadInclusion {
+    pub target: VariableDecl,
+    pub value: VariableDecl,
     pub position: Position,
 }
 
