@@ -48,6 +48,7 @@ pub(in super::super) struct BuiltinMethodsState {
     encoded_newlft_method: bool,
     encoded_endlft_method: bool,
     encoded_open_frac_bor_atomic_methods: FxHashSet<vir_mid::Type>,
+    encoded_dead_inclusion_method: bool,
     encoded_lft_tok_sep_take_methods: FxHashSet<usize>,
     encoded_lft_tok_sep_return_methods: FxHashSet<usize>,
     encoded_open_close_mut_ref_methods: FxHashSet<vir_mid::Type>,
@@ -978,6 +979,7 @@ pub(in super::super) trait BuiltinMethodsInterface {
     fn encode_lft_tok_sep_return_method(&mut self, lft_count: usize) -> SpannedEncodingResult<()>;
     fn encode_newlft_method(&mut self) -> SpannedEncodingResult<()>;
     fn encode_endlft_method(&mut self) -> SpannedEncodingResult<()>;
+    fn encode_dead_inclusion_method(&mut self) -> SpannedEncodingResult<()>;
     fn encode_open_close_mut_ref_methods(
         &mut self,
         ty: &vir_mid::Type,
@@ -2708,6 +2710,41 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 vec![bw.clone()],
                 Vec::new(),
                 vec![expr! { acc(LifetimeToken(bw)) }],
+                None,
+            );
+            self.declare_method(method)?;
+        }
+        Ok(())
+    }
+    fn encode_dead_inclusion_method(&mut self) -> SpannedEncodingResult<()> {
+        if !self.builtin_methods_state.encoded_dead_inclusion_method {
+            self.builtin_methods_state.encoded_dead_inclusion_method = true;
+            self.encode_lifetime_token_predicate()?;
+            self.encode_lifetime_included()?;
+            use vir_low::macros::*;
+            var_decls! {
+                lft_1: Lifetime,
+                lft_2: Lifetime
+            }
+            let pres = vec![
+                expr! { acc(DeadLifetimeToken(lft_2))},
+                vir_low::Expression::domain_function_call(
+                    "Lifetime",
+                    "included$",
+                    vec![lft_1.clone().into(), lft_2.clone().into()],
+                    vir_low::ty::Type::Bool,
+                ),
+            ];
+            let posts = vec![
+                expr! { acc(DeadLifetimeToken(lft_1))},
+                expr! { acc(DeadLifetimeToken(lft_2))},
+            ];
+            let method = vir_low::MethodDecl::new(
+                "dead_inclusion",
+                vec![lft_1, lft_2],
+                vec![],
+                pres,
+                posts,
                 None,
             );
             self.declare_method(method)?;

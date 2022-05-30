@@ -434,12 +434,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             self.lifetimes.get_loan_live_at_start(location);
         let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> =
             self.lifetimes.get_origin_contains_loan_at_mid(location);
+        let mut old_derived_lifetimes_yet_to_kill: BTreeMap<String, BTreeSet<String>> =
+            BTreeMap::new();
         while location.statement_index < terminator_index {
             self.encode_lft_for_statement(
                 &mut block_builder,
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
+                &mut old_derived_lifetimes_yet_to_kill,
             )?;
             self.encode_statement(
                 &mut block_builder,
@@ -454,6 +457,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
+                &mut old_derived_lifetimes_yet_to_kill,
             )?;
             let terminator = &terminator.kind;
             self.encode_terminator(&mut block_builder, location, terminator)?;
