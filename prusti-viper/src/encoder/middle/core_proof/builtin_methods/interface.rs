@@ -737,31 +737,34 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
         let restoration = if is_reborrow {
             let ty_value = &value.place.get_type().clone();
-            let current_snapshot = self.reference_target_current_snapshot(
-                result_type,
-                result_value.clone().into(),
-                position,
-            )?;
-            let final_snapshot = self.reference_target_final_snapshot(
-                result_type,
-                result_value.clone().into(),
-                position,
-            )?;
-            let validity = self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?;
+            // let current_snapshot = self.reference_target_current_snapshot(
+            //     result_type,
+            //     result_value.clone().into(),
+            //     position,
+            // )?;
+            // let final_snapshot = self.reference_target_final_snapshot(
+            //     result_type,
+            //     result_value.clone().into(),
+            //     position,
+            // )?;
+            // let validity = self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?;
             expr! {
                 wand(
                     (acc(DeadLifetimeToken(operand_lifetime))) --* (
                         (acc(UniqueRef<ty_value>(
-                            operand_lifetime,
+                            //operand_lifetime,
+                            old_lifetime,
                             [operand_place.clone().into()],
                             [operand_address.clone().into()],
-                            [current_snapshot],
-                            [final_snapshot])
-                        )) &&
+                            // [current_snapshot],
+                            // [final_snapshot])
+                            [operand_value_current.clone().into()],
+                            [operand_value_final.clone().into()])
+                        )) // &&
                         // TODO: what is this validity for? Do I need it for reborrow too?
-                        [validity] &&
+                        //[validity] &&
                         // DeadLifetimeToken is duplicable and does not get consumed.
-                        (acc(DeadLifetimeToken(operand_lifetime)))
+                        // (acc(DeadLifetimeToken(operand_lifetime)))
                     )
                 )
             }
