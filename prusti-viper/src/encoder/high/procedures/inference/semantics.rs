@@ -337,6 +337,9 @@ impl CollectPermissionChanges for vir_high::Rvalue {
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
         match self {
+            Self::Reborrow(rvalue) => {
+                rvalue.collect(encoder, consumed_permissions, produced_permissions)
+            }
             Self::Ref(rvalue) => {
                 rvalue.collect(encoder, consumed_permissions, produced_permissions)
             }
@@ -359,6 +362,23 @@ impl CollectPermissionChanges for vir_high::Rvalue {
                 rvalue.collect(encoder, consumed_permissions, produced_permissions)
             }
         }
+    }
+}
+
+impl CollectPermissionChanges for vir_high::ast::rvalue::Reborrow {
+    fn collect<'v, 'tcx>(
+        &self,
+        _encoder: &mut Encoder<'v, 'tcx>,
+        consumed_permissions: &mut Vec<Permission>,
+        produced_permissions: &mut Vec<Permission>,
+    ) -> SpannedEncodingResult<()> {
+        // TODO: check if this is right
+        consumed_permissions.push(Permission::Owned(self.place.clone()));
+        produced_permissions.push(Permission::MutBorrowed(MutBorrowed {
+            lifetime: self.lifetime.clone(),
+            place: self.place.clone(),
+        }));
+        Ok(())
     }
 }
 
