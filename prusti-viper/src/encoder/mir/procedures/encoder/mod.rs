@@ -546,8 +546,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             }
             // mir::Rvalue::Repeat(Operand<'tcx>, Const<'tcx>),
             mir::Rvalue::Ref(region, borrow_kind, place) => {
-                // check if place contains deref
-                // iterate over place and find last deref operation
+                let mut is_reborrow = false;
+                if let Some((_ref, projection)) = place.iter_projections().last() {
+                    if projection == mir::ProjectionElem::Deref {
+                        is_reborrow = true;
+                    }
+                }
                 let is_mut = matches!(
                     borrow_kind,
                     mir::BorrowKind::Mut {
@@ -555,15 +559,26 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     }
                 );
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place, None)?;
+                // dbg!(&encoded_place);
                 let region_name = region.to_text();
-                // instead of ref_, use reborrow(..)
-                let encoded_rvalue = vir_high::Rvalue::ref_(
-                    encoded_place,
-                    vir_high::ty::LifetimeConst::new(region_name),
-                    is_mut,
-                    self.lifetime_token_fractional_permission(self.lifetime_count),
-                    encoded_target.clone(),
-                );
+                let encoded_rvalue = if is_reborrow {
+                    vir_high::Rvalue::reborrow(
+                        encoded_place,
+                        vir_high::ty::LifetimeConst::new(region_name),
+                        is_mut,
+                        self.lifetime_token_fractional_permission(self.lifetime_count),
+                        encoded_target.clone(),
+                    )
+                } else {
+                    vir_high::Rvalue::ref_(
+                        encoded_place,
+                        vir_high::ty::LifetimeConst::new(region_name),
+                        is_mut,
+                        self.lifetime_token_fractional_permission(self.lifetime_count),
+                        encoded_target.clone(),
+                    )
+                };
+                // dbg!(&encoded_rvalue);
                 let assign_statement = vir_high::Statement::assign(
                     encoded_target,
                     encoded_rvalue,
