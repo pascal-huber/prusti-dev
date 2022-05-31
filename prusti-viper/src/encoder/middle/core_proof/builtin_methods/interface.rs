@@ -742,12 +742,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             //     result_value.clone().into(),
             //     position,
             // )?;
-            // let final_snapshot = self.reference_target_final_snapshot(
-            //     result_type,
-            //     result_value.clone().into(),
-            //     position,
-            // )?;
-            // let validity = self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?;
+            let final_snapshot = self.reference_target_final_snapshot(
+                result_type,
+                result_value.clone().into(),
+                position,
+            )?;
+            let validity = self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?;
             expr! {
                 wand(
                     (acc(DeadLifetimeToken(operand_lifetime))) --* (
@@ -760,11 +760,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                             // [final_snapshot])
                             [operand_value_current.clone().into()],
                             [operand_value_final.clone().into()])
-                        )) // &&
-                        // TODO: what is this validity for? Do I need it for reborrow too?
-                        //[validity] &&
+                        )) &&
+                        [validity] &&
                         // DeadLifetimeToken is duplicable and does not get consumed.
-                        // (acc(DeadLifetimeToken(operand_lifetime)))
+                        (acc(DeadLifetimeToken(operand_lifetime)))
                     )
                 )
             }
@@ -799,11 +798,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         };
         let reference_target_address =
             self.reference_address(result_type, result_value.clone().into(), position)?;
-        // TODO: do I need this for reborrow?
         posts.push(expr! {
             operand_address == [reference_target_address]
         });
-        // Note: We do not constraint the final snapshot, because it is fresh.
+        // Note: We do not constraint the final snapshot , because it is fresh. (unless reborrow)
         let reference_target_current_snapshot = self.reference_target_current_snapshot(
             result_type,
             result_value.clone().into(),
@@ -813,6 +811,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         posts.push(expr! {
             operand_value_current == [reference_target_current_snapshot]
         });
+        if is_reborrow {
+            let reference_target_final_snapshot = self.reference_target_final_snapshot(
+                result_type,
+                result_value.clone().into(),
+                position,
+            )?;
+            posts.push(expr! {
+                operand_value_final == [reference_target_final_snapshot]
+            });
+            let deref_place = self.reference_deref_place(target_place.clone().into(), position)?;
+            posts.push(expr! {
+                operand_place == [deref_place]
+            });
+        }
         pres.push(expr! {
             [vir_low::Expression::no_permission()] < lifetime_perm
         });
@@ -1283,10 +1295,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     expr! {(acc(MemoryBlock((ComputeAddress::compute_address(target_place, target_root_address)), [size_of.clone()])))},
                     expr! {(acc(OwnedNonAliased<ty>(source_place, source_root_address, source_value, lifetime)))},
                 ];
+                let deref_source_place =
+                    self.reference_deref_place(source_place.clone().into(), position)?;
+                let deref_target_place =
+                    self.reference_deref_place(target_place.clone().into(), position)?;
                 postconditions = vec![
                     expr! {(acc(OwnedNonAliased<ty>(target_place, target_root_address, source_value, lifetime)))},
                     expr! {(acc(MemoryBlock((ComputeAddress::compute_address(source_place, source_root_address)), [size_of])))},
                     expr! {(([bytes]) == (Snap<ty>::to_bytes(source_value)))},
+                    expr! { [ deref_source_place.clone().into() ] == [ deref_target_place.clone().into() ] },
                 ];
             } else {
                 statements.push(stmtp! { position =>
