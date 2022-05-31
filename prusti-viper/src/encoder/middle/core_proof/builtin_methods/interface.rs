@@ -52,6 +52,7 @@ pub(in super::super) struct BuiltinMethodsState {
     encoded_lft_tok_sep_take_methods: FxHashSet<usize>,
     encoded_lft_tok_sep_return_methods: FxHashSet<usize>,
     encoded_open_close_mut_ref_methods: FxHashSet<vir_mid::Type>,
+    encoded_bor_shorten_methods: FxHashSet<vir_mid::Type>,
 }
 
 trait Private {
@@ -747,7 +748,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 result_value.clone().into(),
                 position,
             )?;
-            let validity = self.encode_snapshot_valid_call_for_type(final_snapshot.clone(), ty)?;
+            let validity = self.encode_snapshot_valid_call_for_type(final_snapshot, ty)?;
             expr! {
                 wand(
                     (acc(DeadLifetimeToken(operand_lifetime))) --* (
@@ -820,7 +821,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             posts.push(expr! {
                 operand_value_final == [reference_target_final_snapshot]
             });
-            let deref_place = self.reference_deref_place(target_place.clone().into(), position)?;
+            let deref_place = self.reference_deref_place(target_place.into(), position)?;
             posts.push(expr! {
                 operand_place == [deref_place]
             });
@@ -998,6 +999,10 @@ pub(in super::super) trait BuiltinMethodsInterface {
     fn encode_open_close_mut_ref_methods(
         &mut self,
         ty: &vir_mid::Type,
+    ) -> SpannedEncodingResult<()>;
+    fn encode_bor_shorten_method(
+        &mut self,
+        ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()>;
 }
 
@@ -1291,7 +1296,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     expr! {(acc(OwnedNonAliased<ty>(target_place, target_root_address, source_value, lifetime)))},
                     expr! {(acc(MemoryBlock((ComputeAddress::compute_address(source_place, source_root_address)), [size_of])))},
                     expr! {(([bytes]) == (Snap<ty>::to_bytes(source_value)))},
-                    expr! { [ deref_source_place.clone().into() ] == [ deref_target_place.clone().into() ] },
+                    expr! { [ deref_source_place ] == [ deref_target_place ] },
                 ];
             } else {
                 statements.push(stmtp! { position =>
@@ -2889,6 +2894,87 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 );
                 self.declare_method(close_method)?;
             }
+        }
+        Ok(())
+    }
+    fn encode_bor_shorten_method(
+        &mut self,
+        ty_with_lifetime: &vir_mid::Type,
+    ) -> SpannedEncodingResult<()> {
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
+        ty.erase_lifetime();
+        if !self
+            .builtin_methods_state
+            .encoded_bor_shorten_methods
+            .contains(ty)
+        {
+            self.builtin_methods_state
+                .encoded_bor_shorten_methods
+                .insert(ty.clone());
+            use vir_low::macros::*;
+            let type_decl = self.encoder.get_type_decl_mid(ty)?;
+            let target_type = &type_decl.unwrap_reference().target_type;
+            var_decls! {
+                lft: Lifetime,
+                old_lft: Lifetime,
+                lifetime_perm: Perm,
+                place: Place,
+                address: Address,
+                current_snapshot: {target_type.to_snapshot(self)?},
+                final_snapshot: {target_type.to_snapshot(self)?}
+            }
+            let pres = vec![
+                expr! { [vir_low::Expression::no_permission()] < lifetime_perm },
+                expr! { lifetime_perm < [vir_low::Expression::full_permission()] }, // TODO: is this right, it wasn't in the manual encoding?
+                // TODO: use macro for Lifetime::included$
+                vir_low::Expression::domain_function_call(
+                    "Lifetime",
+                    "included$",
+                    vec![lft.clone().into(), old_lft.clone().into()],
+                    vir_low::ty::Type::Bool,
+                ),
+                // TODO: why no access for old_lft???
+                expr! { acc(LifetimeToken(lft), lifetime_perm)},
+                expr! {
+                    acc(UniqueRef<target_type>(
+                        old_lft,
+                        place,
+                        address,
+                        current_snapshot,
+                        final_snapshot
+                    ))
+                },
+            ];
+            let posts = vec![
+                expr! { acc(LifetimeToken(lft), lifetime_perm)},
+                expr! {
+                    acc(UniqueRef<target_type>(
+                        lft,
+                        place,
+                        address,
+                        current_snapshot,
+                        final_snapshot
+                    ))
+                },
+            ];
+
+            let method = vir_low::MethodDecl::new(
+                method_name! { bor_shorten<ty> },
+                vec![
+                    lft,
+                    old_lft,
+                    lifetime_perm,
+                    place,
+                    address,
+                    current_snapshot,
+                    final_snapshot,
+                ],
+                vec![],
+                pres,
+                posts,
+                None,
+            );
+            self.declare_method(method)?;
         }
         Ok(())
     }

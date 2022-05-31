@@ -640,6 +640,43 @@ impl IntoLow for vir_mid::Statement {
                 }];
                 Ok(statements)
             }
+            Self::BorShorten(statement) => {
+                let ty = statement.value.get_type();
+                lowerer.encode_bor_shorten_method(ty)?;
+                let perm_amount = statement
+                    .lifetime_token_permission
+                    .to_procedure_snapshot(lowerer)?;
+                let lifetime = lowerer.encode_lifetime_const_into_variable(statement.lifetime)?;
+                let old_lifetime =
+                    lowerer.encode_lifetime_const_into_variable(statement.old_lifetime)?;
+                let place = lowerer.encode_expression_as_place(&statement.value)?;
+                let reference_value = statement.value.to_procedure_snapshot(lowerer)?;
+
+                let address =
+                    lowerer.reference_address(ty, reference_value.clone(), statement.position)?;
+                let current_snapshot = lowerer.reference_target_current_snapshot(
+                    ty,
+                    reference_value.clone(),
+                    statement.position,
+                )?;
+                let final_snapshot = lowerer.reference_target_final_snapshot(
+                    ty,
+                    reference_value,
+                    statement.position,
+                )?;
+                let statements = vec![stmtp! { statement.position =>
+                    call bor_shorten<ty>(
+                        lifetime,
+                        old_lifetime,
+                        [perm_amount],
+                        [place],
+                        [address],
+                        [current_snapshot],
+                        [final_snapshot]
+                    )
+                }];
+                Ok(statements)
+            }
         }
     }
 }
