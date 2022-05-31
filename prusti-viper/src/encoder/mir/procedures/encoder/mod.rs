@@ -76,6 +76,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let allocation = compute_definitely_allocated(def_id, mir);
     let lifetime_count = lifetimes.lifetime_count();
     let lifetime_token_permission = None;
+    let old_lifetime_ctr: usize = 0;
     let function_call_ctr: usize = 0;
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
@@ -95,6 +96,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         fresh_id_generator: 0,
         lifetime_count,
         lifetime_token_permission,
+        old_lifetime_ctr,
         function_call_ctr,
     };
     procedure_encoder.encode()
@@ -125,6 +127,7 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     fresh_id_generator: usize,
     lifetime_count: usize,
     lifetime_token_permission: Option<vir_high::VariableDecl>,
+    old_lifetime_ctr: usize,
     function_call_ctr: usize,
 }
 

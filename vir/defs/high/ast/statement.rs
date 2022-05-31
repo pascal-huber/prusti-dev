@@ -41,6 +41,7 @@ pub enum Statement {
     OpenFracRef(OpenFracRef),
     CloseMutRef(CloseMutRef),
     CloseFracRef(CloseFracRef),
+    BorShorten(BorShorten),
 }
 
 #[display(fmt = "// {}", comment)]
@@ -336,5 +337,20 @@ pub struct CloseFracRef {
     pub place: Expression,
     /// The permission amount that we get for accessing `Owned`.
     pub predicate_permission_amount: VariableDecl,
+    pub position: Position,
+}
+
+#[display(
+    fmt = "bor_shorten({}, {}, {}, {})",
+    lifetime,
+    old_lifetime,
+    value,
+    lifetime_token_permission
+)]
+pub struct BorShorten {
+    pub lifetime: LifetimeConst,
+    pub old_lifetime: LifetimeConst,
+    pub value: Expression,
+    pub lifetime_token_permission: Expression,
     pub position: Position,
 }
