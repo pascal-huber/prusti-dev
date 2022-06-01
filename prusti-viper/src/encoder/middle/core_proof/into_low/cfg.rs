@@ -781,10 +781,14 @@ impl IntoLow for vir_mid::Statement {
                 let perm_amount = statement
                     .lifetime_token_permission
                     .to_procedure_snapshot(lowerer)?;
-                let lifetime = lowerer.encode_lifetime_const_into_variable(statement.lifetime)?;
+                let lifetime =
+                    lowerer.encode_lifetime_const_into_variable(statement.lifetime.clone())?;
                 let old_lifetime =
-                    lowerer.encode_lifetime_const_into_variable(statement.old_lifetime)?;
-                let place = lowerer.encode_expression_as_place(&statement.value)?;
+                    lowerer.encode_lifetime_const_into_variable(statement.old_lifetime.clone())?;
+                // FIXME: need a deref_reference_place
+                let reference_place = lowerer.encode_expression_as_place(&statement.value)?;
+                let deref_place =
+                    lowerer.reference_deref_place(reference_place, statement.position)?;
                 let reference_value = statement.value.to_procedure_snapshot(lowerer)?;
 
                 let address =
@@ -799,17 +803,97 @@ impl IntoLow for vir_mid::Statement {
                     reference_value,
                     statement.position,
                 )?;
-                let statements = vec![stmtp! { statement.position =>
+                let mut statements: Vec<vir_low::Statement> = vec![];
+
+                if statement.reborrow_operand_lifetime.is_some() {
+                    let operand_lifetime = lowerer.encode_lifetime_const_into_variable(
+                        statement.clone().reborrow_operand_lifetime.unwrap(),
+                    )?;
+                    let place_lifetime = lowerer.encode_lifetime_const_into_variable(
+                        statement.clone().reborrow_place_lifetime.unwrap(),
+                    )?;
+
+                    let type_decl = lowerer.encoder.get_type_decl_mid(ty)?;
+                    let target_type = &type_decl.unwrap_reference().target_type;
+                    // TODO: apply magic wand
+                    // apply acc(DeadLifetimeToken(lft_5$snapshot$0)) --* acc(
+                    //     UniqueRef$I32(
+                    //         lft_9$snapshot$0, // old_lifetime
+                    //         deref_reference_place(_9$place()),
+                    //         destructor$Snap$ref$Unique$I32$$address(_9$snapshot$1),
+                    //         destructor$Snap$ref$Unique$I32$$target_current(_9$snapshot$1),
+                    //         destructor$Snap$ref$Unique$I32$$target_final(_9$snapshot$1)
+                    //     )
+                    // ) && valid$Snap$I32(destructor$Snap$ref$Unique$I32$$target_final(_8$snapshot$1)) &&
+                    //     acc(DeadLifetimeToken(lft_5$snapshot$0), write)
+
+                    // TODO: this is the wrong snapshot
+
+                    let reborrow_target_snapshot = statement
+                        .reborrow_target
+                        .unwrap()
+                        .to_procedure_snapshot(lowerer)?;
+                    let reborrow_target_final_snapshot = lowerer.reference_target_final_snapshot(
+                        ty,
+                        reborrow_target_snapshot,
+                        statement.position,
+                    )?;
+                    let validity = lowerer.encode_snapshot_valid_call_for_type(
+                        reborrow_target_final_snapshot,
+                        target_type,
+                    )?;
+
+                    // let wand = stmtp! {
+                    //     statement.position =>
+                    //     apply (acc(DeadLifetimeToken([operand_lifetime.clone().into()]))) --*
+                    //         (acc(UniqueRef<target_type>(
+                    //             place_lifetime,
+                    //             [deref_place.clone()],
+                    //             [address.clone()],
+                    //             [current_snapshot.clone()],
+                    //             [final_snapshot.clone()]
+                    //         )) && acc(DeadLifetimeToken([operand_lifetime.clone().into()])))
+                    // };
+
+                    // TODO: use macro.. why no working
+                    let wand = vir_low::Statement::apply_magic_wand_no_pos(
+                        vir_low::Expression::magic_wand_no_pos(
+                            expr! { acc(DeadLifetimeToken([operand_lifetime.clone().into()])) },
+                            vir_low::Expression::binary_op(
+                                vir_low::BinaryOpKind::And,
+                                expr! {
+                                    acc(UniqueRef<target_type>(
+                                        place_lifetime,
+                                        [deref_place.clone()],
+                                        [address.clone()],
+                                        [current_snapshot.clone()],
+                                        [final_snapshot.clone()]
+                                    ))
+                                },
+                                vir_low::Expression::binary_op(
+                                    vir_low::BinaryOpKind::And,
+                                    validity,
+                                    expr! { acc(DeadLifetimeToken([operand_lifetime.into()])) },
+                                    Default::default(),
+                                ),
+                                Default::default(),
+                            ),
+                        ),
+                    );
+
+                    statements.push(wand.set_default_position(statement.position));
+                }
+                statements.push(stmtp! { statement.position =>
                     call bor_shorten<ty>(
                         lifetime,
                         old_lifetime,
                         [perm_amount],
-                        [place],
+                        [deref_place],
                         [address],
                         [current_snapshot],
                         [final_snapshot]
                     )
-                }];
+                });
                 Ok(statements)
             }
         }
