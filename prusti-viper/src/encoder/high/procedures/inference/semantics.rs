@@ -375,7 +375,7 @@ impl CollectPermissionChanges for vir_high::ast::rvalue::Reborrow {
         // TODO: check if this is right, same as ref?
         consumed_permissions.push(Permission::Owned(self.place.clone()));
         produced_permissions.push(Permission::MutBorrowed(MutBorrowed {
-            lifetime: self.lifetime.clone(),
+            lifetime: self.place_lifetime.clone(),
             place: self.place.clone(),
         }));
         Ok(())

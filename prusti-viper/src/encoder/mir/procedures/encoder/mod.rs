@@ -584,12 +584,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         };
                         self.reborrow_holder.insert(
                             encoded_target.clone(),
-                            (operand_lifetime, place_lifetime, encoded_target.clone()),
+                            (operand_lifetime.clone(), place_lifetime.clone(), encoded_target.clone()),
                         );
-                        dbg!(&self.reborrow_holder);
                         vir_high::Rvalue::reborrow(
                             encoded_place,
-                            vir_high::ty::LifetimeConst::new(region_name),
+                            operand_lifetime,
+                            place_lifetime,
                             is_mut,
                             self.lifetime_token_fractional_permission(self.lifetime_count),
                             encoded_target.clone(),

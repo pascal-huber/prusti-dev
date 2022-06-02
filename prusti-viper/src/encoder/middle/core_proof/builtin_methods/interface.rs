@@ -189,27 +189,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         match value {
             vir_mid::Rvalue::Reborrow(value) => {
                 if let vir_mid::Expression::Deref(vir_mid::Deref { box base, .. }) = &value.place {
-                    if let vir_mid::Expression::Local(vir_mid::Local {
-                        variable:
-                            vir_mid::VariableDecl {
-                                name: _,
-                                ty:
-                                    vir_mid::ty::Type::Reference(vir_mid::ty::Reference {
-                                        lifetime: old_lifetime,
-                                        ..
-                                    }),
-                            },
-                        ..
-                    }) = &base
-                    {
-                        let old_lifetime_arg =
-                            self.encode_lifetime_const_into_variable(old_lifetime.clone())?;
-                        arguments.push(old_lifetime_arg.into());
-                    } else {
-                        // TODO: is it ?
-                        unreachable!()
-                    }
-
+                    let place_lifetime =
+                        self.encode_lifetime_const_into_variable(value.place_lifetime.clone())?;
+                    arguments.push(place_lifetime.into());
                     self.encode_place_arguments(arguments, &value.place)?;
 
                     // NOTE: to_procedure_snapshot creates "target_current" in "fn deref_to_snapshot"
@@ -223,7 +205,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     arguments.push(value_final);
 
                     let operand_lifetime =
-                        self.encode_lifetime_const_into_variable(value.lifetime.clone())?;
+                        self.encode_lifetime_const_into_variable(value.operand_lifetime.clone())?;
                     arguments.push(operand_lifetime.into());
                 } else {
                     unreachable!()
