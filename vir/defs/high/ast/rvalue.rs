@@ -27,10 +27,11 @@ pub enum Rvalue {
     // ShallowInitBox(ShallowInitBox),
 }
 
-#[display(fmt = "&{} {}", lifetime, place)]
+#[display(fmt = "{} := &'{} (*{})", target, operand_lifetime, place)]
 pub struct Reborrow {
     pub place: Expression,
-    pub lifetime: LifetimeConst,
+    pub operand_lifetime: LifetimeConst,
+    pub place_lifetime: LifetimeConst,
     pub is_mut: bool,
     pub lifetime_token_permission: Expression,
     pub target: Expression,
