@@ -785,12 +785,10 @@ impl IntoLow for vir_mid::Statement {
                     lowerer.encode_lifetime_const_into_variable(statement.lifetime.clone())?;
                 let old_lifetime =
                     lowerer.encode_lifetime_const_into_variable(statement.old_lifetime.clone())?;
-                // FIXME: need a deref_reference_place
                 let reference_place = lowerer.encode_expression_as_place(&statement.value)?;
                 let deref_place =
                     lowerer.reference_deref_place(reference_place, statement.position)?;
                 let reference_value = statement.value.to_procedure_snapshot(lowerer)?;
-
                 let address =
                     lowerer.reference_address(ty, reference_value.clone(), statement.position)?;
                 let current_snapshot = lowerer.reference_target_current_snapshot(
@@ -804,7 +802,6 @@ impl IntoLow for vir_mid::Statement {
                     statement.position,
                 )?;
                 let mut statements: Vec<vir_low::Statement> = vec![];
-
                 if statement.reborrow_operand_lifetime.is_some() {
                     let operand_lifetime = lowerer.encode_lifetime_const_into_variable(
                         statement.clone().reborrow_operand_lifetime.unwrap(),

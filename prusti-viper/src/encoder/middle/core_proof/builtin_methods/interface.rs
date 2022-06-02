@@ -384,7 +384,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     return Ok(());
                 }
                 vir_mid::Rvalue::Ref(value) => {
-                    // println!("##### REF !!!");
                     self.encode_assign_method_rvalue_ref(
                         method_name,
                         parameters,
@@ -765,11 +764,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
         let restoration = {
             let ty_value = &value.place.get_type().clone();
-            // let current_snapshot = self.reference_target_current_snapshot(
-            //     result_type,
-            //     result_value.clone().into(),
-            //     position,
-            // )?;
             let final_snapshot = self.reference_target_final_snapshot(
                 result_type,
                 result_value.clone().into(),
@@ -832,7 +826,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         posts.push(lifetime_token);
         posts.push(reference_predicate);
         posts.push(restoration);
-
         parameters.push(old_lifetime);
         parameters.push(operand_place);
         parameters.push(operand_address);
@@ -921,7 +914,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         posts.push(expr! {
             operand_address == [reference_target_address]
         });
-        // Note: We do not constraint the final snapshot , because it is fresh.
+        // Note: We do not constraint the final snapshot, because it is fresh.
         let reference_target_current_snapshot = self.reference_target_current_snapshot(
             result_type,
             result_value.clone().into(),
@@ -941,7 +934,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         posts.push(lifetime_token);
         posts.push(reference_predicate);
         posts.push(restoration);
-
         parameters.push(operand_place);
         parameters.push(operand_address);
         parameters.push(operand_value);
