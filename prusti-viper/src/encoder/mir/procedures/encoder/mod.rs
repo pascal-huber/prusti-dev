@@ -563,6 +563,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         is_reborrow = true;
                     }
                 }
+                // TODO: remove is_mut?
                 let is_mut = matches!(
                     borrow_kind,
                     mir::BorrowKind::Mut {
@@ -572,53 +573,30 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place, None)?;
                 let region_name = region.to_text();
                 let encoded_rvalue = if is_reborrow {
-                    // let operand_lifetime = self.encode_lft_variable(region_name.clone())?;
-                    let operand_lifetime = vir_high::ty::LifetimeConst {
-                        name: region_name.clone(),
-                    };
-                    // TODO: nasty nasty
-                    if let vir_high::Expression::Deref(vir_high::Deref {
-                        base:
-                            box vir_high::Expression::Local(vir_high::Local {
-                                variable:
-                                    vir_high::VariableDecl {
-                                        name: _,
-                                        ty:
-                                            vir_high::ty::Type::Reference(vir_high::ty::Reference {
-                                                lifetime,
-                                                ..
-                                            }),
-                                        ..
-                                    },
-                                ..
-                            }),
-                        ..
-                    }) = &encoded_place
-                    {
-                        // let place_lifetime = self.encode_lft_variable(lifetime.name.clone())?;
+                    let root = self.encoder.encode_local_high(self.mir, place.local)?;
+                    let place_lifetime_name = self.lifetime_name(root.into());
+                    if let Some(place_lifetime_name) = place_lifetime_name {
                         let place_lifetime = vir_high::ty::LifetimeConst {
-                            name: lifetime.name.clone(),
+                            name: place_lifetime_name.clone(),
+                        };
+                        let operand_lifetime = vir_high::ty::LifetimeConst {
+                            name: region_name.clone(),
                         };
                         self.reborrow_holder.insert(
                             encoded_target.clone(),
                             (operand_lifetime, place_lifetime, encoded_target.clone()),
                         );
+                        dbg!(&self.reborrow_holder);
+                        vir_high::Rvalue::reborrow(
+                            encoded_place,
+                            vir_high::ty::LifetimeConst::new(region_name),
+                            is_mut,
+                            self.lifetime_token_fractional_permission(self.lifetime_count),
+                            encoded_target.clone(),
+                        )
                     } else {
-                        // TODO: yeah?
                         unreachable!()
                     }
-                    // self.reborrow_holder.insert(encoded_target.clone());
-                    // self.reborrow_holder.insert(
-                    //     encoded_target.clone(),
-                    //     (operand_lifetime, place_lifetime),
-                    // );
-                    vir_high::Rvalue::reborrow(
-                        encoded_place,
-                        vir_high::ty::LifetimeConst::new(region_name),
-                        is_mut,
-                        self.lifetime_token_fractional_permission(self.lifetime_count),
-                        encoded_target.clone(),
-                    )
                 } else {
                     vir_high::Rvalue::ref_(
                         encoded_place,

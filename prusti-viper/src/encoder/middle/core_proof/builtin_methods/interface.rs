@@ -353,8 +353,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             .encoded_assign_methods
             .contains(method_name)
         {
-            // println!("---- encode_assign_method");
-            // dbg!(&value);
             self.encode_compute_address(ty)?;
             self.encode_write_place_method(ty)?;
             let span = self.encoder.get_type_definition_span_mid(ty)?;
@@ -391,7 +389,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     )?;
                 }
                 vir_mid::Rvalue::Reborrow(value) => {
-                    // println!("##### REBORROW !!!");
                     self.encode_assign_method_rvalue_reborrow(
                         method_name,
                         parameters,
@@ -770,7 +767,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             operand_lifetime: Lifetime,
             lifetime_perm: Perm
         };
-        // TODO: compute method_name here
         let predicate = expr! {
             acc(UniqueRef<ty>(
                 old_lifetime,
@@ -823,7 +819,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         posts.push(expr! {
             operand_address == [reference_target_address]
         });
-        // Note: We do not constraint the final snapshot , because it is fresh. (unless reborrow)
         let reference_target_current_snapshot = self.reference_target_current_snapshot(
             result_type,
             result_value.clone().into(),
@@ -894,17 +889,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         var_decls! {
             target_place: Place,
             target_address: Address,
-            // old_lifetime: Lifetime,
             operand_place: Place,
             operand_address: Address,
-            operand_value_current: { ty.to_snapshot(self)? },
-            // operand_value_final: { ty.to_snapshot(self)? },
+            operand_value: { ty.to_snapshot(self)? },
             operand_lifetime: Lifetime,
             lifetime_perm: Perm
         };
         let predicate = {
             expr! {
-                acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value_current))
+                acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
             }
         };
         let reference_predicate = expr! {
@@ -946,14 +939,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         posts.push(expr! {
             operand_address == [reference_target_address]
         });
-        // Note: We do not constraint the final snapshot , because it is fresh. (unless reborrow)
+        // Note: We do not constraint the final snapshot , because it is fresh.
         let reference_target_current_snapshot = self.reference_target_current_snapshot(
             result_type,
             result_value.clone().into(),
             position,
         )?;
         posts.push(expr! {
-            operand_value_current == [reference_target_current_snapshot]
+            operand_value == [reference_target_current_snapshot]
         });
         pres.push(expr! {
             [vir_low::Expression::no_permission()] < lifetime_perm
@@ -969,7 +962,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
 
         parameters.push(operand_place);
         parameters.push(operand_address);
-        parameters.push(operand_value_current);
+        parameters.push(operand_value);
         parameters.push(operand_lifetime);
         parameters.push(lifetime_perm);
         let method = vir_low::MethodDecl::new(
@@ -2506,7 +2499,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         }
         Ok(())
     }
-
     fn encode_assign_method_call(
         &mut self,
         statements: &mut Vec<vir_low::Statement>,
@@ -2519,7 +2511,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         let target_place = self.encode_expression_as_place(&target)?;
         let target_address = self.extract_root_address(&target)?;
         let mut arguments = vec![target_place, target_address];
-
         self.encode_rvalue_arguments(&mut arguments, &value)?;
         let target_value_type = target.get_type().to_snapshot(self)?;
         let result_value = self.create_new_temporary_variable(target_value_type)?;
@@ -2847,6 +2838,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             }
             let pres = vec![
                 expr! { acc(DeadLifetimeToken(lft_2))},
+                // TODO: use macro?
                 vir_low::Expression::domain_function_call(
                     "Lifetime",
                     "included$",

@@ -247,9 +247,9 @@ impl FoldUnfoldState {
         debug!("state:\n{}", self);
     }
 
-    // pub(in super::super) fn is_empty(&self) -> bool {
-    //     self.unconditional.is_empty() && self.conditional.is_empty()
-    // }
+    pub(in super::super) fn is_empty(&self) -> bool {
+        self.unconditional.is_empty() && self.conditional.is_empty()
+    }
 
     pub(in super::super) fn reset_incoming_labels_with(
         &mut self,
