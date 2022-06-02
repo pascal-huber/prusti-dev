@@ -680,20 +680,6 @@ impl IntoLow for vir_mid::Statement {
 
                     let type_decl = lowerer.encoder.get_type_decl_mid(ty)?;
                     let target_type = &type_decl.unwrap_reference().target_type;
-                    // TODO: apply magic wand
-                    // apply acc(DeadLifetimeToken(lft_5$snapshot$0)) --* acc(
-                    //     UniqueRef$I32(
-                    //         lft_9$snapshot$0, // old_lifetime
-                    //         deref_reference_place(_9$place()),
-                    //         destructor$Snap$ref$Unique$I32$$address(_9$snapshot$1),
-                    //         destructor$Snap$ref$Unique$I32$$target_current(_9$snapshot$1),
-                    //         destructor$Snap$ref$Unique$I32$$target_final(_9$snapshot$1)
-                    //     )
-                    // ) && valid$Snap$I32(destructor$Snap$ref$Unique$I32$$target_final(_8$snapshot$1)) &&
-                    //     acc(DeadLifetimeToken(lft_5$snapshot$0), write)
-
-                    // TODO: this is the wrong snapshot
-
                     let reborrow_target_snapshot = statement
                         .reborrow_target
                         .unwrap()
@@ -717,10 +703,12 @@ impl IntoLow for vir_mid::Statement {
                     //             [address.clone()],
                     //             [current_snapshot.clone()],
                     //             [final_snapshot.clone()]
-                    //         )) && acc(DeadLifetimeToken([operand_lifetime.clone().into()])))
+                    //         ))
+                    //         && valid$Snap$I32(destructor$Snap$ref$Unique$I32$$target_final(_8$snapshot$1))
+                    //         && acc(DeadLifetimeToken([operand_lifetime.clone().into()])))
                     // };
 
-                    // TODO: use macro.. why no working
+                    // TODO: for some reason the macro didn't accept the binary ops
                     let wand = vir_low::Statement::apply_magic_wand_no_pos(
                         vir_low::Expression::magic_wand_no_pos(
                             expr! { acc(DeadLifetimeToken([operand_lifetime.clone().into()])) },

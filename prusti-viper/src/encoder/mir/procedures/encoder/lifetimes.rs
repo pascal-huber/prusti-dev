@@ -328,9 +328,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                     let object = self.encode_local(var)?;
                     let backup_var_name =
                         format!("old_{}_{}", lifetime.clone(), self.old_lifetime_ctr);
+                    self.old_lifetime_ctr += 1;
                     lifetime_backups
                         .insert(lifetime.clone(), (backup_var_name.clone(), object.into()));
-                    self.old_lifetime_ctr += 1;
                     let lifetime_var =
                         vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
                     let backup_var =
@@ -345,7 +345,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                         ),
                     )?);
                 } else {
-                    // TODO: or is it?
                     unreachable!()
                 }
             }
@@ -490,7 +489,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
                         vir_high::Statement::dead_inclusion_no_pos(encoded_target, encoded_value),
                     )?);
                     old_derived_lifetimes_yet_to_kill.remove(&lifetime);
-                    continue;
+                    break;
                 }
             }
         }

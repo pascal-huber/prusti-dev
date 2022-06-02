@@ -372,7 +372,7 @@ impl CollectPermissionChanges for vir_high::ast::rvalue::Reborrow {
         consumed_permissions: &mut Vec<Permission>,
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
-        // TODO: check if this is right
+        // TODO: check if this is right, same as ref?
         consumed_permissions.push(Permission::Owned(self.place.clone()));
         produced_permissions.push(Permission::MutBorrowed(MutBorrowed {
             lifetime: self.lifetime.clone(),
@@ -675,9 +675,12 @@ impl CollectPermissionChanges for vir_high::BorShorten {
     fn collect<'v, 'tcx>(
         &self,
         _encoder: &mut Encoder<'v, 'tcx>,
-        _consumed_permissions: &mut Vec<Permission>,
-        _produced_permissions: &mut Vec<Permission>,
+        consumed_permissions: &mut Vec<Permission>,
+        produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
+        // TODO: check if this is right
+        consumed_permissions.push(Permission::Owned(self.value.clone()));
+        produced_permissions.push(Permission::Owned(self.value.clone()));
         Ok(())
     }
 }
