@@ -284,13 +284,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder for ProcedureEncoder<'p, 'v, 'tcx> {
             let mut reborrow_operand_lifetime: Option<vir_high::ty::LifetimeConst> = None;
             let mut reborrow_place_lifetime: Option<vir_high::ty::LifetimeConst> = None;
             let mut reborrow_target: Option<vir_high::Expression> = None;
-            for (reborrow_object, (operand_lifetime, place_lifetime, target)) in
-                &self.reborrow_holder
-            {
-                if reborrow_object == object {
-                    reborrow_operand_lifetime = Some(operand_lifetime.clone());
-                    reborrow_place_lifetime = Some(place_lifetime.clone());
-                    reborrow_target = Some(target.clone());
+            for (expr, reborrow) in &self.points_to_reborrow {
+                if expr == object {
+                    if let vir_high::Rvalue::Reborrow(reborrow) = reborrow {
+                        reborrow_operand_lifetime = Some(reborrow.operand_lifetime.clone());
+                        reborrow_place_lifetime = Some(reborrow.place_lifetime.clone());
+                        reborrow_target = Some(reborrow.target.clone());
+                    } else {
+                        unreachable!()
+                    }
                 }
             }
             block_builder.add_statement(self.set_statement_error(
