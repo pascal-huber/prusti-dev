@@ -78,7 +78,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let lifetime_token_permission = None;
     let old_lifetime_ctr: usize = 0;
     let function_call_ctr: usize = 0;
-    let reborrow_holder = BTreeMap::new();
+    let points_to_reborrow = BTreeMap::new();
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
         def_id,
@@ -99,7 +99,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         lifetime_token_permission,
         old_lifetime_ctr,
         function_call_ctr,
-        reborrow_holder,
+        points_to_reborrow,
     };
     procedure_encoder.encode()
 }
@@ -131,14 +131,7 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     lifetime_token_permission: Option<vir_high::VariableDecl>,
     old_lifetime_ctr: usize,
     function_call_ctr: usize,
-    reborrow_holder: BTreeMap<
-        vir_high::Expression,
-        (
-            vir_high::ty::LifetimeConst,
-            vir_high::ty::LifetimeConst,
-            vir_high::Expression,
-        ),
-    >,
+    points_to_reborrow: BTreeMap<vir_high::Expression, vir_high::Rvalue>,
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
@@ -431,7 +424,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         bb: mir::BasicBlock,
         data: &mir::BasicBlockData<'tcx>,
     ) -> SpannedEncodingResult<()> {
-        self.reborrow_holder.clear();
+        self.points_to_reborrow.clear();
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
         let mir::BasicBlockData {
@@ -582,18 +575,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         let operand_lifetime = vir_high::ty::LifetimeConst {
                             name: region_name.clone(),
                         };
-                        self.reborrow_holder.insert(
-                            encoded_target.clone(),
-                            (operand_lifetime.clone(), place_lifetime.clone(), encoded_target.clone()),
-                        );
-                        vir_high::Rvalue::reborrow(
+                        let reborrow = vir_high::Rvalue::reborrow(
                             encoded_place,
                             operand_lifetime,
                             place_lifetime,
                             is_mut,
                             self.lifetime_token_fractional_permission(self.lifetime_count),
                             encoded_target.clone(),
-                        )
+                        );
+                        self.points_to_reborrow
+                            .insert(encoded_target.clone(), reborrow.clone());
+                        reborrow
                     } else {
                         unreachable!()
                     }
@@ -863,10 +855,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let encoded_source =
                     self.encoder
                         .encode_place_high(self.mir, *source, Some(span))?;
-                if self.reborrow_holder.contains_key(&encoded_source) {
-                    let (x, y, z) = self.reborrow_holder.get(&encoded_source).unwrap().clone();
-                    self.reborrow_holder
-                        .insert(encoded_target.clone(), (x, y, z));
+                if self.points_to_reborrow.contains_key(&encoded_source) {
+                    let reborrow = self
+                        .points_to_reborrow
+                        .get(&encoded_source)
+                        .unwrap()
+                        .clone();
+                    self.points_to_reborrow
+                        .insert(encoded_target.clone(), reborrow);
                 }
                 block_builder.add_statement(self.set_statement_error(
                     location,
