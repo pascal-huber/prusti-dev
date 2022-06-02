@@ -570,10 +570,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                     let place_lifetime_name = self.lifetime_name(root.into());
                     if let Some(place_lifetime_name) = place_lifetime_name {
                         let place_lifetime = vir_high::ty::LifetimeConst {
-                            name: place_lifetime_name.clone(),
+                            name: place_lifetime_name,
                         };
                         let operand_lifetime = vir_high::ty::LifetimeConst {
-                            name: region_name.clone(),
+                            name: region_name,
                         };
                         let reborrow = vir_high::Rvalue::reborrow(
                             encoded_place,
