@@ -616,18 +616,26 @@ impl IntoLow for vir_mid::Statement {
             }
             Self::LifetimeTake(statement) => {
                 if statement.value.len() == 1 {
-                    let expr = vir_low::Expression::local_no_pos(
+                    let value = vir_low::Expression::local_no_pos(
                         statement
                             .value
                             .first()
                             .unwrap()
                             .to_procedure_snapshot(lowerer)?,
                     );
-                    Ok(vec![Statement::assign(
-                        statement.target.to_procedure_snapshot(lowerer)?,
-                        expr,
+                    let mut statements = vec![Statement::assign(
+                        // statement.target.to_procedure_snapshot(lowerer)?,
+                        lowerer.new_snapshot_variable_version(&statement.target, statement.position)?.into(),
+                        value.clone(),
                         statement.position,
-                    )])
+                    )];
+                    // lowerer.encode_snapshot_update(
+                    //     &mut statements,
+                    //     &statement.target.into(),
+                    //     value,
+                    //     statement.position,
+                    // )?;
+                    Ok(statements)
                 } else {
                     lowerer.encode_lft_tok_sep_take_method(statement.value.len())?;
                     let mut arguments: Vec<vir_low::Expression> = vec![];
@@ -636,6 +644,7 @@ impl IntoLow for vir_mid::Statement {
                             lifetime.to_procedure_snapshot(lowerer)?,
                         ));
                     }
+                    let lifetime_arguments = arguments.clone();
                     let perm_amount = statement
                         .lifetime_token_permission
                         .to_procedure_snapshot(lowerer)?;
@@ -643,12 +652,26 @@ impl IntoLow for vir_mid::Statement {
                     let target = vec![vir_low::Expression::local_no_pos(
                         statement.target.to_procedure_snapshot(lowerer)?,
                     )];
-                    Ok(vec![Statement::method_call(
+                    let mut statements = vec![Statement::method_call(
                         format!("lft_tok_sep_take${}", statement.value.len()),
-                        arguments,
-                        target,
+                        arguments.clone(),
+                        vec![lowerer.new_snapshot_variable_version(&statement.target, statement.position)?.into()],
                         statement.position,
-                    )])
+                    )];
+                    // use vir_low::macros::*;
+                    // let intersection = vir_low::Expression::domain_function_call(
+                    //     "Lifetime",
+                    //     format!("intersect${}", statement.value.len()),
+                    //     lifetime_arguments.clone(),
+                    //     ty!(Lifetime),
+                    // );
+                    // lowerer.encode_snapshot_update(
+                    //     &mut statements,
+                    //     &statement.target.clone().into(),
+                    //     intersection,
+                    //     statement.position,
+                    // )?;
+                    Ok(statements)
                 }
             }
             Self::LifetimeReturn(statement) => {
@@ -866,7 +889,8 @@ impl IntoLow for vir_mid::Statement {
                         ),
                     );
 
-                    statements.push(wand.set_default_position(statement.position));
+                    // TODO: remove everyting leading to this *sigh*
+                    // statements.push(wand.set_default_position(statement.position));
                 }
                 statements.push(stmtp! { statement.position =>
                     call bor_shorten<ty>(

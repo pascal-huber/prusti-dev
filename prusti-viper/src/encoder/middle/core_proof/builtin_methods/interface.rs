@@ -774,12 +774,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 wand(
                     (acc(DeadLifetimeToken(operand_lifetime))) --* (
                         (acc(UniqueRef<ty_value>(
-                            //operand_lifetime,
                             old_lifetime,
                             [operand_place.clone().into()],
                             [operand_address.clone().into()],
-                            // [current_snapshot],
-                            // [final_snapshot])
                             [operand_value_current.clone().into()],
                             [operand_value_final.clone().into()])
                         )) &&
@@ -811,10 +808,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         posts.push(expr! {
             operand_value_final == [reference_target_final_snapshot]
         });
-        let deref_place = self.reference_deref_place(target_place.into(), position)?;
-        posts.push(expr! {
-            operand_place == [deref_place]
-        });
+        // let deref_place = self.reference_deref_place(target_place.into(), position)?;
+        // posts.push(expr! {
+        //     operand_place == [deref_place]
+        // });
         pres.push(expr! {
             [vir_low::Expression::no_permission()] < lifetime_perm
         });
@@ -1386,15 +1383,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     expr! {(acc(MemoryBlock((ComputeAddress::compute_address(target_place, target_root_address)), [size_of.clone()])))},
                     expr! {(acc(OwnedNonAliased<ty>(source_place, source_root_address, source_value, lifetime)))},
                 ];
-                let deref_source_place =
-                    self.reference_deref_place(source_place.clone().into(), position)?;
-                let deref_target_place =
-                    self.reference_deref_place(target_place.clone().into(), position)?;
+                // let deref_source_place =
+                //     self.reference_deref_place(source_place.clone().into(), position)?;
+                // let deref_target_place =
+                //     self.reference_deref_place(target_place.clone().into(), position)?;
                 postconditions = vec![
                     expr! {(acc(OwnedNonAliased<ty>(target_place, target_root_address, source_value, lifetime)))},
                     expr! {(acc(MemoryBlock((ComputeAddress::compute_address(source_place, source_root_address)), [size_of])))},
                     expr! {(([bytes]) == (Snap<ty>::to_bytes(source_value)))},
-                    expr! { [ deref_source_place ] == [ deref_target_place ] },
+                    // expr! { [ deref_source_place ] == [ deref_target_place ] },
                 ];
             } else {
                 statements.push(stmtp! { position =>
