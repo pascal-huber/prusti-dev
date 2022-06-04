@@ -679,8 +679,12 @@ impl CollectPermissionChanges for vir_high::BorShorten {
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
         // TODO: check if this is right
-        consumed_permissions.push(Permission::Owned(self.value.clone()));
-        produced_permissions.push(Permission::Owned(self.value.clone()));
+        let ty = *self.value.get_type().clone().unwrap_reference().target_type;
+        let place = self.value.clone().deref(ty, self.position);
+        consumed_permissions.push(Permission::Owned(place.clone()));
+        produced_permissions.push(Permission::Owned(place));
+        // consumed_permissions.push(Permission::Owned(self.value.clone()));
+        // produced_permissions.push(Permission::Owned(self.value.clone()));
         Ok(())
     }
 }
