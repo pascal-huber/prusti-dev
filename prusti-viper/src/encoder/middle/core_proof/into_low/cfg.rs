@@ -476,7 +476,9 @@ impl IntoLow for vir_mid::Statement {
                     );
                     let mut statements = vec![Statement::assign(
                         // statement.target.to_procedure_snapshot(lowerer)?,
-                        lowerer.new_snapshot_variable_version(&statement.target, statement.position)?.into(),
+                        lowerer
+                            .new_snapshot_variable_version(&statement.target, statement.position)?
+                            .into(),
                         value.clone(),
                         statement.position,
                     )];
@@ -506,7 +508,9 @@ impl IntoLow for vir_mid::Statement {
                     let mut statements = vec![Statement::method_call(
                         format!("lft_tok_sep_take${}", statement.value.len()),
                         arguments.clone(),
-                        vec![lowerer.new_snapshot_variable_version(&statement.target, statement.position)?.into()],
+                        vec![lowerer
+                            .new_snapshot_variable_version(&statement.target, statement.position)?
+                            .into()],
                         statement.position,
                     )];
                     // use vir_low::macros::*;
@@ -755,7 +759,7 @@ impl IntoLow for vir_mid::Statement {
                     );
 
                     // TODO: remove everyting leading to this *sigh*
-                    statements.push(wand.set_default_position(statement.position));
+                    // statements.push(wand.set_default_position(statement.position));
                 }
                 statements.push(stmtp! { statement.position =>
                     call bor_shorten<ty>(

@@ -437,6 +437,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
         let terminator_index = statements.len();
+        let mut reborrow_lifetimes_to_remove: BTreeSet<String> = BTreeSet::new();
         let mut original_lifetimes: BTreeSet<String> =
             self.lifetimes.get_loan_live_at_start(location);
         let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> =
@@ -450,6 +451,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
                 &mut old_derived_lifetimes_yet_to_kill,
+                &mut reborrow_lifetimes_to_remove,
+                Some(&statements[location.statement_index]),
             )?;
             self.encode_statement(
                 &mut block_builder,
@@ -465,6 +468,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
                 &mut old_derived_lifetimes_yet_to_kill,
+                &mut reborrow_lifetimes_to_remove,
+                None,
             )?;
             let terminator = &terminator.kind;
             self.encode_terminator(&mut block_builder, location, terminator)?;
@@ -572,9 +577,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         let place_lifetime = vir_high::ty::LifetimeConst {
                             name: place_lifetime_name,
                         };
-                        let operand_lifetime = vir_high::ty::LifetimeConst {
-                            name: region_name,
-                        };
+                        let operand_lifetime = vir_high::ty::LifetimeConst { name: region_name };
                         let reborrow = vir_high::Rvalue::reborrow(
                             encoded_place,
                             operand_lifetime,
