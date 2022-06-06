@@ -755,7 +755,7 @@ impl IntoLow for vir_mid::Statement {
                     );
 
                     // TODO: remove everyting leading to this *sigh*
-                    // statements.push(wand.set_default_position(statement.position));
+                    statements.push(wand.set_default_position(statement.position));
                 }
                 statements.push(stmtp! { statement.position =>
                     call bor_shorten<ty>(
