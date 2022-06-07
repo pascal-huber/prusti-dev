@@ -62,6 +62,8 @@ fn ensure_required_permission(
         Permission::MutBorrowed(borrow) => unreachable!("requiring a borrow: {}", borrow),
     };
 
+    // TODO: somewhere here
+
     let unconditional_predicate_state = state.get_unconditional_state()?;
     if can_place_be_ensured_in(
         context,
@@ -135,6 +137,7 @@ fn check_can_place_be_ensured_in(
         .contains_non_discriminant_with_prefix(permission_kind, place)
         .is_some();
     // The requirement can be satisfied by restoring a mutable borrow.
+    // TODO: contains_blocked wrong?
     let by_restoring_blocked = predicate_state.contains_blocked(place)?.is_some();
     // The requirement can be satisfied by converting into Memory Block.
     // Short circuiting is used to prevent infinite recursion.

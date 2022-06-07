@@ -29,6 +29,7 @@ impl Positioned for Statement {
             Self::DeadInclusion(statement) => statement.position(),
             Self::LifetimeTake(statement) => statement.position(),
             Self::LifetimeReturn(statement) => statement.position(),
+            Self::ObtainMutRef(statement) => statement.position(),
             Self::OpenMutRef(statement) => statement.position(),
             Self::OpenFracRef(statement) => statement.position(),
             Self::CloseMutRef(statement) => statement.position(),
@@ -183,6 +184,12 @@ impl Positioned for LifetimeTake {
 }
 
 impl Positioned for LifetimeReturn {
+    fn position(&self) -> Position {
+        self.position
+    }
+}
+
+impl Positioned for ObtainMutRef {
     fn position(&self) -> Position {
         self.position
     }
