@@ -37,6 +37,7 @@ pub enum Statement {
     DeadInclusion(DeadInclusion),
     LifetimeTake(LifetimeTake),
     LifetimeReturn(LifetimeReturn),
+    ObtainMutRef(ObtainMutRef),
     OpenMutRef(OpenMutRef),
     OpenFracRef(OpenFracRef),
     CloseMutRef(CloseMutRef),
@@ -277,6 +278,19 @@ pub struct LifetimeReturn {
     pub target: VariableDecl,
     pub value: Vec<VariableDecl>,
     pub lifetime_token_permission: Expression,
+    pub position: Position,
+}
+
+#[display(
+    fmt = "obtain_mut_ref({}, rd({}), {})",
+    lifetime,
+    lifetime_token_permission,
+    place
+)]
+pub struct ObtainMutRef {
+    pub lifetime: LifetimeConst,
+    pub lifetime_token_permission: Expression,
+    pub place: Expression,
     pub position: Position,
 }
 

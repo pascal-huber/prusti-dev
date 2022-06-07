@@ -20,8 +20,8 @@ pub use self::{
         statement::{
             Assert, Assign, Assume, BorShorten, CloseFracRef, CloseMutRef, Comment, Consume,
             CopyPlace, Dead, DeadInclusion, EndLft, Exhale, Havoc, Inhale, LeakAll, LifetimeReturn,
-            LifetimeTake, LoopInvariant, MovePlace, NewLft, OldLabel, OpenFracRef, OpenMutRef,
-            SetUnionVariant, Statement, WriteAddress, WritePlace,
+            LifetimeTake, LoopInvariant, MovePlace, NewLft, ObtainMutRef, OldLabel, OpenFracRef,
+            OpenMutRef, SetUnionVariant, Statement, WriteAddress, WritePlace,
         },
         ty::{self, Type},
         type_decl::{self, DiscriminantRange, DiscriminantValue, TypeDecl},

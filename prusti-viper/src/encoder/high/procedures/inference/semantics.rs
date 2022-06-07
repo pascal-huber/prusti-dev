@@ -100,6 +100,9 @@ impl CollectPermissionChanges for vir_high::Statement {
             vir_high::Statement::LifetimeTake(statement) => {
                 statement.collect(encoder, consumed_permissions, produced_permissions)
             }
+            vir_high::Statement::ObtainMutRef(statement) => {
+                statement.collect(encoder, consumed_permissions, produced_permissions)
+            }
             vir_high::Statement::OpenMutRef(statement) => {
                 statement.collect(encoder, consumed_permissions, produced_permissions)
             }
@@ -615,6 +618,20 @@ impl CollectPermissionChanges for vir_high::LifetimeReturn {
         _consumed_permissions: &mut Vec<Permission>,
         _produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
+        Ok(())
+    }
+}
+
+impl CollectPermissionChanges for vir_high::ObtainMutRef {
+    fn collect<'v, 'tcx>(
+        &self,
+        _encoder: &mut Encoder<'v, 'tcx>,
+        consumed_permissions: &mut Vec<Permission>,
+        produced_permissions: &mut Vec<Permission>,
+    ) -> SpannedEncodingResult<()> {
+        // TODO: write this
+        consumed_permissions.push(Permission::Owned(self.place.clone()));
+        produced_permissions.push(Permission::Owned(self.place.clone()));
         Ok(())
     }
 }

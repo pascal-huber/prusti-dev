@@ -2,7 +2,6 @@ use crate::encoder::{
     errors::{ErrorCtxt, SpannedEncodingResult},
     mir::{
         errors::ErrorInterface,
-        places::PlacesEncoderInterface,
         procedures::encoder::{scc::*, ProcedureEncoder},
     },
 };
@@ -42,6 +41,19 @@ pub(super) trait LifetimesEncoder<'tcx> {
         reborrow_lifetimes_to_remove: &mut BTreeSet<String>,
         new_reborrow_lifetime_to_remove: Option<String>,
     ) -> SpannedEncodingResult<()>;
+    fn update_lifetimes_to_remove(
+        &mut self,
+        reborrow_lifetimes_to_remove: &mut BTreeSet<String>,
+        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+        new_reborrow_lifetime_to_remove: Option<String>,
+        lifetimes_to_create: &BTreeSet<String>,
+    );
+    fn remove_reborrow_lifetimes(
+        &mut self,
+        reborrow_lifetimes_to_remove: &BTreeSet<String>,
+        new_original_lifetimes: &mut BTreeSet<String>,
+        new_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
+    );
     fn encode_bor_shorten(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
@@ -67,8 +79,7 @@ pub(super) trait LifetimesEncoder<'tcx> {
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
-        old_original_lifetimes: &BTreeSet<String>,
-        new_original_lifetimes: &BTreeSet<String>,
+        lifetimes_to_create: &BTreeSet<String>,
     ) -> SpannedEncodingResult<()>;
     fn encode_end_lft(
         &mut self,
@@ -189,20 +200,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
 
     fn reborrow_lifetime(&mut self, statement: Option<&mir::Statement<'tcx>>) -> Option<String> {
         if let Some(statement) = statement {
-            // TODO: create a function is_reborrow() - to be used here and in mod.rs
-            if let mir::StatementKind::Assign(box (target, source)) = &statement.kind {
-                if let mir::Rvalue::Ref(region, borrow_kind, place) = source {
-                    let region_name: String = region.to_text();
-                    if let Some((_ref, projection)) = place.iter_projections().last() {
-                        if projection == mir::ProjectionElem::Deref {
-                            // let root = self.encoder.encode_local_high(self.mir, place.local)?;
-                            // let place_lifetime_name = self.lifetime_name(root.into());
-                            // is_reborrow = true;
-                            // println!("---reborrow");
-                            // dbg!(&statement);
-                            // dbg!(&region_name);
-                            return Some(region_name);
-                        }
+            if let mir::StatementKind::Assign(box (
+                _target,
+                mir::Rvalue::Ref(region, _borrow_kind, place),
+            )) = &statement.kind
+            {
+                let region_name: String = region.to_text();
+                if let Some((_ref, projection)) = place.iter_projections().last() {
+                    if projection == mir::ProjectionElem::Deref {
+                        return Some(region_name);
                     }
                 }
             }
@@ -256,64 +262,22 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             .into_values()
             .flatten()
             .collect();
-
-        // println!("------");
-        // dbg!(&location);
-        // dbg!(&old_original_lifetimes);
-        // dbg!(&new_original_lifetimes);
-
-        // find new lifetimes to ignore
-        // TODO: move this into  a function
         let lifetimes_to_create =
             self.lifetimes_to_create(old_original_lifetimes, &new_original_lifetimes);
-        // dbg!(&lifetimes_to_create);
-        if let Some(lifetime_to_ignore) = new_reborrow_lifetime_to_remove {
-            // find original lifetime to removed
-            let mut new_lifetimes_to_ignore: BTreeSet<String> = BTreeSet::new();
-            for (lifetime, derived_from) in new_derived_lifetimes.clone() {
-                if lifetime == lifetime_to_ignore {
-                    new_lifetimes_to_ignore = derived_from
-                        .clone()
-                        .iter()
-                        .filter(|x| lifetimes_to_create.contains(*x))
-                        .cloned()
-                        .collect();
-                }
-            }
-            reborrow_lifetimes_to_remove.append(&mut new_lifetimes_to_ignore);
-        }
-
-        // remove lifetimes from collections
-        // TODO: move this into  a function
-        new_original_lifetimes = new_original_lifetimes
-            .clone()
-            .iter()
-            .filter(|&lft| !reborrow_lifetimes_to_remove.contains(lft))
-            .cloned()
-            .collect();
-        *new_derived_lifetimes = new_derived_lifetimes
-            .clone()
-            .iter()
-            .map(|(lifetime, derived_from)| {
-                let updated_derived_from: BTreeSet<String> = derived_from
-                    .clone()
-                    .iter()
-                    .filter(|&lft| !reborrow_lifetimes_to_remove.contains(lft))
-                    .cloned()
-                    .collect();
-                (lifetime.clone(), updated_derived_from.clone())
-            })
-            .collect();
-
-        // println!(">>>>");
-        // dbg!(&reborrow_lifetimes_to_remove);
-        // dbg!(&new_original_lifetimes);
-        // dbg!(&new_derived_lifetimes);
-
-        // create a backup of the lifetime for bor_shorten
         let mut lifetime_backups: BTreeMap<String, (String, vir_high::Expression)> =
             BTreeMap::new();
 
+        self.update_lifetimes_to_remove(
+            reborrow_lifetimes_to_remove,
+            new_derived_lifetimes,
+            new_reborrow_lifetime_to_remove,
+            &lifetimes_to_create,
+        );
+        self.remove_reborrow_lifetimes(
+            reborrow_lifetimes_to_remove,
+            &mut new_original_lifetimes,
+            new_derived_lifetimes,
+        );
         if shorten_lifetimes {
             self.encode_lifetime_backups(
                 block_builder,
@@ -342,12 +306,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             old_derived_lifetimes,
             new_derived_lifetimes,
         )?;
-        self.encode_new_lft(
-            block_builder,
-            location,
-            old_original_lifetimes,
-            &new_original_lifetimes,
-        )?;
+        self.encode_new_lft(block_builder, location, &lifetimes_to_create)?;
         self.encode_lft_take(
             block_builder,
             location,
@@ -366,6 +325,56 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         *old_original_lifetimes = new_original_lifetimes.clone();
         *old_derived_lifetimes = new_derived_lifetimes.clone();
         Ok(())
+    }
+
+    fn update_lifetimes_to_remove(
+        &mut self,
+        reborrow_lifetimes_to_remove: &mut BTreeSet<String>,
+        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+        new_reborrow_lifetime_to_remove: Option<String>,
+        lifetimes_to_create: &BTreeSet<String>,
+    ) {
+        if let Some(lifetime_to_ignore) = new_reborrow_lifetime_to_remove {
+            let mut new_lifetimes_to_ignore: BTreeSet<String> = BTreeSet::new();
+            for (lifetime, derived_from) in new_derived_lifetimes.clone() {
+                if lifetime == lifetime_to_ignore {
+                    new_lifetimes_to_ignore = derived_from
+                        .clone()
+                        .iter()
+                        .filter(|x| lifetimes_to_create.contains(*x))
+                        .cloned()
+                        .collect();
+                }
+            }
+            reborrow_lifetimes_to_remove.append(&mut new_lifetimes_to_ignore);
+        }
+    }
+
+    fn remove_reborrow_lifetimes(
+        &mut self,
+        reborrow_lifetimes_to_remove: &BTreeSet<String>,
+        new_original_lifetimes: &mut BTreeSet<String>,
+        new_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
+    ) {
+        *new_original_lifetimes = new_original_lifetimes
+            .clone()
+            .iter()
+            .filter(|&lft| !reborrow_lifetimes_to_remove.contains(lft))
+            .cloned()
+            .collect();
+        *new_derived_lifetimes = new_derived_lifetimes
+            .clone()
+            .iter()
+            .map(|(lifetime, derived_from)| {
+                let updated_derived_from: BTreeSet<String> = derived_from
+                    .clone()
+                    .iter()
+                    .filter(|&lft| !reborrow_lifetimes_to_remove.contains(lft))
+                    .cloned()
+                    .collect();
+                (lifetime.clone(), updated_derived_from)
+            })
+            .collect();
     }
 
     fn encode_bor_shorten(
@@ -471,11 +480,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
-        old_original_lifetimes: &BTreeSet<String>,
-        new_original_lifetimes: &BTreeSet<String>,
+        lifetimes_to_create: &BTreeSet<String>,
     ) -> SpannedEncodingResult<()> {
-        let lifetimes_to_create =
-            self.lifetimes_to_create(old_original_lifetimes, new_original_lifetimes);
         for lifetime in lifetimes_to_create {
             let lifetime_var = vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
             block_builder.add_statement(self.set_statement_error(
