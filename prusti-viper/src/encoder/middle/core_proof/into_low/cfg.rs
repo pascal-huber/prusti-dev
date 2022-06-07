@@ -611,8 +611,7 @@ impl IntoLow for vir_mid::Statement {
                 }])
             }
             Self::ObtainMutRef(_statement) => {
-                // TODO: either leave empty or implement
-                Ok(vec![Statement::comment("obtain_mut_ref".to_string())])
+                Ok(vec![]) // NOTE: nothing to do, we only want the fold_unfold
             }
             Self::OpenMutRef(statement) => {
                 let place = statement.place.get_parent_ref().unwrap();
