@@ -54,6 +54,13 @@ pub(super) trait LifetimesEncoder<'tcx> {
         new_original_lifetimes: &mut BTreeSet<String>,
         new_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     );
+    fn encode_obtain_mut_ref(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+    ) -> SpannedEncodingResult<()>;
     fn encode_bor_shorten(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
@@ -279,6 +286,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             new_derived_lifetimes,
         );
         if shorten_lifetimes {
+            self.encode_obtain_mut_ref(
+                block_builder,
+                location,
+                old_derived_lifetimes,
+                new_derived_lifetimes,
+            )?;
             self.encode_lifetime_backups(
                 block_builder,
                 location,
@@ -415,6 +428,40 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
                     reborrow_target,
                 ),
             )?);
+        }
+        Ok(())
+    }
+
+    fn encode_obtain_mut_ref(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+    ) -> SpannedEncodingResult<()>{
+        // TODO: redundnat with encode_lifetime_backups
+        for (lifetime, _) in old_derived_lifetimes.clone() {
+            if new_derived_lifetimes.contains_key(&lifetime) {
+                if let Some(var) = self.procedure.get_var_of_lifetime(&lifetime[..]) {
+                    let object = self.encode_local(var)?;
+                    // let lifetime_var =
+                    //     vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
+                    block_builder.add_statement(self.set_statement_error(
+                        location,
+                        ErrorCtxt::LifetimeEncoding,
+                        vir_high::Statement::obtain_mut_ref_no_pos(
+                            vir_high::ty::LifetimeConst {
+                                name: lifetime.to_string(),
+                            },
+                            // TODO: remove this permission from ObtainMutRef, not needed:
+                            self.lifetime_token_fractional_permission(self.lifetime_count),
+                            object.variable.clone().into(),
+                        ),
+                    )?);
+                } else {
+                    unreachable!()
+                }
+            }
         }
         Ok(())
     }

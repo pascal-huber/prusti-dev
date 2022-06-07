@@ -630,8 +630,13 @@ impl CollectPermissionChanges for vir_high::ObtainMutRef {
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
         // TODO: write this
-        consumed_permissions.push(Permission::Owned(self.place.clone()));
-        produced_permissions.push(Permission::Owned(self.place.clone()));
+
+        let ty = *self.place.get_type().clone().unwrap_reference().target_type;
+        let place = self.place.clone().deref(ty, self.position);
+        consumed_permissions.push(Permission::Owned(place.clone()));
+        produced_permissions.push(Permission::Owned(place));
+        // consumed_permissions.push(Permission::Owned(self.place.clone()));
+        // produced_permissions.push(Permission::Owned(self.place.clone()));
         Ok(())
     }
 }
