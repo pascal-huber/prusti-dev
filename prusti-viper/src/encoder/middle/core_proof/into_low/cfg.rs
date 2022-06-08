@@ -274,10 +274,13 @@ impl IntoLow for vir_mid::Statement {
                 let validity = lowerer.encode_snapshot_valid_call_for_type(snapshot.clone(), ty)?;
                 let low_statement = if let Some(condition) = statement.condition {
                     let low_condition = lowerer.lower_block_marker_condition(condition)?;
+                    // FIXME: Why was validity not present here? It is needed for if-else example.
+                    //   Did this break something else?
                     stmtp! {
                         statement.position =>
                         apply<low_condition> (acc(DeadLifetimeToken(lifetime))) --* (
                             (acc(OwnedNonAliased<ty>([place], [address], [snapshot]))) &&
+                            [validity] &&
                             (acc(DeadLifetimeToken(lifetime)))
                         )
                     }

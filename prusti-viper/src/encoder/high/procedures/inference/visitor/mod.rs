@@ -157,10 +157,11 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
         let successor_blocks = self.current_successors()?;
         // FIXME: Fix leaked predicates. Can be triggered with an if-else where each branch
         //   assigns a reference to a common variable.
-        // assert!(
-        //     !successor_blocks.is_empty() || state.is_empty(),
-        //     "some predicates are leaked"
-        // );
+        println!("remaining state: {}", &state);
+        assert!(
+            !successor_blocks.is_empty() || state.is_empty(),
+            "some predicates are leaked"
+        );
         if config::dump_debug_info() {
             self.state_at_exit
                 .insert(self.current_label.clone().unwrap(), state.clone());
@@ -188,7 +189,12 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
             statement,
             cjoin(&consumed_permissions)
         );
+        println!("---- lower statement");
+        dbg!(&statement);
+        // dbg!(&consumed_permissions.clone());
+        println!("state before ensure_required_permissions: {}", &state);
         let actions = ensure_required_permissions(self, state, consumed_permissions.clone())?;
+        println!("state after ensure_required_permissions: {}", &state);
         for action in actions {
             let statement = match action {
                 Action::Unfold(FoldingActionState {

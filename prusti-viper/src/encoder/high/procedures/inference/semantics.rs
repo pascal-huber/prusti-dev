@@ -377,9 +377,14 @@ impl CollectPermissionChanges for vir_high::ast::rvalue::Reborrow {
     ) -> SpannedEncodingResult<()> {
         // TODO: check if this is right, same as ref?
         consumed_permissions.push(Permission::Owned(self.place.clone()));
+        // println!("collect_perm_reborrow:");
+        // dbg!(&self);
+        // // produced_permissions.push(Permission::Owned(self.place.clone()));
         produced_permissions.push(Permission::MutBorrowed(MutBorrowed {
             lifetime: self.place_lifetime.clone(),
             place: self.place.clone(),
+            // lifetime: self.operand_lifetime.clone(),
+            // place: self.target.clone(),
         }));
         Ok(())
     }
@@ -393,6 +398,8 @@ impl CollectPermissionChanges for vir_high::ast::rvalue::Ref {
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
         consumed_permissions.push(Permission::Owned(self.place.clone()));
+        // println!("collect_perm_ref:");
+        // dbg!(&self);
         produced_permissions.push(Permission::MutBorrowed(MutBorrowed {
             lifetime: self.lifetime.clone(),
             place: self.place.clone(),
