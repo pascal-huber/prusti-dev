@@ -2853,10 +2853,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     }
     fn encode_open_close_mut_ref_methods(
         &mut self,
-        ty_with_lifetime: &vir_mid::Type,
+        target_type: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
-        ty.erase_lifetime();
+        let mut target_time_without_lifetime: &mut vir_mid::Type = &mut target_type.clone();
+        target_time_without_lifetime.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_open_close_mut_ref_methods

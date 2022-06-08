@@ -20,6 +20,7 @@ use vir_crate::{
     low::{self as vir_low},
     middle::{self as vir_mid, operations::ty::Typed},
 };
+use crate::encoder::middle::core_proof::references::ReferencesInterface;
 
 impl<S: IntoLow> IntoLow for Vec<S> {
     type Target = Vec<<S as IntoLow>::Target>;
@@ -833,75 +834,7 @@ impl IntoLow for vir_mid::Statement {
                     reference_value,
                     statement.position,
                 )?;
-                let mut statements: Vec<vir_low::Statement> = vec![];
-                // if statement.reborrow_operand_lifetime.is_some() {
-                // let operand_lifetime = lowerer.encode_lifetime_const_into_variable(
-                //     statement.clone().reborrow_operand_lifetime.unwrap(),
-                // )?;
-                // let place_lifetime = lowerer.encode_lifetime_const_into_variable(
-                //     statement.clone().reborrow_place_lifetime.unwrap(),
-                // )?;
-
-                // let type_decl = lowerer.encoder.get_type_decl_mid(ty)?;
-                // let target_type = &type_decl.unwrap_reference().target_type;
-                // let reborrow_target_snapshot = statement
-                //     .reborrow_target
-                //     .unwrap()
-                //     .to_procedure_snapshot(lowerer)?;
-                // let reborrow_target_final_snapshot = lowerer.reference_target_final_snapshot(
-                //     ty,
-                //     reborrow_target_snapshot,
-                //     statement.position,
-                // )?;
-                // let validity = lowerer.encode_snapshot_valid_call_for_type(
-                //     reborrow_target_final_snapshot,
-                //     target_type,
-                // )?;
-
-                // let wand = stmtp! {
-                //     statement.position =>
-                //     apply (acc(DeadLifetimeToken([operand_lifetime.clone().into()]))) --*
-                //         (acc(UniqueRef<target_type>(
-                //             place_lifetime,
-                //             [deref_place.clone()],
-                //             [address.clone()],
-                //             [current_snapshot.clone()],
-                //             [final_snapshot.clone()]
-                //         ))
-                //         && valid$Snap$I32(destructor$Snap$ref$Unique$I32$$target_final(_8$snapshot$1))
-                //         && acc(DeadLifetimeToken([operand_lifetime.clone().into()])))
-                // };
-
-                // // TODO: for some reason the macro didn't accept the binary ops
-                // let wand = vir_low::Statement::apply_magic_wand_no_pos(
-                //     vir_low::Expression::magic_wand_no_pos(
-                //         expr! { acc(DeadLifetimeToken([operand_lifetime.clone().into()])) },
-                //         vir_low::Expression::binary_op(
-                //             vir_low::BinaryOpKind::And,
-                //             expr! {
-                //                 acc(UniqueRef<target_type>(
-                //                     place_lifetime,
-                //                     [deref_place.clone()],
-                //                     [address.clone()],
-                //                     [current_snapshot.clone()],
-                //                     [final_snapshot.clone()]
-                //                 ))
-                //             },
-                //             vir_low::Expression::binary_op(
-                //                 vir_low::BinaryOpKind::And,
-                //                 validity,
-                //                 expr! { acc(DeadLifetimeToken([operand_lifetime.into()])) },
-                //                 Default::default(),
-                //             ),
-                //             Default::default(),
-                //         ),
-                //     ),
-                // );
-
-                // TODO: remove everyting leading to this *sigh*
-                // statements.push(wand.set_default_position(statement.position));
-                // }
-                statements.push(stmtp! { statement.position =>
+                Ok(vec![stmtp! { statement.position =>
                     call bor_shorten<ty>(
                         lifetime,
                         old_lifetime,
@@ -911,8 +844,7 @@ impl IntoLow for vir_mid::Statement {
                         [current_snapshot],
                         [final_snapshot]
                     )
-                });
-                Ok(statements)
+                }])
             }
         }
     }
