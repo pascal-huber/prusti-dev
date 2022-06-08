@@ -438,7 +438,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         location: mir::Location,
         old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
         new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
-    ) -> SpannedEncodingResult<()>{
+    ) -> SpannedEncodingResult<()> {
         // TODO: redundnat with encode_lifetime_backups
         for (lifetime, _) in old_derived_lifetimes.clone() {
             if new_derived_lifetimes.contains_key(&lifetime) {

@@ -289,6 +289,7 @@ impl FoldUnfoldState {
         >,
         incoming_state: Self,
     ) -> SpannedEncodingResult<()> {
+        println!("########## MERGE ############");
         let mut new_conditional = PredicateState::default();
         let mut incoming_conditional = PredicateState::default();
 
@@ -304,6 +305,12 @@ impl FoldUnfoldState {
             incoming_state.unconditional.memory_block_stack,
             &mut new_conditional.memory_block_stack,
             &mut incoming_conditional.memory_block_stack,
+        )?;
+        Self::merge_unconditional_mut_borrowed(
+            &mut self.unconditional.mut_borrowed,
+            incoming_state.unconditional.mut_borrowed,
+            &mut new_conditional.mut_borrowed,
+            &mut incoming_conditional.mut_borrowed,
         )?;
 
         // Copy over conditional.
@@ -371,6 +378,42 @@ impl FoldUnfoldState {
         }
         self.incoming_labels.push(incoming_label);
         self.check_no_default_position();
+        println!("###### END OF MERGE with state:");
+        println!("{}", &self);
+        Ok(())
+    }
+
+    fn merge_unconditional_mut_borrowed(
+        unconditional: &mut BTreeMap<vir_high::Expression, vir_high::ty::LifetimeConst>,
+        incoming_unconditional: BTreeMap<vir_high::Expression, vir_high::ty::LifetimeConst>,
+        new_conditional: &mut BTreeMap<vir_high::Expression, vir_high::ty::LifetimeConst>,
+        incoming_conditional: &mut BTreeMap<vir_high::Expression, vir_high::ty::LifetimeConst>,
+    ) -> SpannedEncodingResult<()> {
+        // println!("--- merge_unconditional_mut_borrowed");
+        // dbg!(&incoming_conditional);
+        // dbg!(&incoming_unconditional);
+        // dbg!(&unconditional);
+        let mut unconditional_predicates = BTreeMap::default();
+        for (predicate, lifetime) in &incoming_unconditional {
+            if unconditional.contains_key(&predicate) {
+                unconditional_predicates.insert(predicate, lifetime);
+            } else {
+                incoming_conditional.insert(predicate.clone(), lifetime.clone());
+            }
+        }
+        for (predicate, lifetime) in
+        unconditional.drain_filter(|predicate, lifetime| !unconditional_predicates.contains_key(predicate))
+        {
+            // new_conditional contains the predicates which are not in uncondtional_predicates
+            println!("adding to new_conditional:");
+            dbg!(&predicate);
+            dbg!(&lifetime);
+            new_conditional.insert(predicate, lifetime);
+        }
+        // println!("--- after merge_unconditional_mut_borrowed");
+        // dbg!(&incoming_conditional);
+        // dbg!(&incoming_unconditional);
+        // dbg!(&unconditional);
         Ok(())
     }
 
@@ -393,6 +436,7 @@ impl FoldUnfoldState {
         for predicate in
             unconditional.drain_filter(|predicate| !unconditional_predicates.contains(predicate))
         {
+            // new_conditional contains the predicates which are not in uncondtional_predicates
             new_conditional.insert(predicate);
         }
         Ok(())
