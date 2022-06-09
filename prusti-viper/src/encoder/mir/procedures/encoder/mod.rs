@@ -76,7 +76,10 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let allocation = compute_definitely_allocated(def_id, mir);
     let lifetime_count = lifetimes.lifetime_count();
     let lifetime_token_permission = None;
+    let old_lifetime_ctr: usize = 0;
     let function_call_ctr: usize = 0;
+    let points_to_reborrow = BTreeMap::new();
+    let derived_lifetimes_yet_to_kill: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
         def_id,
@@ -95,7 +98,10 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         fresh_id_generator: 0,
         lifetime_count,
         lifetime_token_permission,
+        old_lifetime_ctr,
         function_call_ctr,
+        points_to_reborrow, // TODO: is this still needed?
+        derived_lifetimes_yet_to_kill,
     };
     procedure_encoder.encode()
 }
@@ -125,7 +131,10 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     fresh_id_generator: usize,
     lifetime_count: usize,
     lifetime_token_permission: Option<vir_high::VariableDecl>,
+    old_lifetime_ctr: usize,
     function_call_ctr: usize,
+    points_to_reborrow: BTreeMap<vir_high::Expression, vir_high::Rvalue>,
+    derived_lifetimes_yet_to_kill: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
@@ -134,7 +143,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let (allocate_parameters, deallocate_parameters) = self.encode_parameters()?;
         let (allocate_returns, deallocate_returns) = self.encode_returns()?;
         self.lifetime_token_permission =
-            Some(self.fresh_ghost_variable("positive_perm_amount", vir_high::Type::MPerm));
+            Some(self.fresh_ghost_variable("lifetime_token_perm_amount", vir_high::Type::MPerm));
         let (assume_preconditions, assert_postconditions) =
             self.encode_functional_specifications()?;
         let (assume_lifetime_preconditions, assert_lifetime_postconditions) =
@@ -418,6 +427,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         bb: mir::BasicBlock,
         data: &mir::BasicBlockData<'tcx>,
     ) -> SpannedEncodingResult<()> {
+        self.points_to_reborrow.clear();
+        self.derived_lifetimes_yet_to_kill.clear();
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
         let mir::BasicBlockData {
@@ -430,6 +441,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
         let terminator_index = statements.len();
+        let mut reborrow_lifetimes_to_remove: BTreeSet<String> = BTreeSet::new();
         let mut original_lifetimes: BTreeSet<String> =
             self.lifetimes.get_loan_live_at_start(location);
         let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> =
@@ -440,6 +452,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
+                &mut reborrow_lifetimes_to_remove,
+                Some(&statements[location.statement_index]),
             )?;
             self.encode_statement(
                 &mut block_builder,
@@ -454,6 +468,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
+                &mut reborrow_lifetimes_to_remove,
+                None,
             )?;
             let terminator = &terminator.kind;
             self.encode_terminator(&mut block_builder, location, terminator)?;
@@ -553,6 +569,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 )?);
             }
             mir::Rvalue::Ref(region, borrow_kind, place) => {
+                let mut is_reborrow = false;
+                if let Some((_ref, projection)) = place.iter_projections().last() {
+                    if projection == mir::ProjectionElem::Deref {
+                        is_reborrow = true;
+                    }
+                }
                 let is_mut = matches!(
                     borrow_kind,
                     mir::BorrowKind::Mut {
@@ -561,13 +583,38 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 );
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place, None)?;
                 let region_name = region.to_text();
-                let encoded_rvalue = vir_high::Rvalue::ref_(
-                    encoded_place,
-                    vir_high::ty::LifetimeConst::new(region_name),
-                    is_mut,
-                    self.lifetime_token_fractional_permission(self.lifetime_count),
-                    encoded_target.clone(),
-                );
+                let encoded_rvalue = if is_reborrow {
+                    let root = self.encoder.encode_local_high(self.mir, place.local)?;
+                    let place_lifetime_name = self.lifetime_name(root.into());
+                    if let Some(place_lifetime_name) = place_lifetime_name {
+                        let place_lifetime = vir_high::ty::LifetimeConst {
+                            name: place_lifetime_name,
+                        };
+                        let operand_lifetime = vir_high::ty::LifetimeConst { name: region_name };
+                        let reborrow = vir_high::Rvalue::reborrow(
+                            encoded_place,
+                            operand_lifetime,
+                            place_lifetime,
+                            is_mut,
+                            self.lifetime_token_fractional_permission(self.lifetime_count),
+                            encoded_target.clone(),
+                        );
+                        self.points_to_reborrow
+                            .insert(encoded_target.clone(), reborrow.clone());
+                        reborrow
+                    } else {
+                        unreachable!()
+                    }
+                } else {
+                    vir_high::Rvalue::ref_(
+                        encoded_place,
+                        vir_high::ty::LifetimeConst::new(region_name),
+                        is_mut,
+                        self.lifetime_token_fractional_permission(self.lifetime_count),
+                        encoded_target.clone(),
+                    )
+                };
+                // dbg!(&encoded_rvalue);
                 let assign_statement = vir_high::Statement::assign(
                     encoded_target,
                     encoded_rvalue,
@@ -830,6 +877,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let encoded_source =
                     self.encoder
                         .encode_place_high(self.mir, *source, Some(span))?;
+                if self.points_to_reborrow.contains_key(&encoded_source) {
+                    let reborrow = self
+                        .points_to_reborrow
+                        .get(&encoded_source)
+                        .unwrap()
+                        .clone();
+                    self.points_to_reborrow
+                        .insert(encoded_target.clone(), reborrow);
+                }
                 block_builder.add_statement(self.set_statement_error(
                     location,
                     ErrorCtxt::MovePlace,
