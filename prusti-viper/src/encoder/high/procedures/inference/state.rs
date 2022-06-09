@@ -55,7 +55,15 @@ impl std::fmt::Display for PredicateState {
 
 impl PredicateState {
     fn is_empty(&self) -> bool {
-        self.owned_non_aliased.is_empty() && self.memory_block_stack.is_empty()
+        // FIXME: Handle Derefs in a nicer way such that they don't get leaked.
+        let mut mut_borrowed_ctr = 0;
+        for (x,_y) in self.mut_borrowed.clone().into_iter() {
+            match &x {
+                vir_high::Expression::Deref(_) => {},
+                _ => { mut_borrowed_ctr += 1},
+            }
+        }
+        self.owned_non_aliased.is_empty() && self.memory_block_stack.is_empty() && mut_borrowed_ctr == 0
     }
 
     fn places_mut(&mut self, kind: PermissionKind) -> &mut BTreeSet<vir_high::Expression> {
@@ -200,6 +208,7 @@ impl PredicateState {
     pub(super) fn clear(&mut self) -> SpannedEncodingResult<()> {
         self.owned_non_aliased.clear();
         self.memory_block_stack.clear();
+        self.mut_borrowed.clear();
         self.check_no_default_position();
         Ok(())
     }
@@ -243,7 +252,7 @@ impl FoldUnfoldState {
         }
     }
 
-    pub(in super::super) fn debug_print(&self) {
+    pub(in super::super) fn debug_urint(&self) {
         debug!("state:\n{}", self);
     }
 
@@ -289,7 +298,6 @@ impl FoldUnfoldState {
         >,
         incoming_state: Self,
     ) -> SpannedEncodingResult<()> {
-        println!("########## MERGE ############");
         let mut new_conditional = PredicateState::default();
         let mut incoming_conditional = PredicateState::default();
 
@@ -378,8 +386,6 @@ impl FoldUnfoldState {
         }
         self.incoming_labels.push(incoming_label);
         self.check_no_default_position();
-        println!("###### END OF MERGE with state:");
-        println!("{}", &self);
         Ok(())
     }
 
@@ -389,11 +395,8 @@ impl FoldUnfoldState {
         new_conditional: &mut BTreeMap<vir_high::Expression, vir_high::ty::LifetimeConst>,
         incoming_conditional: &mut BTreeMap<vir_high::Expression, vir_high::ty::LifetimeConst>,
     ) -> SpannedEncodingResult<()> {
-        // println!("--- merge_unconditional_mut_borrowed");
-        // dbg!(&incoming_conditional);
-        // dbg!(&incoming_unconditional);
-        // dbg!(&unconditional);
         let mut unconditional_predicates = BTreeMap::default();
+        // Unconditional: merge incoming into self.
         for (predicate, lifetime) in &incoming_unconditional {
             if unconditional.contains_key(&predicate) {
                 unconditional_predicates.insert(predicate, lifetime);
@@ -405,15 +408,8 @@ impl FoldUnfoldState {
         unconditional.drain_filter(|predicate, lifetime| !unconditional_predicates.contains_key(predicate))
         {
             // new_conditional contains the predicates which are not in uncondtional_predicates
-            println!("adding to new_conditional:");
-            dbg!(&predicate);
-            dbg!(&lifetime);
             new_conditional.insert(predicate, lifetime);
         }
-        // println!("--- after merge_unconditional_mut_borrowed");
-        // dbg!(&incoming_conditional);
-        // dbg!(&incoming_unconditional);
-        // dbg!(&unconditional);
         Ok(())
     }
 

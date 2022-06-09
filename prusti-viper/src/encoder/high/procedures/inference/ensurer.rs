@@ -62,8 +62,6 @@ fn ensure_required_permission(
         Permission::MutBorrowed(borrow) => unreachable!("requiring a borrow: {}", borrow),
     };
 
-    // TODO: somewhere here
-
     let unconditional_predicate_state = state.get_unconditional_state()?;
     if can_place_be_ensured_in(
         context,
@@ -71,7 +69,6 @@ fn ensure_required_permission(
         permission_kind,
         unconditional_predicate_state,
     )? {
-        println!("if>>>>");
         assert!(
             !ensure_permission_in_state(
                 context,
@@ -83,19 +80,13 @@ fn ensure_required_permission(
             "cannot drop unconditional state"
         );
     } else {
-        println!("else>>>>");
-        println!("state: {}", &state);
         for (condition, conditional_predicate_state) in state.get_conditional_states()? {
-            println!("condition:");
-            dbg!(&condition);
-            println!("conditional_predicate_state: {}", conditional_predicate_state);
             if can_place_be_ensured_in(
                 context,
                 &place,
                 permission_kind,
                 conditional_predicate_state,
             )? {
-                println!("YES, we can!");
                 let mut conditional_actions = Vec::new();
                 let to_drop = ensure_permission_in_state(
                     context,
@@ -104,8 +95,6 @@ fn ensure_required_permission(
                     permission_kind,
                     &mut conditional_actions,
                 )?;
-                dbg!(&to_drop);
-                // println!("{}", &conditional_actions);
                 // Even if the state is unreachable, we add the actions because
                 // one of them should be the marker that the state is
                 // unreachable.
@@ -116,15 +105,9 @@ fn ensure_required_permission(
                 );
                 if to_drop {
                     // The state should be unreachable. Drop it.
-                    // println!("DROPPING:");
-                    // println!("{}", &conditional_predicate_state);
                     conditional_predicate_state.clear()?;
                 } else {
-                    // println!("REMOVING:");
-                    // dbg!(&place);
-                    // println!("before update: {}", &conditional_predicate_state);
                     conditional_predicate_state.remove(permission_kind, &place)?;
-                    // println!("updated: {}", &conditional_predicate_state);
                 }
             } else {
                 println!("No, we cannot! :(");
@@ -156,11 +139,6 @@ fn check_can_place_be_ensured_in(
     // The requirement can be satisfied by restoring a mutable borrow.
     // TODO: contains_blocked wrong?
     let by_restoring_blocked = predicate_state.contains_blocked(place)?.is_some();
-    // println!("-----");
-    // println!("predicate_state: {}", predicate_state);
-    // // dbg!(&place);
-    // dbg!(&predicate_state.contains_blocked(place)?);
-    // dbg!(&by_restoring_blocked);
     // The requirement can be satisfied by converting into Memory Block.
     // Short circuiting is used to prevent infinite recursion.
     let by_into_memory_block = check_conversions
@@ -239,11 +217,8 @@ fn ensure_permission_in_state(
     permission_kind: PermissionKind,
     actions: &mut Vec<Action>,
 ) -> SpannedEncodingResult<bool> {
-    println!("# state at begin of ensure_permission_in_state: {}", &predicate_state);
-    dbg!(&place);
     let to_drop = if predicate_state.contains(permission_kind, &place) {
         // The requirement is already satisfied.
-        println!("requirement satisified for {:?}", &place);
         false
     } else if let Some(prefix) = predicate_state.find_prefix(permission_kind, &place) {
         if prefix.get_type().is_trusted() {
@@ -326,7 +301,7 @@ fn ensure_permission_in_state(
         predicate_state.remove_mut_borrowed(&prefix)?;
         predicate_state.insert(PermissionKind::Owned, prefix.clone())?;
         actions.push(Action::restore_mut_borrowed(lifetime, prefix.clone()));
-        ensure_permission_in_state(context, predicate_state, place, permission_kind, actions)?
+        ensure_permission_in_state(context, predicate_state, place, permission_kind, actions)?;
     } else if permission_kind == PermissionKind::MemoryBlock
         && can_place_be_ensured_in(context, &place, PermissionKind::Owned, predicate_state)?
     {
@@ -398,7 +373,5 @@ fn ensure_permission_in_state(
         // The requirement cannot be satisfied.
         unreachable!("{} {:?}", place, permission_kind);
     };
-    println!("# state at end of ensure_permission_in_state: {}", &predicate_state);
-    dbg!(&to_drop);
     Ok(to_drop)
 }
