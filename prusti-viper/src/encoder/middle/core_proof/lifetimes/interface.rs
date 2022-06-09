@@ -150,7 +150,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
             let arguments: Vec<vir_low::Expression> = vec![lft_1.into(), lft_2.into()];
             self.create_domain_func_app(
                 "Lifetime",
-                "included$",
+                "included",
                 arguments,
                 vir_low::ty::Type::Bool,
                 Default::default(),
@@ -165,7 +165,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
         var_decls!(lft: Lifetime);
         let quantifier_body = self.create_domain_func_app(
             "Lifetime",
-            "included$",
+            "included",
             vec![lft.clone().into(), lft.clone().into()],
             vir_low::ty::Type::Bool,
             Default::default(),
@@ -224,7 +224,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
             for i in 1..(lft_count + 1) {
                 trigger_expressions.push(self.create_domain_func_app(
                     "Lifetime",
-                    "included$",
+                    "included",
                     arguments.get_mut(i - 1).unwrap().clone(),
                     vir_low::ty::Type::Bool,
                     Default::default(),

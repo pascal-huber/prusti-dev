@@ -2785,15 +2785,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 lft_1: Lifetime,
                 lft_2: Lifetime
             }
+            let included = ty!(Bool);
             let pres = vec![
                 expr! { acc(DeadLifetimeToken(lft_2))},
-                // TODO: use macro?
-                vir_low::Expression::domain_function_call(
-                    "Lifetime",
-                    "included$",
-                    vec![lft_1.clone().into(), lft_2.clone().into()],
-                    vir_low::ty::Type::Bool,
-                ),
+                expr! { Lifetime::included( [lft_1.clone().into()], [lft_2.clone().into()] ) },
             ];
             let posts = vec![
                 expr! { acc(DeadLifetimeToken(lft_1))},
@@ -2988,6 +2983,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             use vir_low::macros::*;
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
             let target_type = &type_decl.unwrap_reference().target_type;
+            let included = ty!(Bool);
             var_decls! {
                 lft: Lifetime,
                 old_lft: Lifetime,
@@ -2999,15 +2995,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             }
             let pres = vec![
                 expr! { [vir_low::Expression::no_permission()] < lifetime_perm },
-                expr! { lifetime_perm < [vir_low::Expression::full_permission()] }, // TODO: is this right, it wasn't in the manual encoding?
-                // TODO: use macro for Lifetime::included$
-                vir_low::Expression::domain_function_call(
-                    "Lifetime",
-                    "included$",
-                    vec![lft.clone().into(), old_lft.clone().into()],
-                    vir_low::ty::Type::Bool,
-                ),
-                // TODO: why no access for old_lft???
+                expr! { lifetime_perm < [vir_low::Expression::full_permission()] },
+                expr! { Lifetime::included([lft.clone().into()], [old_lft.clone().into()])},
                 expr! { acc(LifetimeToken(lft), lifetime_perm)},
                 expr! {
                     acc(UniqueRef<target_type>(
@@ -3031,7 +3020,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     ))
                 },
             ];
-
             let method = vir_low::MethodDecl::new(
                 method_name! { bor_shorten<ty> },
                 vec![
