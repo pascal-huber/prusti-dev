@@ -79,6 +79,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let old_lifetime_ctr: usize = 0;
     let function_call_ctr: usize = 0;
     let points_to_reborrow = BTreeMap::new();
+    let derived_lifetimes_yet_to_kill: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
         def_id,
@@ -99,7 +100,8 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         lifetime_token_permission,
         old_lifetime_ctr,
         function_call_ctr,
-        points_to_reborrow,
+        points_to_reborrow, // TODO: is this still needed?
+        derived_lifetimes_yet_to_kill,
     };
     procedure_encoder.encode()
 }
@@ -132,6 +134,7 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     old_lifetime_ctr: usize,
     function_call_ctr: usize,
     points_to_reborrow: BTreeMap<vir_high::Expression, vir_high::Rvalue>,
+    derived_lifetimes_yet_to_kill: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
@@ -425,6 +428,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         data: &mir::BasicBlockData<'tcx>,
     ) -> SpannedEncodingResult<()> {
         self.points_to_reborrow.clear();
+        self.derived_lifetimes_yet_to_kill.clear();
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
         let mir::BasicBlockData {
@@ -442,15 +446,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             self.lifetimes.get_loan_live_at_start(location);
         let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> =
             self.lifetimes.get_origin_contains_loan_at_mid(location);
-        let mut old_derived_lifetimes_yet_to_kill: BTreeMap<String, BTreeSet<String>> =
-            BTreeMap::new();
         while location.statement_index < terminator_index {
             self.encode_lft_for_statement(
                 &mut block_builder,
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
-                &mut old_derived_lifetimes_yet_to_kill,
                 &mut reborrow_lifetimes_to_remove,
                 Some(&statements[location.statement_index]),
             )?;
@@ -467,7 +468,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
-                &mut old_derived_lifetimes_yet_to_kill,
                 &mut reborrow_lifetimes_to_remove,
                 None,
             )?;
