@@ -808,10 +808,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         posts.push(expr! {
             operand_value_final == [reference_target_final_snapshot]
         });
-        // let deref_place = self.reference_deref_place(target_place.into(), position)?;
-        // posts.push(expr! {
-        //     operand_place == [deref_place]
-        // });
         pres.push(expr! {
             [vir_low::Expression::no_permission()] < lifetime_perm
         });
@@ -1383,15 +1379,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     expr! {(acc(MemoryBlock((ComputeAddress::compute_address(target_place, target_root_address)), [size_of.clone()])))},
                     expr! {(acc(OwnedNonAliased<ty>(source_place, source_root_address, source_value, lifetime)))},
                 ];
-                // let deref_source_place =
-                //     self.reference_deref_place(source_place.clone().into(), position)?;
-                // let deref_target_place =
-                //     self.reference_deref_place(target_place.clone().into(), position)?;
                 postconditions = vec![
                     expr! {(acc(OwnedNonAliased<ty>(target_place, target_root_address, source_value, lifetime)))},
                     expr! {(acc(MemoryBlock((ComputeAddress::compute_address(source_place, source_root_address)), [size_of])))},
                     expr! {(([bytes]) == (Snap<ty>::to_bytes(source_value)))},
-                    // expr! { [ deref_source_place ] == [ deref_target_place ] },
                 ];
             } else {
                 statements.push(stmtp! { position =>
@@ -2855,8 +2846,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         target_type: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let mut target_time_without_lifetime: &mut vir_mid::Type = &mut target_type.clone();
-        target_time_without_lifetime.erase_lifetime();
         if !self
             .builtin_methods_state
             .encoded_open_close_mut_ref_methods

@@ -375,16 +375,10 @@ impl CollectPermissionChanges for vir_high::ast::rvalue::Reborrow {
         consumed_permissions: &mut Vec<Permission>,
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
-        // TODO: check if this is right, same as ref?
         consumed_permissions.push(Permission::Owned(self.place.clone()));
-        // println!("collect_perm_reborrow:");
-        // dbg!(&self);
-        // // produced_permissions.push(Permission::Owned(self.place.clone()));
         produced_permissions.push(Permission::MutBorrowed(MutBorrowed {
             lifetime: self.place_lifetime.clone(),
             place: self.place.clone(),
-            // lifetime: self.operand_lifetime.clone(),
-            // place: self.target.clone(),
         }));
         Ok(())
     }
@@ -398,8 +392,6 @@ impl CollectPermissionChanges for vir_high::ast::rvalue::Ref {
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
         consumed_permissions.push(Permission::Owned(self.place.clone()));
-        // println!("collect_perm_ref:");
-        // dbg!(&self);
         produced_permissions.push(Permission::MutBorrowed(MutBorrowed {
             lifetime: self.lifetime.clone(),
             place: self.place.clone(),
@@ -636,14 +628,10 @@ impl CollectPermissionChanges for vir_high::ObtainMutRef {
         consumed_permissions: &mut Vec<Permission>,
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
-        // TODO: write this
-
         let ty = *self.place.get_type().clone().unwrap_reference().target_type;
         let place = self.place.clone().deref(ty, self.position);
         consumed_permissions.push(Permission::Owned(place.clone()));
         produced_permissions.push(Permission::Owned(place));
-        // consumed_permissions.push(Permission::Owned(self.place.clone()));
-        // produced_permissions.push(Permission::Owned(self.place.clone()));
         Ok(())
     }
 }
@@ -707,13 +695,10 @@ impl CollectPermissionChanges for vir_high::BorShorten {
         consumed_permissions: &mut Vec<Permission>,
         produced_permissions: &mut Vec<Permission>,
     ) -> SpannedEncodingResult<()> {
-        // TODO: check if this is right
         let ty = *self.value.get_type().clone().unwrap_reference().target_type;
         let place = self.value.clone().deref(ty, self.position);
         consumed_permissions.push(Permission::Owned(place.clone()));
         produced_permissions.push(Permission::Owned(place));
-        // consumed_permissions.push(Permission::Owned(self.value.clone()));
-        // produced_permissions.push(Permission::Owned(self.value.clone()));
         Ok(())
     }
 }

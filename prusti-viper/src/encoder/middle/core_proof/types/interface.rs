@@ -280,7 +280,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> TypesInterface for Lowerer<'p, 'v, 'tcx> {
         {
             // We insert before doing the actual work to break infinite
             // recursion.
-            // dbg!(&ty_no_lifetime);
             self.types_state.ensured_definitions.insert(ty_no_lifetime);
 
             let type_decl = self.encoder.get_type_decl_mid(ty)?;

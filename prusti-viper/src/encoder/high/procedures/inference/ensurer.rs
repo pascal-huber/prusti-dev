@@ -109,8 +109,6 @@ fn ensure_required_permission(
                 } else {
                     conditional_predicate_state.remove(permission_kind, &place)?;
                 }
-            } else {
-                println!("No, we cannot! :(");
             }
         }
         state.remove_empty_conditional_states()?;
@@ -137,7 +135,6 @@ fn check_can_place_be_ensured_in(
         .contains_non_discriminant_with_prefix(permission_kind, place)
         .is_some();
     // The requirement can be satisfied by restoring a mutable borrow.
-    // TODO: contains_blocked wrong?
     let by_restoring_blocked = predicate_state.contains_blocked(place)?.is_some();
     // The requirement can be satisfied by converting into Memory Block.
     // Short circuiting is used to prevent infinite recursion.
@@ -301,7 +298,7 @@ fn ensure_permission_in_state(
         predicate_state.remove_mut_borrowed(&prefix)?;
         predicate_state.insert(PermissionKind::Owned, prefix.clone())?;
         actions.push(Action::restore_mut_borrowed(lifetime, prefix.clone()));
-        ensure_permission_in_state(context, predicate_state, place, permission_kind, actions)?;
+        ensure_permission_in_state(context, predicate_state, place, permission_kind, actions)?
     } else if permission_kind == PermissionKind::MemoryBlock
         && can_place_be_ensured_in(context, &place, PermissionKind::Owned, predicate_state)?
     {

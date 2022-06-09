@@ -514,7 +514,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         let variables_to_kill =
             self.variables_to_kill(old_derived_lifetimes, new_derived_lifetimes)?;
         for var in variables_to_kill {
-            // FIXME: is this really necessary? If yes, fix it.
+            // FIXME: variables_to_kill is way to agressive.
             // block_builder.add_statement(self.set_statement_error(
             //     location,
             //     ErrorCtxt::LifetimeEncoding,

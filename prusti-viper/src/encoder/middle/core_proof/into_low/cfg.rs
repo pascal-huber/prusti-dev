@@ -10,6 +10,7 @@ use crate::encoder::{
         lowerer::{Lowerer, VariablesLowererInterface},
         places::PlacesInterface,
         predicates::{PredicatesMemoryBlockInterface, PredicatesOwnedInterface},
+        references::ReferencesInterface,
         snapshots::{
             IntoProcedureBoolExpression, IntoProcedureFinalSnapshot, IntoProcedureSnapshot,
             SnapshotValidityInterface, SnapshotVariablesInterface,
@@ -20,7 +21,6 @@ use vir_crate::{
     low::{self as vir_low},
     middle::{self as vir_mid, operations::ty::Typed},
 };
-use crate::encoder::middle::core_proof::references::ReferencesInterface;
 
 impl<S: IntoLow> IntoLow for Vec<S> {
     type Target = Vec<<S as IntoLow>::Target>;
@@ -399,8 +399,6 @@ impl IntoLow for vir_mid::Statement {
                 let validity = lowerer.encode_snapshot_valid_call_for_type(snapshot.clone(), ty)?;
                 let low_statement = if let Some(condition) = statement.condition {
                     let low_condition = lowerer.lower_block_marker_condition(condition)?;
-                    // FIXME: Why was validity not present here? It is needed for if-else example.
-                    //   Did this break something else?
                     stmtp! {
                         statement.position =>
                         apply<low_condition> (acc(DeadLifetimeToken(lifetime))) --* (
@@ -634,12 +632,6 @@ impl IntoLow for vir_mid::Statement {
                         value,
                         statement.position,
                     )];
-                    // lowerer.encode_snapshot_update(
-                    //     &mut statements,
-                    //     &statement.target.into(),
-                    //     value,
-                    //     statement.position,
-                    // )?;
                     Ok(statements)
                 } else {
                     lowerer.encode_lft_tok_sep_take_method(statement.value.len())?;
@@ -649,14 +641,10 @@ impl IntoLow for vir_mid::Statement {
                             lifetime.to_procedure_snapshot(lowerer)?,
                         ));
                     }
-                    // let lifetime_arguments = arguments.clone();
                     let perm_amount = statement
                         .lifetime_token_permission
                         .to_procedure_snapshot(lowerer)?;
                     arguments.push(perm_amount);
-                    // let target = vec![vir_low::Expression::local_no_pos(
-                    //     statement.target.to_procedure_snapshot(lowerer)?,
-                    // )];
                     let statements = vec![Statement::method_call(
                         format!("lft_tok_sep_take${}", statement.value.len()),
                         arguments.clone(),
@@ -665,19 +653,6 @@ impl IntoLow for vir_mid::Statement {
                             .into()],
                         statement.position,
                     )];
-                    // use vir_low::macros::*;
-                    // let intersection = vir_low::Expression::domain_function_call(
-                    //     "Lifetime",
-                    //     format!("intersect${}", statement.value.len()),
-                    //     lifetime_arguments.clone(),
-                    //     ty!(Lifetime),
-                    // );
-                    // lowerer.encode_snapshot_update(
-                    //     &mut statements,
-                    //     &statement.target.clone().into(),
-                    //     intersection,
-                    //     statement.position,
-                    // )?;
                     Ok(statements)
                 }
             }

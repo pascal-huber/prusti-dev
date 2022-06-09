@@ -57,13 +57,15 @@ impl PredicateState {
     fn is_empty(&self) -> bool {
         // FIXME: Handle Derefs in a nicer way such that they don't get leaked.
         let mut mut_borrowed_ctr = 0;
-        for (x,_y) in self.mut_borrowed.clone().into_iter() {
-            match &x {
-                vir_high::Expression::Deref(_) => {},
-                _ => { mut_borrowed_ctr += 1},
+        for (expr, _) in self.mut_borrowed.clone().into_iter() {
+            match &expr {
+                vir_high::Expression::Deref(_) => {}
+                _ => mut_borrowed_ctr += 1,
             }
         }
-        self.owned_non_aliased.is_empty() && self.memory_block_stack.is_empty() && mut_borrowed_ctr == 0
+        self.owned_non_aliased.is_empty()
+            && self.memory_block_stack.is_empty()
+            && mut_borrowed_ctr == 0
     }
 
     fn places_mut(&mut self, kind: PermissionKind) -> &mut BTreeSet<vir_high::Expression> {
@@ -252,7 +254,7 @@ impl FoldUnfoldState {
         }
     }
 
-    pub(in super::super) fn debug_urint(&self) {
+    pub(in super::super) fn debug_print(&self) {
         debug!("state:\n{}", self);
     }
 
@@ -398,16 +400,16 @@ impl FoldUnfoldState {
         let mut unconditional_predicates = BTreeMap::default();
         // Unconditional: merge incoming into self.
         for (predicate, lifetime) in &incoming_unconditional {
-            if unconditional.contains_key(&predicate) {
+            if unconditional.contains_key(predicate) {
                 unconditional_predicates.insert(predicate, lifetime);
             } else {
                 incoming_conditional.insert(predicate.clone(), lifetime.clone());
             }
         }
-        for (predicate, lifetime) in
-        unconditional.drain_filter(|predicate, lifetime| !unconditional_predicates.contains_key(predicate))
+        // Unconditional: check what needs to be made conditional.
+        for (predicate, lifetime) in unconditional
+            .drain_filter(|predicate, _| !unconditional_predicates.contains_key(predicate))
         {
-            // new_conditional contains the predicates which are not in uncondtional_predicates
             new_conditional.insert(predicate, lifetime);
         }
         Ok(())
@@ -432,7 +434,6 @@ impl FoldUnfoldState {
         for predicate in
             unconditional.drain_filter(|predicate| !unconditional_predicates.contains(predicate))
         {
-            // new_conditional contains the predicates which are not in uncondtional_predicates
             new_conditional.insert(predicate);
         }
         Ok(())
