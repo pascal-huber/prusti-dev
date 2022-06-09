@@ -397,20 +397,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         lifetime_backups: &BTreeMap<String, (String, vir_high::Expression)>,
     ) -> SpannedEncodingResult<()> {
         for (lifetime, (old_lifetime, object)) in lifetime_backups {
-            let mut reborrow_operand_lifetime: Option<vir_high::ty::LifetimeConst> = None;
-            let mut reborrow_place_lifetime: Option<vir_high::ty::LifetimeConst> = None;
-            let mut reborrow_target: Option<vir_high::Expression> = None;
-            for (expr, reborrow) in &self.points_to_reborrow {
-                if expr == object {
-                    if let vir_high::Rvalue::Reborrow(reborrow) = reborrow {
-                        reborrow_operand_lifetime = Some(reborrow.operand_lifetime.clone());
-                        reborrow_place_lifetime = Some(reborrow.place_lifetime.clone());
-                        reborrow_target = Some(reborrow.target.clone());
-                    } else {
-                        unreachable!()
-                    }
-                }
-            }
             block_builder.add_statement(self.set_statement_error(
                 location,
                 ErrorCtxt::LifetimeEncoding,
@@ -423,9 +409,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
                     },
                     object.clone(),
                     self.lifetime_token_fractional_permission(self.lifetime_count),
-                    reborrow_operand_lifetime,
-                    reborrow_place_lifetime,
-                    reborrow_target,
                 ),
             )?);
         }

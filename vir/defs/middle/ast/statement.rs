@@ -418,8 +418,5 @@ pub struct BorShorten {
     pub old_lifetime: LifetimeConst,
     pub value: Expression,
     pub lifetime_token_permission: Expression,
-    pub reborrow_operand_lifetime: Option<LifetimeConst>,
-    pub reborrow_place_lifetime: Option<LifetimeConst>,
-    pub reborrow_target: Option<Expression>,
     pub position: Position,
 }
