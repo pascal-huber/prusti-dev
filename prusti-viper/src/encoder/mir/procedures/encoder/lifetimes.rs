@@ -52,26 +52,29 @@ pub(super) trait LifetimesEncoder<'tcx> {
         new_original_lifetimes: &mut BTreeSet<String>,
         new_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     );
+    fn lifetime_backups(
+        &mut self,
+        old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
+        lifetime_backups: &mut BTreeMap<String, (String, vir_high::Local)>,
+    ) -> SpannedEncodingResult<()>;
     fn encode_obtain_mut_ref(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
-        old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
-        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
-    ) -> SpannedEncodingResult<()>;
-    fn encode_bor_shorten(
-        &mut self,
-        block_builder: &mut BasicBlockBuilder,
-        location: mir::Location,
-        lifetime_backups: &BTreeMap<String, (String, vir_high::Expression)>,
+        lifetime_backups: &BTreeMap<String, (String, vir_high::Local)>,
     ) -> SpannedEncodingResult<()>;
     fn encode_lifetime_backups(
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
-        old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
-        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
-        lifetime_backups: &mut BTreeMap<String, (String, vir_high::Expression)>,
+        lifetime_backups: &BTreeMap<String, (String, vir_high::Local)>,
+    ) -> SpannedEncodingResult<()>;
+    fn encode_bor_shorten(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        lifetime_backups: &BTreeMap<String, (String, vir_high::Local)>,
     ) -> SpannedEncodingResult<()>;
     fn encode_new_lft(
         &mut self,
@@ -253,8 +256,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             .collect();
         let lifetimes_to_create =
             self.lifetimes_to_create(old_original_lifetimes, &new_original_lifetimes);
-        let mut lifetime_backups: BTreeMap<String, (String, vir_high::Expression)> =
-            BTreeMap::new();
+        let mut lifetime_backups: BTreeMap<String, (String, vir_high::Local)> = BTreeMap::new();
 
         if let Some(reborrow_lifetimes_to_remove) = reborrow_lifetimes_to_remove {
             self.update_lifetimes_to_remove(
@@ -270,19 +272,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             );
         }
         if shorten_lifetimes {
-            self.encode_obtain_mut_ref(
-                block_builder,
-                location,
-                old_derived_lifetimes,
-                new_derived_lifetimes,
-            )?;
-            self.encode_lifetime_backups(
-                block_builder,
-                location,
+            self.lifetime_backups(
                 old_derived_lifetimes,
                 new_derived_lifetimes,
                 &mut lifetime_backups,
             )?;
+            self.encode_obtain_mut_ref(block_builder, location, &lifetime_backups)?;
+            self.encode_lifetime_backups(block_builder, location, &lifetime_backups)?;
         }
         self.encode_lft_return(
             block_builder,
@@ -365,7 +361,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         &mut self,
         block_builder: &mut BasicBlockBuilder,
         location: mir::Location,
-        lifetime_backups: &BTreeMap<String, (String, vir_high::Expression)>,
+        lifetime_backups: &BTreeMap<String, (String, vir_high::Local)>,
     ) -> SpannedEncodingResult<()> {
         for (lifetime, (old_lifetime, object)) in lifetime_backups {
             block_builder.add_statement(self.set_statement_error(
@@ -378,7 +374,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
                     vir_high::ty::LifetimeConst {
                         name: old_lifetime.to_string(),
                     },
-                    object.clone(),
+                    object.clone().into(),
                     self.lifetime_token_fractional_permission(self.lifetime_count),
                 ),
             )?);
@@ -386,47 +382,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         Ok(())
     }
 
-    fn encode_obtain_mut_ref(
+    fn lifetime_backups(
         &mut self,
-        block_builder: &mut BasicBlockBuilder,
-        location: mir::Location,
         old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
         new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
-    ) -> SpannedEncodingResult<()> {
-        // TODO: redundnat with encode_lifetime_backups
-        for (lifetime, _) in old_derived_lifetimes.clone() {
-            if new_derived_lifetimes.contains_key(&lifetime) {
-                if let Some(var) = self.procedure.get_var_of_lifetime(&lifetime[..]) {
-                    let object = self.encode_local(var)?;
-                    // let lifetime_var =
-                    //     vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
-                    block_builder.add_statement(self.set_statement_error(
-                        location,
-                        ErrorCtxt::LifetimeEncoding,
-                        vir_high::Statement::obtain_mut_ref_no_pos(
-                            vir_high::ty::LifetimeConst {
-                                name: lifetime.to_string(),
-                            },
-                            // TODO: remove this permission from ObtainMutRef, not needed:
-                            self.lifetime_token_fractional_permission(self.lifetime_count),
-                            object.variable.clone().into(),
-                        ),
-                    )?);
-                } else {
-                    unreachable!()
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn encode_lifetime_backups(
-        &mut self,
-        block_builder: &mut BasicBlockBuilder,
-        location: mir::Location,
-        old_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
-        new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
-        lifetime_backups: &mut BTreeMap<String, (String, vir_high::Expression)>,
+        lifetime_backups: &mut BTreeMap<String, (String, vir_high::Local)>,
     ) -> SpannedEncodingResult<()> {
         for (lifetime, _) in old_derived_lifetimes.clone() {
             if new_derived_lifetimes.contains_key(&lifetime) {
@@ -435,25 +395,53 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
                     let backup_var_name =
                         format!("old_{}_{}", lifetime.clone(), self.old_lifetime_ctr);
                     self.old_lifetime_ctr += 1;
-                    lifetime_backups
-                        .insert(lifetime.clone(), (backup_var_name.clone(), object.into()));
-                    let lifetime_var =
-                        vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
-                    let backup_var =
-                        vir_high::VariableDecl::new(backup_var_name, vir_high::ty::Type::Lifetime);
-                    block_builder.add_statement(self.set_statement_error(
-                        location,
-                        ErrorCtxt::LifetimeEncoding,
-                        vir_high::Statement::lifetime_take_no_pos(
-                            backup_var,
-                            vec![lifetime_var],
-                            self.lifetime_token_fractional_permission(self.lifetime_count),
-                        ),
-                    )?);
-                } else {
-                    unreachable!()
+                    lifetime_backups.insert(lifetime.clone(), (backup_var_name.clone(), object));
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn encode_obtain_mut_ref(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        lifetime_backups: &BTreeMap<String, (String, vir_high::Local)>,
+    ) -> SpannedEncodingResult<()> {
+        for (lifetime, (_backup_var_name, object)) in lifetime_backups {
+            block_builder.add_statement(self.set_statement_error(
+                location,
+                ErrorCtxt::LifetimeEncoding,
+                vir_high::Statement::obtain_mut_ref_no_pos(
+                    object.variable.clone().into(),
+                    vir_high::ty::LifetimeConst {
+                        name: lifetime.to_string(),
+                    },
+                ),
+            )?);
+        }
+        Ok(())
+    }
+
+    fn encode_lifetime_backups(
+        &mut self,
+        block_builder: &mut BasicBlockBuilder,
+        location: mir::Location,
+        lifetime_backups: &BTreeMap<String, (String, vir_high::Local)>,
+    ) -> SpannedEncodingResult<()> {
+        for (lifetime, (backup_var_name, _object)) in lifetime_backups {
+            let lifetime_var = vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
+            let backup_var =
+                vir_high::VariableDecl::new(backup_var_name, vir_high::ty::Type::Lifetime);
+            block_builder.add_statement(self.set_statement_error(
+                location,
+                ErrorCtxt::LifetimeEncoding,
+                vir_high::Statement::lifetime_take_no_pos(
+                    backup_var,
+                    vec![lifetime_var],
+                    self.lifetime_token_fractional_permission(self.lifetime_count),
+                ),
+            )?);
         }
         Ok(())
     }

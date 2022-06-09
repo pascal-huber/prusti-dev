@@ -333,16 +333,10 @@ pub struct LifetimeReturn {
     pub position: Position,
 }
 
-#[display(
-    fmt = "obtain_mut_ref({}, rd({}), {})",
-    lifetime,
-    lifetime_token_permission,
-    place
-)]
+#[display(fmt = "obtain_mut_ref({}, {})", place, lifetime)]
 pub struct ObtainMutRef {
-    pub lifetime: LifetimeConst,
-    pub lifetime_token_permission: Expression,
     pub place: Expression,
+    pub lifetime: LifetimeConst,
     pub position: Position,
 }
 

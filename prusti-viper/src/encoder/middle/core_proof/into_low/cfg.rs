@@ -626,7 +626,6 @@ impl IntoLow for vir_mid::Statement {
                             .to_procedure_snapshot(lowerer)?,
                     );
                     let statements = vec![Statement::assign(
-                        // statement.target.to_procedure_snapshot(lowerer)?,
                         lowerer
                             .new_snapshot_variable_version(&statement.target, statement.position)?,
                         value,

@@ -561,7 +561,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                         is_reborrow = true;
                     }
                 }
-                // TODO: remove is_mut?
                 let is_mut = matches!(
                     borrow_kind,
                     mir::BorrowKind::Mut {

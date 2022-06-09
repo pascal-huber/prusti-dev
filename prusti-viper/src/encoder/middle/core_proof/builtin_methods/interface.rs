@@ -850,10 +850,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             operand_lifetime: Lifetime,
             lifetime_perm: Perm
         };
-        let predicate = {
-            expr! {
-                acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
-            }
+        let predicate = expr! {
+            acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
         };
         let reference_predicate = expr! {
             acc(OwnedNonAliased<result_type>(target_place, target_address, result_value, operand_lifetime))
