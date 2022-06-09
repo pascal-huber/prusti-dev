@@ -15,13 +15,15 @@ use crate::encoder::{
         predicates::{PredicatesMemoryBlockInterface, PredicatesOwnedInterface},
         references::ReferencesInterface,
         snapshots::{
-            IntoProcedureSnapshot, IntoSnapshot, SnapshotBytesInterface, SnapshotValidityInterface,
-            SnapshotValuesInterface, SnapshotVariablesInterface,
+            IntoProcedureFinalSnapshot, IntoProcedureSnapshot, IntoSnapshot,
+            SnapshotBytesInterface, SnapshotValidityInterface, SnapshotValuesInterface,
+            SnapshotVariablesInterface,
         },
         type_layouts::TypeLayoutsInterface,
         utils::type_decl_encoder::TypeDeclWalker,
     },
 };
+
 use rustc_hash::FxHashSet;
 use vir_crate::{
     common::{
@@ -188,32 +190,18 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<()> {
         match value {
             vir_mid::Rvalue::Reborrow(value) => {
-                if let vir_mid::Expression::Deref(vir_mid::Deref { box base, .. }) = &value.place {
-                    let place_lifetime =
-                        self.encode_lifetime_const_into_variable(value.place_lifetime.clone())?;
-                    arguments.push(place_lifetime.into());
-                    self.encode_place_arguments(arguments, &value.place)?;
-
-                    // NOTE: to_procedure_snapshot creates "target_current" in "fn deref_to_snapshot"
-                    // thus we create "target_final" manually:
-                    let base_snapshot = base.clone().to_procedure_snapshot(self)?;
-                    let value_final = self.reference_target_final_snapshot(
-                        base.get_type(),
-                        base_snapshot,
-                        Default::default(),
-                    )?;
-                    arguments.push(value_final);
-
-                    let operand_lifetime =
-                        self.encode_lifetime_const_into_variable(value.operand_lifetime.clone())?;
-                    arguments.push(operand_lifetime.into());
-                } else {
-                    unreachable!()
-                }
-
+                let place_lifetime =
+                    self.encode_lifetime_const_into_variable(value.place_lifetime.clone())?;
+                let value_final = value.place.to_procedure_final_snapshot(self)?;
+                let operand_lifetime =
+                    self.encode_lifetime_const_into_variable(value.operand_lifetime.clone())?;
                 let perm_amount = value
                     .lifetime_token_permission
                     .to_procedure_snapshot(self)?;
+                arguments.push(place_lifetime.into());
+                self.encode_place_arguments(arguments, &value.place)?;
+                arguments.push(value_final);
+                arguments.push(operand_lifetime.into());
                 arguments.push(perm_amount);
             }
             vir_mid::Rvalue::Ref(value) => {
@@ -468,7 +456,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<()> {
         use vir_low::macros::*;
         let assigned_value = match value {
-            // TODO: check if this is ok
             vir_mid::Rvalue::Reborrow(_value) => {
                 unreachable!("Reborrow should be handled in the caller.");
             }
