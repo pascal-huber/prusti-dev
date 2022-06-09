@@ -55,17 +55,13 @@ impl std::fmt::Display for PredicateState {
 
 impl PredicateState {
     fn is_empty(&self) -> bool {
-        // FIXME: Handle Derefs in a nicer way such that they don't get leaked.
-        let mut mut_borrowed_ctr = 0;
-        for (expr, _) in self.mut_borrowed.clone().into_iter() {
-            match &expr {
-                vir_high::Expression::Deref(_) => {}
-                _ => mut_borrowed_ctr += 1,
-            }
-        }
         self.owned_non_aliased.is_empty()
             && self.memory_block_stack.is_empty()
-            && mut_borrowed_ctr == 0
+            && self.mut_borrowed.is_empty()
+    }
+
+    fn contains_only_leakable(&self) -> bool {
+        self.owned_non_aliased.is_empty() && self.memory_block_stack.is_empty()
     }
 
     fn places_mut(&mut self, kind: PermissionKind) -> &mut BTreeSet<vir_high::Expression> {
@@ -258,8 +254,13 @@ impl FoldUnfoldState {
         debug!("state:\n{}", self);
     }
 
-    pub(in super::super) fn is_empty(&self) -> bool {
-        self.unconditional.is_empty() && self.conditional.is_empty()
+    pub(in super::super) fn contains_only_leakable(&self) -> bool {
+        for state in self.conditional.values() {
+            if !state.contains_only_leakable() {
+                return false;
+            }
+        }
+        self.unconditional.contains_only_leakable()
     }
 
     pub(in super::super) fn reset_incoming_labels_with(
