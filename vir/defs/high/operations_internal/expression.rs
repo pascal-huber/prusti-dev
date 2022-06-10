@@ -2,11 +2,8 @@ use super::{
     super::ast::{
         expression::{
             visitors::{
-                default_fold_expression, default_fold_quantifier, default_walk_addr_of,
-                default_walk_builtin_func_app, default_walk_constant, default_walk_constructor,
-                default_walk_deref, default_walk_expression, default_walk_func_app,
-                default_walk_local, default_walk_seq, default_walk_variant, ExpressionFolder,
-                ExpressionWalker,
+                default_fold_expression, default_fold_quantifier, default_walk_expression,
+                ExpressionFolder, ExpressionWalker,
             },
             *,
         },
@@ -105,7 +102,6 @@ impl Expression {
             _ => false,
         }
     }
-
     /// Check whether the place is a dereference of a reference and if that is
     /// the case, returns the uniqueness guarantees given by this reference.
     pub fn get_dereference_kind(&self) -> Option<(ty::LifetimeConst, ty::Uniqueness)> {

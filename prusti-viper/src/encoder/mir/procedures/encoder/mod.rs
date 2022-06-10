@@ -78,7 +78,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let old_lifetime_ctr: usize = 0;
     let function_call_ctr: usize = 0;
     let derived_lifetimes_yet_to_kill: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    let reborrow_lifetimes_to_remove: BTreeMap<mir::BasicBlock, BTreeSet<String>> = BTreeMap::new();
+    let reborrow_lifetimes_to_remove: BTreeSet<String> = BTreeSet::new();
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
         def_id,
@@ -100,8 +100,7 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         old_lifetime_ctr,
         function_call_ctr,
         derived_lifetimes_yet_to_kill,
-        reborrow_lifetimes_to_remove: reborrow_lifetimes_to_remove,
-        current_bb: None,
+        reborrow_lifetimes_to_remove,
     };
     procedure_encoder.encode()
 }
@@ -134,8 +133,7 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     old_lifetime_ctr: usize,
     function_call_ctr: usize,
     derived_lifetimes_yet_to_kill: BTreeMap<String, BTreeSet<String>>,
-    reborrow_lifetimes_to_remove: BTreeMap<mir::BasicBlock, BTreeSet<String>>,
-    current_bb: Option<mir::BasicBlock>,
+    reborrow_lifetimes_to_remove: BTreeSet<String>,
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
@@ -411,7 +409,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             if !self.specification_blocks.is_specification_block(bb)
                 && self.reachable_blocks.contains(&bb)
             {
-                self.current_bb = Some(bb);
                 self.encode_basic_block(procedure_builder, bb, data)?;
             }
         }
@@ -430,6 +427,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         data: &mir::BasicBlockData<'tcx>,
     ) -> SpannedEncodingResult<()> {
         self.derived_lifetimes_yet_to_kill.clear();
+        self.reborrow_lifetimes_to_remove.clear();
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
         let mir::BasicBlockData {
@@ -589,15 +587,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                             name: place_lifetime_name,
                         };
                         let operand_lifetime = vir_high::ty::LifetimeConst { name: region_name };
-                        let reborrow = vir_high::Rvalue::reborrow(
+                        vir_high::Rvalue::reborrow(
                             encoded_place,
                             operand_lifetime,
                             place_lifetime,
                             is_mut,
                             self.lifetime_token_fractional_permission(self.lifetime_count),
                             encoded_target.clone(),
-                        );
-                        reborrow
+                        )
                     } else {
                         unreachable!()
                     }

@@ -26,7 +26,7 @@ impl WithIdentifier for Repeat {
 
 impl WithIdentifier for Reborrow {
     fn get_identifier(&self) -> String {
-        format!("ref_${}", self.place.get_type().get_identifier())
+        format!("Reborrow${}", self.place.get_type().get_identifier())
     }
 }
 

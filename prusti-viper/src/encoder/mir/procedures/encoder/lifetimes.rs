@@ -26,11 +26,6 @@ pub(super) trait LifetimesEncoder<'tcx> {
         location: mir::Location,
         block_builder: &mut BasicBlockBuilder,
     ) -> SpannedEncodingResult<()>;
-    // TODO: remove this once I'm sure I don't need it
-    // fn inherit_reborrow_lifetimes_to_remove(
-    //     &mut self,
-    //     target_block: mir::BasicBlock,
-    // );
     #[allow(clippy::too_many_arguments)]
     fn encode_lft(
         &mut self,
@@ -185,9 +180,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         let mut new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
         block_builder.add_comment(format!("Prepare lifetimes for statement {:?}", location));
         let new_reborrow_lifetime_to_ignore: Option<String> = self.reborrow_lifetime(statement);
-        self.reborrow_lifetimes_to_remove
-            .entry(self.current_bb.unwrap())
-            .or_insert_with(BTreeSet::new);
         self.encode_lft(
             block_builder,
             location,
@@ -240,28 +232,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         )?;
         Ok(())
     }
-
-    // TODO: remove this once I'm sure I don't need it
-    // fn inherit_reborrow_lifetimes_to_remove(
-    //     &mut self,
-    //     target_block: mir::BasicBlock,
-    // ){
-    //     assert!(false);
-    //     let mut current = self
-    //         .reborrow_lifetimes_to_remove
-    //         .get(&self.current_bb.unwrap())
-    //         .unwrap()
-    //         .clone();
-    //     if let std::collections::btree_map::Entry::Vacant(e) = self
-    //         .reborrow_lifetimes_to_remove.entry(target_block) {
-    //         e.insert(current);
-    //     } else {
-    //         self.reborrow_lifetimes_to_remove
-    //             .get_mut(&target_block)
-    //             .unwrap()
-    //             .append(&mut current);
-    //     }
-    // }
 
     /// Adds all statements needed for the encoding of the location.
     fn encode_lft(
@@ -350,8 +320,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             }
         }
         self.reborrow_lifetimes_to_remove
-            .get_mut(&self.current_bb.unwrap())
-            .unwrap()
             .append(&mut new_lifetimes_to_ignore);
     }
 
@@ -363,26 +331,22 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         old_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
         lifetimes_to_create: &mut BTreeSet<String>,
     ) {
-        let reborrow_lifetimes_to_remove = self
-            .reborrow_lifetimes_to_remove
-            .get(&self.current_bb.unwrap())
-            .unwrap();
         *lifetimes_to_create = lifetimes_to_create
             .clone()
             .iter()
-            .filter(|&lft| !reborrow_lifetimes_to_remove.contains(lft))
+            .filter(|&lft| !self.reborrow_lifetimes_to_remove.contains(lft))
             .cloned()
             .collect();
         *new_original_lifetimes = new_original_lifetimes
             .clone()
             .iter()
-            .filter(|&lft| !reborrow_lifetimes_to_remove.contains(lft))
+            .filter(|&lft| !self.reborrow_lifetimes_to_remove.contains(lft))
             .cloned()
             .collect();
         *old_original_lifetimes = old_original_lifetimes
             .clone()
             .iter()
-            .filter(|&lft| !reborrow_lifetimes_to_remove.contains(lft))
+            .filter(|&lft| !self.reborrow_lifetimes_to_remove.contains(lft))
             .cloned()
             .collect();
         *old_derived_lifetimes = old_derived_lifetimes
@@ -392,7 +356,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
                 let updated_derived_from: BTreeSet<String> = derived_from
                     .clone()
                     .iter()
-                    .filter(|&lft| !reborrow_lifetimes_to_remove.contains(lft))
+                    .filter(|&lft| !self.reborrow_lifetimes_to_remove.contains(lft))
                     .cloned()
                     .collect();
                 (lifetime.clone(), updated_derived_from)
@@ -405,7 +369,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
                 let updated_derived_from: BTreeSet<String> = derived_from
                     .clone()
                     .iter()
-                    .filter(|&lft| !reborrow_lifetimes_to_remove.contains(lft))
+                    .filter(|&lft| !self.reborrow_lifetimes_to_remove.contains(lft))
                     .cloned()
                     .collect();
                 (lifetime.clone(), updated_derived_from)
