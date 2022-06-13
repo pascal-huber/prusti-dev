@@ -2250,6 +2250,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     }
                 }
             } else {
+                // println!("------ encode_memory_block_join_method");
+                // dbg!(&ty);
+                // TODO: Reference to primitive type
                 let mut helper = SplitJoinHelper::new(true);
                 helper.walk_type(ty, (), self)?;
                 let to_bytes = ty! { Bytes };

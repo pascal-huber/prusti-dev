@@ -317,6 +317,8 @@ impl IntoLow for vir_mid::Statement {
                 Ok(vec![low_statement])
             }
             Self::JoinBlock(statement) => {
+                // println!("---- cfg.rs join block");
+                // dbg!(&statement);
                 let ty = statement.place.get_type();
                 lowerer.encode_memory_block_join_method(ty)?;
                 let address = lowerer.encode_expression_as_place_address(&statement.place)?;
