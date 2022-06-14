@@ -239,7 +239,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 self.encode_place_arguments(arguments, &value.place)?;
             }
             vir_mid::Rvalue::Aggregate(value) => {
+                println!("----- rvalue::aggregate");
                 for operand in &value.operands {
+                    dbg!(&operand);
                     self.encode_operand_arguments(arguments, operand)?;
                 }
             }
@@ -604,6 +606,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 self.construct_constant_snapshot(result_type, discriminant_call, position)?
             }
             vir_mid::Rvalue::Aggregate(value) => {
+                // println!("------rvalue_aggr");
+                // dbg!(&pre_write_statements);
                 let mut arguments = Vec::new();
                 for (i, operand) in value.operands.iter().enumerate() {
                     let operand_value = self.encode_assign_operand(
@@ -614,6 +618,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         i.try_into().unwrap(),
                         operand,
                     )?;
+                    // dbg!(&pre_write_statements);
                     arguments.push(operand_value.into());
                 }
                 let assigned_value = match &value.ty {
@@ -644,6 +649,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             assigned_value,
             position,
         ));
+        // dbg!(&pre_write_statements);
         Ok(())
     }
     fn encode_assign_method_rvalue_checked_binary_op(
@@ -1025,6 +1031,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         // which then could be implemented as bodyless methods
                         // in case `ty` is a type variable.
                         self.encode_into_memory_block_method(ty)?;
+                        // TODO: lifetimes missing in into_memory_block here
                         pre_write_statements
                             .push(stmt! { call into_memory_block<ty>(place, root_address, value) });
                     }
@@ -1623,7 +1630,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let address = expr! { ComputeAddress::compute_address(place, root_address) };
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
             self.mark_owned_non_aliased_as_unfolded(ty)?;
-            match type_decl {
+            match &type_decl {
                 vir_mid::TypeDecl::Bool
                 | vir_mid::TypeDecl::Int(_)
                 | vir_mid::TypeDecl::Float(_)
@@ -1837,6 +1844,23 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 // because we would need builtin methods to support loops if we
                 // wanted to implement the body.
                 None
+            } else if let vir_mid::TypeDecl::Struct(decl) = &type_decl {
+            // } else if ty.is_struct() {
+                // TODO: We currently make write_place bodyless for structs with fields
+                // TODO: Do what what I wrote above, not all structs...
+                // println!("---- struct, no method body");
+                // let type_decl = self.encoder.get_type_decl_mid(ty)?;
+                let mut body = Some(statements);
+                for field in decl.iter_fields() {
+                    if field.ty.is_reference() {
+                        body = None;
+                    }
+                    // parameters.push(vir_low::VariableDecl::new(
+                    //     field.name.clone(),
+                    //     field.ty.to_snapshot(self)?,
+                    // ));
+                }
+                body
             } else {
                 Some(statements)
             };
@@ -2348,6 +2372,24 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 .conjoin();
             let arguments = self.extract_non_type_parameters_from_type_as_exprs(ty)?;
             let arguments2 = arguments.clone();
+            if let vir_mid::Type::Struct(_) = ty {
+                // TODO: ignore body only for structs with references
+
+            }
+            // let mut method = if let vir_mid::Type::Struct(_) = ty {
+            //     method! {
+            //     into_memory_block<ty>(
+            //         place: Place,
+            //         root_address: Address,
+            //         value: {ty.to_snapshot(self)?},
+            //         *parameters
+            //     ) returns ()
+            //         requires ([parameters_validity]);
+            //         requires (acc(OwnedNonAliased<ty>(place, root_address, value; arguments)));
+            //         ensures (acc(MemoryBlock([address], [size_of])));
+            //         ensures (([bytes]) == (Snap<to_bytes_type>::to_bytes([memory_block_value])));
+            //     }
+            // } else {
             let mut method = method! {
                 into_memory_block<ty>(
                     place: Place,
@@ -2528,10 +2570,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     ensures (acc(MemoryBlock([address], [size_of])));
                     ensures (([bytes]) == (Snap<to_bytes_type>::to_bytes([memory_block_value])));
             };
-            if !ty.is_trusted() && !ty.is_array() {
+            method.body = if ty.is_trusted() || ty.is_array() {
                 // FIXME: Encode the body for array. (Would require a loop to achieve this.)
-                method.body = Some(statements);
-            }
+                None
+            } else if let vir_mid::Type::Struct(_) = ty {
+                // FIXME: Encode the body for structs with references.
+                // TODO: make what I just wrote above, not all structs!
+                None
+            } else {
+                Some(statements)
+            };
             self.declare_method(method)?;
         }
         Ok(())
@@ -2543,15 +2591,38 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         value: vir_mid::Rvalue,
         position: vir_low::Position,
     ) -> SpannedEncodingResult<()> {
+        println!("encode_assign_method_call");
         let method_name = self.encode_assign_method_name(target.get_type(), &value)?;
         self.encode_assign_method(&method_name, target.get_type(), &value)?;
         let target_place = self.encode_expression_as_place(&target)?;
         let target_address = self.extract_root_address(&target)?;
         let mut arguments = vec![target_place, target_address];
         self.encode_rvalue_arguments(&mut arguments, &value)?;
+        // println!("#### ----");
+        // dbg!(&target.get_type());
         arguments.extend(
             self.extract_non_type_arguments_from_type_excluding_lifetimes(target.get_type())?,
         );
+
+        // add lifetimes for structs
+        if target.get_type().is_struct() {
+            let type_decl = self.encoder.get_type_decl_mid(&target.get_type())?;
+            if let vir_mid::TypeDecl::Struct(decl) = type_decl {
+                for field in decl.iter_fields() {
+                    if let vir_mid::Type::Reference(reference) = &field.ty {
+                        let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+                        arguments.push(lifetime.into())
+                    }
+                }
+            }
+        }
+
+        // arguments.extend(
+        //     self.extract_non_type_arguments_from_type(target.get_type())?,
+        // );
+        // arguments.extend(
+        //     self.extract_lifetime_arguments(target.get_type())?,
+        // );
         let target_value_type = target.get_type().to_snapshot(self)?;
         let result_value = self.create_new_temporary_variable(target_value_type)?;
         statements.push(vir_low::Statement::method_call(

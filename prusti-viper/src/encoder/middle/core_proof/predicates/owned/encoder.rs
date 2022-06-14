@@ -443,11 +443,11 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             let field_ty = &field.ty;
             if let vir_mid::Type::Reference(reference) = field_ty {
                 // TODO: why vec here?
-                println!("###### encode_owned_non_aliased_with_ref_field");
-                dbg!(&field_place);
-                dbg!(&field_value);
-                dbg!(&field_ty);
-                dbg!(&reference.lifetime.clone());
+                // println!("###### encode_owned_non_aliased_with_ref_field");
+                // dbg!(&field_place);
+                // dbg!(&field_value);
+                // dbg!(&field_ty);
+                // dbg!(&reference.lifetime.clone());
 
                 // let lifetime_ty = self.lowerer.domain_type("Lifetime")?;
                 let lifetime_ty = ty!(Lifetime);
@@ -473,7 +473,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 };
                 field_predicates.push(acc);
             } else {
-                println!("###### encode_owned_non_aliased_with_NO_ref_field");
                 let acc = expr! {
                     acc(OwnedNonAliased<field_ty>(
                         [field_place], root_address, [field_value]
@@ -502,9 +501,9 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 (([bytes]) == (Snap<ty>::to_bytes(snapshot)))
             });
         }
-        println!("-----");
-        dbg!(&ty);
-        dbg!(&lifetimes);
+        // println!("-----");
+        // dbg!(&ty);
+        // dbg!(&lifetimes);
         let predicate_decl = predicate! {
             OwnedNonAliased<ty>(place: Place, root_address: Address, snapshot: {snapshot_type}, *lifetimes)
             {(
