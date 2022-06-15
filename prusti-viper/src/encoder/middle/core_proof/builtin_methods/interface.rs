@@ -400,6 +400,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     post_write_statements.push(stmtp! {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
+                    // Redundant!
                     let mut lifetimes: Vec<vir_low::Expression> = vec![];
                     if let vir_mid::Rvalue::Aggregate(value) = value {
                         for operand in &value.operands {
@@ -2633,19 +2634,25 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.extract_non_type_arguments_from_type_excluding_lifetimes(target.get_type())?,
         );
 
-        // TODO: this is redundant and nasty
-        if target.get_type().is_struct() {
-            let type_decl = self.encoder.get_type_decl_mid(target.get_type())?;
-            if let vir_mid::TypeDecl::Struct(decl) = type_decl {
-                for field in decl.iter_fields() {
-                    if let vir_mid::Type::Reference(reference) = &field.ty {
-                        let lifetime =
-                            self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-                        arguments.push(lifetime.into())
+        // Redundant code
+        let mut lifetimes: Vec<vir_low::Expression> = vec![];
+        if let vir_mid::Rvalue::Aggregate(aggregate) = &value {
+            for operand in &aggregate.operands {
+                match operand.kind {
+                    vir_mid::OperandKind::Copy | vir_mid::OperandKind::Move => {
+                        let operand_ty = operand.expression.get_type();
+                        if let vir_mid::ty::Type::Reference(reference) = operand_ty {
+                            let lifetime = self.encode_lifetime_const_into_variable(
+                                reference.lifetime.clone(),
+                            )?;
+                            lifetimes.push(lifetime.into());
+                        }
                     }
+                    _ => {}
                 }
             }
         }
+        arguments.extend(lifetimes);
 
         let target_value_type = target.get_type().to_snapshot(self)?;
         let result_value = self.create_new_temporary_variable(target_value_type)?;
