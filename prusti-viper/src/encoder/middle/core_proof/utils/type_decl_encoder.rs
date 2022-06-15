@@ -75,14 +75,6 @@ pub(in super::super) trait TypeDeclWalker {
     ) -> SpannedEncodingResult<()> {
         self.walk_primitive_and_empty(ty, parameters, lowerer)
     }
-    // fn walk_reference(
-    //     &mut self,
-    //     ty: &vir_mid::Type,
-    //     parameters: &Self::Parameters,
-    //     lowerer: &mut Lowerer,
-    // ) -> SpannedEncodingResult<()> {
-    //     // self.walk_primitive_and_empty(ty, parameters, lowerer)
-    // }
     /// This method must call `Self::walk_type`.
     fn walk_field(
         &mut self,
@@ -147,15 +139,11 @@ pub(in super::super) trait TypeDeclWalker {
     }
     fn need_walk_type(
         &mut self,
-        ty: &vir_mid::Type,
+        _ty: &vir_mid::Type,
         _parameters: &Self::Parameters,
         _lowerer: &mut Lowerer,
     ) -> SpannedEncodingResult<bool> {
-        if let vir_mid::Type::Reference(_) = ty {
-            Ok(true)
-        } else {
-            Ok(true)
-        }
+        Ok(true)
     }
     fn walk_type(
         &mut self,
@@ -182,21 +170,10 @@ pub(in super::super) trait TypeDeclWalker {
             vir_mid::TypeDecl::Bool
             | vir_mid::TypeDecl::Int(_)
             | vir_mid::TypeDecl::Float(_)
+            | vir_mid::TypeDecl::Reference(_)
             | vir_mid::TypeDecl::Pointer(_)
             | vir_mid::TypeDecl::Sequence(_) => {
-                // println!("---- walk_type_decl : walk_primitive(...)");
                 self.walk_primitive(ty, &parameters, lowerer)?;
-            }
-            | vir_mid::TypeDecl::Reference(reference) => {
-                // println!("---- walk_type_decl : walk_reference(...)");
-                // self.walk_type(&reference.target_type, (), lowerer)?;
-                // if self.need_walk_type(&reference.target_type, &parameters, lowerer)? {
-                // let type_decl = lowerer.encoder.get_type_decl_mid(&reference.target_type)?;
-                self.walk_primitive(&reference.target_type, &parameters, lowerer)?;
-                    // self.walk_type_decl(&reference.target_type, &type_decl, &parameters, lowerer)?;
-                // }
-
-                // self.walk_reference(ty, &parameters, lowerer)?;
             }
             // vir_mid::TypeDecl::TypeVar(TypeVar) => {},
             vir_mid::TypeDecl::Tuple(_)

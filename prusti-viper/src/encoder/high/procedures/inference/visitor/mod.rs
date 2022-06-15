@@ -186,9 +186,6 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
             statement,
             cjoin(&consumed_permissions)
         );
-        // println!("lower_statement");
-        // dbg!(&statement);
-        // dbg!(&consumed_permissions);
         let actions = ensure_required_permissions(self, state, consumed_permissions.clone())?;
         for action in actions {
             let statement = match action {
@@ -263,21 +260,14 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
                     condition,
                 }) => {
                     let position = place.position();
-                    // TODO: this seems odd - not only enums land here
-                    // println!("---- action::fold in visitor/mod.rs");
-                    // dbg!(&place);
-                    // dbg!(&enum_variant);
-                    // dbg!(&index);
-                    // dbg!(&condition);
-                    let statement = vir_mid::Statement::join_block(
+                    vir_mid::Statement::join_block(
                         place.to_middle_expression(self.encoder)?,
                         condition,
                         enum_variant
                             .map(|variant| variant.to_middle_expression(self.encoder))
                             .transpose()?,
                         position,
-                    );
-                    statement
+                    )
                 }
                 Action::OwnedIntoMemoryBlock(ConversionState { place, condition }) => {
                     let position = place.position();

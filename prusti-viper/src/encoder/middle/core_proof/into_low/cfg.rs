@@ -262,8 +262,6 @@ impl IntoLow for vir_mid::Statement {
                 Ok(vec![low_statement])
             }
             Self::JoinBlock(statement) => {
-                // println!("---- cfg.rs join block");
-                // dbg!(&statement);
                 let ty = statement.place.get_type();
                 lowerer.encode_memory_block_join_method(ty)?;
                 let address = lowerer.encode_expression_as_place_address(&statement.place)?;
@@ -381,17 +379,24 @@ impl IntoLow for vir_mid::Statement {
                 // TODO: redundant and nasty code again
                 let mut lifetimes: Vec<vir_low::VariableDecl> = vec![];
                 if ty.is_struct() {
-                    let type_decl = lowerer.encoder.get_type_decl_mid(&ty)?;
+                    let type_decl = lowerer.encoder.get_type_decl_mid(ty)?;
                     if let vir_mid::TypeDecl::Struct(decl) = type_decl {
                         for field in decl.iter_fields() {
                             if let vir_mid::Type::Reference(reference) = &field.ty {
-                                let lifetime = lowerer.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+                                let lifetime = lowerer.encode_lifetime_const_into_variable(
+                                    reference.lifetime.clone(),
+                                )?;
                                 lifetimes.push(lifetime)
                             }
                         }
                     }
                 }
-                arguments.extend(lifetimes.iter().map(|x| x.clone().into()).collect::<Vec<vir_low::Expression>>());
+                arguments.extend(
+                    lifetimes
+                        .iter()
+                        .map(|x| x.clone().into())
+                        .collect::<Vec<vir_low::Expression>>(),
+                );
 
                 let low_statement = if let Some(condition) = statement.condition {
                     let low_condition = lowerer.lower_block_marker_condition(condition)?;

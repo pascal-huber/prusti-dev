@@ -401,14 +401,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
                     let mut lifetimes: Vec<vir_low::Expression> = vec![];
-                    if let vir_mid::Rvalue::Aggregate(value)  = value {
+                    if let vir_mid::Rvalue::Aggregate(value) = value {
                         for operand in &value.operands {
                             match operand.kind {
                                 vir_mid::OperandKind::Copy | vir_mid::OperandKind::Move => {
                                     let operand_ty = operand.expression.get_type();
                                     if let vir_mid::ty::Type::Reference(reference) = operand_ty {
-                                        let lifetime =
-                                            self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+                                        let lifetime = self.encode_lifetime_const_into_variable(
+                                            reference.lifetime.clone(),
+                                        )?;
                                         lifetimes.push(lifetime.into());
                                     }
                                 }
@@ -427,7 +428,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         self.extract_non_type_parameters_from_type_validity(ty)?,
                     );
                     pres.extend(old_pres);
-                    dbg!(&parameters);
                     self.encode_assign_method_rvalue(
                         &mut parameters,
                         &mut pres,
@@ -443,11 +443,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             }
             let mut statements = pre_write_statements;
             statements.extend(post_write_statements);
-            let body = if encode_body {
-                Some(statements)
-            } else {
-                None
-            };
+            let body = if encode_body { Some(statements) } else { None };
             let method = vir_low::MethodDecl::new(
                 method_name,
                 parameters,
@@ -671,7 +667,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             assigned_value,
             position,
         ));
-        // dbg!(&pre_write_statements);
         Ok(())
     }
     fn encode_assign_method_rvalue_checked_binary_op(
@@ -1053,7 +1048,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         // which then could be implemented as bodyless methods
                         // in case `ty` is a type variable.
                         self.encode_into_memory_block_method(ty)?;
-                        // TODO: lifetimes missing in into_memory_block here
                         pre_write_statements
                             .push(stmt! { call into_memory_block<ty>(place, root_address, value) });
                     }
@@ -1736,7 +1730,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
                             // TODO: somehow redundant and nasty code again
                             if let vir_mid::Type::Reference(reference) = &field.ty {
-                                let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+                                let lifetime = self.encode_lifetime_const_into_variable(
+                                    reference.lifetime.clone(),
+                                )?;
                                 lifetime_args.push(lifetime)
                             }
 
@@ -1890,7 +1886,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             parameters.extend(self.extract_non_type_parameters_from_type(ty)?);
             let mut args = self.extract_non_type_parameters_from_type_as_exprs(ty)?;
             parameters.extend(lifetime_args.clone());
-            args.extend(lifetime_args.iter().map(|x| x.clone().into()).collect::<Vec<vir_low::Expression>>());
+            args.extend(
+                lifetime_args
+                    .iter()
+                    .map(|x| x.clone().into())
+                    .collect::<Vec<vir_low::Expression>>(),
+            );
 
             let mut pres = self.extract_non_type_parameters_from_type_validity(ty)?;
             pres.push(expr! { (acc(MemoryBlock([address], [size_of]))) });
@@ -2299,7 +2300,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     }
                 }
             } else {
-                // TODO: Reference to primitive type
                 let mut helper = SplitJoinHelper::new(true);
                 helper.walk_type(ty, (), self)?;
                 let to_bytes = ty! { Bytes };
@@ -2393,25 +2393,32 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 .extract_non_type_parameters_from_type_validity(ty)?
                 .into_iter()
                 .conjoin();
-            let mut arguments: Vec<vir_low::Expression> = self.extract_non_type_parameters_from_type_as_exprs(ty)?;
+            let mut arguments: Vec<vir_low::Expression> =
+                self.extract_non_type_parameters_from_type_as_exprs(ty)?;
 
             // add lifetimes to parameters
             // TODO: this is redundant and nasty
             let mut lifetimes: Vec<vir_low::VariableDecl> = vec![];
             if ty.is_struct() {
-                let type_decl = self.encoder.get_type_decl_mid(&ty)?;
+                let type_decl = self.encoder.get_type_decl_mid(ty)?;
                 if let vir_mid::TypeDecl::Struct(decl) = type_decl {
                     for field in decl.iter_fields() {
                         if let vir_mid::Type::Reference(reference) = &field.ty {
                             // TODO: create new lifetime instead of reading it
-                            let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+                            let lifetime = self
+                                .encode_lifetime_const_into_variable(reference.lifetime.clone())?;
                             lifetimes.push(lifetime)
                         }
                     }
                 }
             }
             parameters.extend(lifetimes.clone());
-            arguments.extend(lifetimes.iter().map(|x| x.clone().into()).collect::<Vec<vir_low::Expression>>());
+            arguments.extend(
+                lifetimes
+                    .iter()
+                    .map(|x| x.clone().into())
+                    .collect::<Vec<vir_low::Expression>>(),
+            );
 
             let arguments2 = arguments.clone();
 
@@ -2628,11 +2635,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
         // TODO: this is redundant and nasty
         if target.get_type().is_struct() {
-            let type_decl = self.encoder.get_type_decl_mid(&target.get_type())?;
+            let type_decl = self.encoder.get_type_decl_mid(target.get_type())?;
             if let vir_mid::TypeDecl::Struct(decl) = type_decl {
                 for field in decl.iter_fields() {
                     if let vir_mid::Type::Reference(reference) = &field.ty {
-                        let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+                        let lifetime =
+                            self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
                         arguments.push(lifetime.into())
                     }
                 }
