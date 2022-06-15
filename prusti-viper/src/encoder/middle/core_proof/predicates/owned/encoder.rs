@@ -423,31 +423,10 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 Default::default(),
             )?;
             let field_ty = &field.ty;
-            if let vir_mid::Type::Reference(reference) = field_ty {
-                // TODO: why vec here?
-                // println!("###### encode_owned_non_aliased_with_ref_field");
-                // dbg!(&field_place);
-                // dbg!(&field_value);
-                // dbg!(&field_ty);
-                // dbg!(&reference.lifetime.clone());
-
-                // let lifetime_ty = self.lowerer.domain_type("Lifetime")?;
+            if let vir_mid::Type::Reference(_) = field_ty {
                 let lifetime_ty = ty!(Lifetime);
                 let lifetime = vir_low::VariableDecl::new(format!("lft_field_{}", i), lifetime_ty);
                 lifetimes.push(lifetime.clone());
-
-                // let lifetimes = self.lowerer.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-
-                // let lifetime_variable = vir_mid::VariableDecl::new(reference.lifetime.name, vir_mid::Type::Lifetime);
-                // let lifetime = lifetime_variable.to_procedure_snapshot(self)?;
-                // let lifetimes = self.lowerer
-                //     .extract_lifetime_variables(&reference.target_type)?
-                //     .into_iter()
-                //     .map(|lifetime| lifetime.into());
-                // dbg!(&lifetimes);
-
-                // let lifetime = self.lowerer.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-                // let lifetime: vir_low::Expression = self.lowerer.encode_lifetime_const_into_variable(reference.lifetime.clone())?.into();
                 let acc = expr! {
                     acc(OwnedNonAliased<field_ty>(
                         [field_place], root_address, [field_value], [lifetime.into()]
@@ -460,7 +439,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         [field_place], root_address, [field_value]
                     ))
                 };
-                    field_predicates.push(acc);
+                field_predicates.push(acc);
             }
         }
         if field_predicates.is_empty() {
@@ -483,9 +462,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 (([bytes]) == (Snap<ty>::to_bytes(snapshot)))
             });
         }
-        // println!("-----");
-        // dbg!(&ty);
-        // dbg!(&lifetimes);
         let predicate_decl = predicate! {
             OwnedNonAliased<ty>(place: Place, root_address: Address, snapshot: {snapshot_type}, *lifetimes)
             {(
