@@ -19,3 +19,16 @@ fn simple_struct_assert_false() {
     x.x = 2;
     assert!(false);      //~ ERROR: the asserted expression might not hold
 }
+
+struct S2<'a> {
+    x: &'a mut u32,
+}
+fn struct_with_reference () {
+    let mut n = 4;
+    let mut t = S2{ x: &mut n};
+}
+fn struct_with_reference_assert_false () {
+    let mut n = 4;
+    let mut t = S2{ x: &mut n};
+    assert!(false);      //~ ERROR: the asserted expression might not hold
+}
