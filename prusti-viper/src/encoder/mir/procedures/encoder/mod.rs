@@ -440,36 +440,62 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             statement_index: 0,
         };
         let terminator_index = statements.len();
+
+        // assume we have the conditions at the start of each block
         let mut original_lifetimes: BTreeSet<String> =
             self.lifetimes.get_loan_live_at_start(location);
-        // FIXME: This misses the lifetimes that need to be generated at the
-        // beginning of the block.
         let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> =
-            self.lifetimes.get_origin_contains_loan_at_mid(location);
+            self.lifetimes.get_origin_contains_loan_at_start(location);
+
         while location.statement_index < terminator_index {
+            // for the current statement, we make sure the mid-conditions are satisified
+            let mut new_derived_lifetimes =
+                self.lifetimes.get_origin_contains_loan_at_mid(location);
             self.encode_lft_for_statement(
                 &mut block_builder,
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
                 Some(&statements[location.statement_index]),
+                &mut new_derived_lifetimes,
             )?;
             self.encode_statement(
                 &mut block_builder,
                 location,
                 &statements[location.statement_index],
             )?;
+
             location.statement_index += 1;
+
+            // if we are not yet at the last statement of the block,
+            // make sure we have the conditions for the start of the next statement
+            if location.statement_index < terminator_index - 1 {
+                new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_start(location);
+                self.encode_lft_for_statement(
+                    &mut block_builder,
+                    location,
+                    &mut original_lifetimes,
+                    &mut derived_lifetimes,
+                    Some(&statements[location.statement_index]),
+                    &mut new_derived_lifetimes,
+                )?;
+            }
         }
         if let Some(terminator) = terminator {
+            // for the terminator, make sure the start-conditions are satisfied
+            let mut new_derived_lifetimes =
+                self.lifetimes.get_origin_contains_loan_at_mid(location);
             self.encode_lft_for_statement(
                 &mut block_builder,
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
                 None,
+                &mut new_derived_lifetimes,
             )?;
             let terminator = &terminator.kind;
+            // the terminator-encoding will make sure the lifetime start-conditions for
+            // the next block are satisfied
             self.encode_terminator(&mut block_builder, location, terminator)?;
         }
         if let Some(statement) = self.loop_invariant_encoding.remove(&bb) {
