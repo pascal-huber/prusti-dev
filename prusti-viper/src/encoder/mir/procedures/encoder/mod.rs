@@ -444,17 +444,18 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         let terminator_index = statements.len();
         let mut original_lifetimes: BTreeSet<String> =
             self.lifetimes.get_loan_live_at_start(location);
-        // FIXME: This misses the lifetimes that need to be generated at the
-        // beginning of the block.
         let mut derived_lifetimes: BTreeMap<String, BTreeSet<String>> =
-            self.lifetimes.get_origin_contains_loan_at_mid(location);
+            self.lifetimes.get_origin_contains_loan_at_start(location);
         while location.statement_index < terminator_index {
+            let mut new_derived_lifetimes =
+                self.lifetimes.get_origin_contains_loan_at_mid(location);
             self.encode_lft_for_statement(
                 &mut block_builder,
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
                 Some(&statements[location.statement_index]),
+                &mut new_derived_lifetimes,
             )?;
             self.encode_statement(
                 &mut block_builder,
@@ -462,14 +463,28 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 &statements[location.statement_index],
             )?;
             location.statement_index += 1;
+            if location.statement_index < terminator_index - 1 {
+                new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_start(location);
+                self.encode_lft_for_statement(
+                    &mut block_builder,
+                    location,
+                    &mut original_lifetimes,
+                    &mut derived_lifetimes,
+                    Some(&statements[location.statement_index]),
+                    &mut new_derived_lifetimes,
+                )?;
+            }
         }
         if let Some(terminator) = terminator {
+            let mut new_derived_lifetimes =
+                self.lifetimes.get_origin_contains_loan_at_mid(location);
             self.encode_lft_for_statement(
                 &mut block_builder,
                 location,
                 &mut original_lifetimes,
                 &mut derived_lifetimes,
                 None,
+                &mut new_derived_lifetimes,
             )?;
             let terminator = &terminator.kind;
             self.encode_terminator(&mut block_builder, location, terminator)?;

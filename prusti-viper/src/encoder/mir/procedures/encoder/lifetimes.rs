@@ -18,6 +18,7 @@ pub(super) trait LifetimesEncoder<'tcx> {
         original_lifetimes: &mut BTreeSet<String>,
         derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
         statement: Option<&mir::Statement<'tcx>>,
+        new_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()>;
     fn reborrow_lifetime(&mut self, statement: Option<&mir::Statement<'tcx>>) -> Option<String>;
     fn encode_lft_for_block(
@@ -182,8 +183,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         original_lifetimes: &mut BTreeSet<String>,
         derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
         statement: Option<&mir::Statement<'tcx>>,
+        new_derived_lifetimes: &mut BTreeMap<String, BTreeSet<String>>,
     ) -> SpannedEncodingResult<()> {
-        let mut new_derived_lifetimes = self.lifetimes.get_origin_contains_loan_at_mid(location);
         block_builder.add_comment(format!("Prepare lifetimes for statement {:?}", location));
         let new_reborrow_lifetime_to_ignore: Option<String> = self.reborrow_lifetime(statement);
         self.encode_lft(
@@ -191,7 +192,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             location,
             original_lifetimes,
             derived_lifetimes,
-            &mut new_derived_lifetimes,
+            new_derived_lifetimes,
             false,
             new_reborrow_lifetime_to_ignore,
         )?;
