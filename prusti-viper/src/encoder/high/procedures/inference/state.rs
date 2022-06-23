@@ -199,22 +199,20 @@ impl PredicateState {
     pub(super) fn contains_blocked(
         &self,
         place: &vir_high::Expression,
-        debug_on: bool,
     ) -> SpannedEncodingResult<Option<(&vir_high::Expression, &vir_high::ty::LifetimeConst)>> {
-        let mut x = self.mut_borrowed.iter().find(|(p, _)| place.has_prefix(p));
-        if x.is_none() {
-            for (e, l) in self.mut_borrowed.iter() {
-                if let vir_high::Expression::BuiltinFuncApp(vir_high::BuiltinFuncApp{function, type_arguments: _, arguments, ..}) = &e {
-                    if debug_on {
-                        println!("#### BFA");
-                        dbg!(&function);
-                        dbg!(&arguments[0]);
-                    }
-                    x = self.mut_borrowed.iter().find(|(p, _)| place.has_prefix(&arguments[0]))
-                }
+        Ok(self.mut_borrowed.iter().find(|(p, _)| {
+            if let vir_high::Expression::BuiltinFuncApp(vir_high::BuiltinFuncApp {
+                function,
+                type_arguments: _,
+                arguments,
+                ..
+            }) = &p
+            {
+                *function == vir_high::BuiltinFunc::Index && place.has_prefix(&arguments[0])
+            } else {
+                place.has_prefix(p)
             }
-        }
-        Ok(x)
+        }))
     }
 
     pub(super) fn clear(&mut self) -> SpannedEncodingResult<()> {

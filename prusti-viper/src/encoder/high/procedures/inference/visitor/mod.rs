@@ -141,7 +141,6 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
     }
 
     fn lower_block(&mut self, old_block: vir_high::BasicBlock) -> SpannedEncodingResult<()> {
-        println!("--- lower block");
         let mut state = if config::dump_debug_info() {
             self.state_at_entry
                 .get(self.current_label.as_ref().unwrap())
@@ -187,34 +186,7 @@ impl<'p, 'v, 'tcx> Visitor<'p, 'v, 'tcx> {
             statement,
             cjoin(&consumed_permissions)
         );
-
-        let debug_on: bool = if let vir_high::Statement::Exhale(vir_high::Exhale {
-            predicate:
-                vir_high::Predicate::MemoryBlockStack (
-                    vir_high::MemoryBlockStack {
-                        place:
-                            vir_high::Expression::Local(vir_high::Local {
-                                variable: vir_high::VariableDecl { name, .. },
-                                ..
-                            }),
-                        ..
-                    },
-                ),
-        ..
-        }) = &statement
-        {
-            if *name == String::from("_1") {
-                println!("--- lower statement");
-                dbg!(&statement);
-                true
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        let actions = ensure_required_permissions(self, state, consumed_permissions.clone(), debug_on)?;
+        let actions = ensure_required_permissions(self, state, consumed_permissions.clone())?;
         for action in actions {
             let statement = match action {
                 Action::Unfold(FoldingActionState {

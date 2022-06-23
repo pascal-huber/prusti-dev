@@ -10,7 +10,6 @@ use vir_crate::{
     common::position::Positioned,
     high::{self as vir_high, operations::ty::Typed},
 };
-use vir_crate::low::macros::predicate;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(in super::super) enum ExpandedPermissionKind {
@@ -40,11 +39,10 @@ pub(in super::super) fn ensure_required_permissions(
     context: &mut impl Context,
     state: &mut FoldUnfoldState,
     required_permissions: Vec<Permission>,
-    debug_on: bool,
 ) -> SpannedEncodingResult<Vec<Action>> {
     let mut actions = Vec::new();
     for permission in required_permissions {
-        ensure_required_permission(context, state, permission, &mut actions, debug_on)?;
+        ensure_required_permission(context, state, permission, &mut actions)?;
     }
     Ok(actions)
 }
@@ -54,15 +52,9 @@ fn ensure_required_permission(
     state: &mut FoldUnfoldState,
     required_permission: Permission,
     actions: &mut Vec<Action>,
-    debug_on: bool,
 ) -> SpannedEncodingResult<()> {
     debug!("required_permission: {}", required_permission);
     state.debug_print();
-
-    if debug_on {
-        println!("--- ensure_required_permission");
-        dbg!(&required_permission);
-    }
 
     let (place, permission_kind) = match required_permission {
         Permission::MemoryBlock(place) => (place, PermissionKind::MemoryBlock),
@@ -76,11 +68,7 @@ fn ensure_required_permission(
         &place,
         permission_kind,
         unconditional_predicate_state,
-        debug_on,
     )? {
-        if debug_on {
-            println!(">>> can_place_be_ensured_in = true");
-        }
         assert!(
             !ensure_permission_in_state(
                 context,
@@ -92,20 +80,12 @@ fn ensure_required_permission(
             "cannot drop unconditional state"
         );
     } else {
-        if debug_on {
-            println!(">>> can_place_be_ensured_in = false");
-        }
         for (condition, conditional_predicate_state) in state.get_conditional_states()? {
-            if debug_on {
-                println!("condition");
-                dbg!(&condition);
-            }
             if can_place_be_ensured_in(
                 context,
                 &place,
                 permission_kind,
                 conditional_predicate_state,
-                debug_on,
             )? {
                 let mut conditional_actions = Vec::new();
                 let to_drop = ensure_permission_in_state(
@@ -145,12 +125,7 @@ fn check_can_place_be_ensured_in(
     permission_kind: PermissionKind,
     predicate_state: &PredicateState,
     check_conversions: bool,
-    debug_on: bool,
 ) -> SpannedEncodingResult<bool> {
-    if debug_on {
-        println!("--- check_can_place_be_ensured_in");
-        dbg!(&place);
-    }
     // The requirement is already satisfied.
     let already_satisfied = predicate_state.contains(permission_kind, place);
     // The requirement can be satisifed by unfolding.
@@ -160,14 +135,7 @@ fn check_can_place_be_ensured_in(
         .contains_non_discriminant_with_prefix(permission_kind, place)
         .is_some();
     // The requirement can be satisfied by restoring a mutable borrow.
-    // TODO: fix this for array
-    let by_restoring_blocked = predicate_state.contains_blocked(place, debug_on)?.is_some();
-    if debug_on {
-        // Ok(self.mut_borrowed.iter().find(|(p, _)| place.has_prefix(p)))
-        println!("--- after by_restoring_blocked");
-        println!("predicate_state: {predicate_state}");
-        dbg!(&place);
-    }
+    let by_restoring_blocked = predicate_state.contains_blocked(place)?.is_some();
     // The requirement can be satisfied by converting into Memory Block.
     // Short circuiting is used to prevent infinite recursion.
     let by_into_memory_block = check_conversions
@@ -178,7 +146,6 @@ fn check_can_place_be_ensured_in(
             PermissionKind::Owned,
             predicate_state,
             false,
-            debug_on,
         )?;
     // The requirement can be satisfied by converting into Owned.
     // Short circuiting is used to prevent infinite recursion.
@@ -190,7 +157,6 @@ fn check_can_place_be_ensured_in(
             PermissionKind::MemoryBlock,
             predicate_state,
             false,
-            debug_on,
         )?;
     let can = already_satisfied
         || by_unfolding
@@ -235,9 +201,8 @@ fn can_place_be_ensured_in(
     place: &vir_high::Expression,
     permission_kind: PermissionKind,
     predicate_state: &PredicateState,
-    debug_on: bool,
 ) -> SpannedEncodingResult<bool> {
-    check_can_place_be_ensured_in(context, place, permission_kind, predicate_state, true, debug_on)
+    check_can_place_be_ensured_in(context, place, permission_kind, predicate_state, true)
 }
 
 /// Returns `true` if the state should be droped because it should be
@@ -328,16 +293,15 @@ fn ensure_permission_in_state(
         actions.push(Action::fold(permission_kind, place.clone(), enum_variant));
         predicate_state.insert(permission_kind, place)?;
         false
-    } else if let Some((prefix, lifetime)) = predicate_state.contains_blocked(&place, false)? { // TODO: add debug_on flag
+    } else if let Some((prefix, lifetime)) = predicate_state.contains_blocked(&place)? {
         let prefix = prefix.clone();
         let lifetime = lifetime.clone();
         predicate_state.remove_mut_borrowed(&prefix)?;
-        dbg!(&prefix);
         predicate_state.insert(PermissionKind::Owned, prefix.clone())?;
         actions.push(Action::restore_mut_borrowed(lifetime, prefix.clone()));
         ensure_permission_in_state(context, predicate_state, place, permission_kind, actions)?
     } else if permission_kind == PermissionKind::MemoryBlock
-        && can_place_be_ensured_in(context, &place, PermissionKind::Owned, predicate_state, false)? // TODO: add debug_on flag
+        && can_place_be_ensured_in(context, &place, PermissionKind::Owned, predicate_state)?
     {
         // We have Owned and we need MemoryBlock.
         if predicate_state.contains_prefix_of(PermissionKind::Owned, &place) {
@@ -405,7 +369,6 @@ fn ensure_permission_in_state(
             &place,
             PermissionKind::MemoryBlock,
             predicate_state,
-            false, // TODO: add debug_on flag
         )?
     {
         if predicate_state.contains(PermissionKind::MemoryBlock, &place)
