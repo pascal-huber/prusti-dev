@@ -68,29 +68,29 @@ fn test7() {
 //     assert!(a[0] == 2);     the asserted expression might not hold
 // }
 
-fn test10() {
-    let mut a = [1; 100];
-    let b = &mut a[1];
-    *b = 2;
-    assert!(a[1] == 2);
-    assert!(a[0] == 1);
-    assert!(a[2] == 1);
-    assert!(a[3] == 1);
-    assert!(a[4] == 1);
-    assert!(a[5] == 1);
-}
+//fn test10() {
+    //let mut a = [1; 100];
+    //let b = &mut a[1];
+    //*b = 2;   FIXME
+    //assert!(a[1] == 2);
+    //assert!(a[0] == 1);
+    //assert!(a[2] == 1);
+    //assert!(a[3] == 1);
+    //assert!(a[4] == 1);
+    //assert!(a[5] == 1);
+//}
 
-fn test11() {
-    let mut a = [1; 100];
-    let b = &mut a[1];
-    *b = 2;
-    assert!(a[1] == 2);
-    assert!(a[0] == 1);
-    assert!(a[2] == 1);
-    assert!(a[3] == 1);
-    assert!(a[4] == 1);
-    assert!(a[5] == 1);
-    assert!(a[0] == 2);     //~ ERROR: the asserted expression might not hold
-}
+//fn test11() {
+    //let mut a = [1; 100];
+    //let b = &mut a[1];
+    //*b = 2;   FIXME
+    //assert!(a[1] == 2);
+    //assert!(a[0] == 1);
+    //assert!(a[2] == 1);
+    //assert!(a[3] == 1);
+    //assert!(a[4] == 1);
+    //assert!(a[5] == 1);
+    //assert!(a[0] == 2);     the asserted expression might not hold
+//}
 
 fn main() {}
