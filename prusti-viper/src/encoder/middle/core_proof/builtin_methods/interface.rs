@@ -2550,8 +2550,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                     });
                                 }
                             }
-                            vir_mid::TypeDecl::Array(_) => {
-                            },
+                            vir_mid::TypeDecl::Array(_) => {},
                             vir_mid::TypeDecl::Never => unimplemented!("ty: {}", ty),
                             vir_mid::TypeDecl::Closure(_) => unimplemented!("ty: {}", ty),
                             vir_mid::TypeDecl::Unsupported(_) => unimplemented!("ty: {}", ty),
