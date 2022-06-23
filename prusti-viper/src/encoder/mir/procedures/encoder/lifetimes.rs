@@ -604,15 +604,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
 
     fn encode_dead_variable(
         &mut self,
-        block_builder: &mut BasicBlockBuilder,
-        location: mir::Location,
-        variable: vir_high::Local,
+        _block_builder: &mut BasicBlockBuilder,
+        _location: mir::Location,
+        _variable: vir_high::Local,
     ) -> SpannedEncodingResult<()> {
-        block_builder.add_statement(self.set_statement_error(
-            location,
-            ErrorCtxt::LifetimeEncoding,
-            vir_high::Statement::dead_no_pos(variable.into()),
-        )?);
+        // FIXME: Use Dead statement correctly
+        // block_builder.add_statement(self.set_statement_error(
+        //     location,
+        //     ErrorCtxt::LifetimeEncoding,
+        //     vir_high::Statement::dead_no_pos(variable.into()),
+        // )?);
         Ok(())
     }
 
