@@ -195,7 +195,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             vir_mid::Rvalue::Reborrow(value) => {
                 let place_lifetime =
                     self.encode_lifetime_const_into_variable(value.place_lifetime.clone())?;
-                let value_final = value.place.to_procedure_final_snapshot(self)?;
                 let operand_lifetime =
                     self.encode_lifetime_const_into_variable(value.operand_lifetime.clone())?;
                 let perm_amount = value
@@ -203,7 +202,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     .to_procedure_snapshot(self)?;
                 arguments.push(place_lifetime.into());
                 self.encode_place_arguments(arguments, &value.place)?;
-                arguments.push(value_final);
+                if value.is_mut {
+                    let value_final = value.place.to_procedure_final_snapshot(self)?;
+                    arguments.push(value_final);
+                }
                 arguments.push(operand_lifetime.into());
                 arguments.push(perm_amount);
             }
@@ -799,25 +801,42 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             operand_place: Place,
             operand_address: Address,
             operand_value_current: { ty.to_snapshot(self)? },
-            operand_value_final: { ty.to_snapshot(self)? },
+            operand_value_final: { ty.to_snapshot(self)? }, // only for reborrow mut
             operand_lifetime: Lifetime,
             lifetime_perm: Perm
         };
-        let predicate = expr! {
-            acc(UniqueRef<ty>(
-                old_lifetime,
-                [operand_place.clone().into()],
-                [operand_address.clone().into()],
-                [operand_value_current.clone().into()],
-                [operand_value_final.clone().into()])
-            )
+        let is_mut = if let vir_mid::ty::Type::Reference(vir_mid::ty::Reference{ lifetime: _, uniqueness: vir_mid::ty::Uniqueness::Shared, .. }) = &result_type {
+            false
+        } else {
+            true
+        };
+        dbg!(&is_mut);
+        let predicate = if is_mut {
+            expr! {
+                acc(UniqueRef<ty>(
+                    old_lifetime,
+                    [operand_place.clone().into()],
+                    [operand_address.clone().into()],
+                    [operand_value_current.clone().into()],
+                    [operand_value_final.clone().into()])
+                )
+            }
+        } else {
+            expr! {
+                acc(FracRef<ty>(
+                    old_lifetime,
+                    [operand_place.clone().into()],
+                    [operand_address.clone().into()],
+                    [operand_value_current.clone().into()])
+                )
+            }
         };
         let reference_predicate = expr! {
             acc(OwnedNonAliased<result_type>(target_place, target_address, result_value, operand_lifetime))
         };
         let lifetime_token =
             self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
-        let restoration = {
+        let restoration = if is_mut {
             let ty_value = &value.place.get_type().clone();
             let final_snapshot = self.reference_target_final_snapshot(
                 result_type,
@@ -841,6 +860,23 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     )
                 )
             }
+        } else {
+            let ty_value = &value.place.get_type().clone();
+            expr! {
+                wand(
+                    (acc(DeadLifetimeToken(operand_lifetime))) --* (
+                        (acc(FracRef<ty_value>(
+                            old_lifetime,
+                            [operand_place.clone().into()],
+                            [operand_address.clone().into()],
+                            [operand_value_current.clone().into()])
+                        )) &&
+                        // DeadLifetimeToken is duplicable and does not get consumed.
+                        (acc(DeadLifetimeToken(operand_lifetime)))
+                    )
+                )
+            }
+
         };
         let reference_target_address =
             self.reference_address(result_type, result_value.clone().into(), position)?;
@@ -860,9 +896,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             result_value.clone().into(),
             position,
         )?;
-        posts.push(expr! {
-            operand_value_final == [reference_target_final_snapshot]
-        });
+        if is_mut {
+            posts.push(expr! {
+                operand_value_final == [reference_target_final_snapshot]
+            });
+        }
         pres.push(expr! {
             [vir_low::Expression::no_permission()] < lifetime_perm
         });
@@ -878,7 +916,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         parameters.push(operand_place);
         parameters.push(operand_address);
         parameters.push(operand_value_current);
-        parameters.push(operand_value_final);
+        if is_mut {
+            parameters.push(operand_value_final);
+        }
         parameters.push(operand_lifetime);
         parameters.push(lifetime_perm);
         let method = vir_low::MethodDecl::new(
