@@ -82,7 +82,6 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
     let old_lifetime_ctr: usize = 0;
     let function_call_ctr: usize = 0;
     let derived_lifetimes_yet_to_kill: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    // let reborrow_lifetimes_to_remove: BTreeSet<String> = BTreeSet::new();
     let reborrow_lifetimes_to_remove_for_block: BTreeMap<mir::BasicBlock, BTreeSet<String>> =
         BTreeMap::new();
     let points_to_reborrow: BTreeSet<vir_high::Local> = BTreeSet::new();

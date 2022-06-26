@@ -273,7 +273,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             true,
             None,
         )?;
-
         self.reborrow_lifetimes_to_remove_for_block
             .entry(target)
             .or_insert_with(BTreeSet::new);
@@ -286,7 +285,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             .get_mut(&target)
             .unwrap()
             .append(&mut values);
-
         Ok(())
     }
 
@@ -494,7 +492,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             let lifetime_var = vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
             let backup_var =
                 vir_high::VariableDecl::new(backup_var_name, vir_high::ty::Type::Lifetime);
-            let statement = self.set_statement_error(
+            block_builder.add_statement(self.set_statement_error(
                 location,
                 ErrorCtxt::LifetimeEncoding,
                 vir_high::Statement::lifetime_take_no_pos(
@@ -502,8 +500,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
                     vec![lifetime_var],
                     self.lifetime_token_fractional_permission(self.lifetime_count),
                 ),
-            )?;
-            block_builder.add_statement(statement);
+            )?);
         }
         Ok(())
     }
