@@ -67,16 +67,34 @@ fn function_call_return_value_assert_false() {
     assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 
-
 fn f5<'a>(x: &'a mut i32) -> &'a mut i32{
     x
 }
 fn function_call_return_ref() {
-    let mut n = 1;
-    let x = f5(&mut n);
+    let mut a = 1;
+    let aa = f5(&mut a);
+    *aa = 2;
 }
 fn function_call_return_ref_assert_false() {
-    let mut n = 1;
-    let x = f5(&mut n);
+    let mut a = 1;
+    let aa = f5(&mut a);
+    *aa = 2;
+    assert!(false);      //~ ERROR: the asserted expression might not hold
+}
+
+fn f6<'a, 'b>(x: &'a mut i32, y: &'b mut i32) -> &'b mut i32{
+    y
+}
+fn function_call_return_ref_2() {
+    let mut a = 1;
+    let mut b = 2;
+    let bb = f6(&mut a, &mut b);
+    *bb = 3;
+}
+fn function_call_return_ref_2_assert_false() {
+    let mut a = 1;
+    let mut b = 2;
+    let bb = f6(&mut a, &mut b);
+    *bb = 3;
     assert!(false);      //~ ERROR: the asserted expression might not hold
 }
