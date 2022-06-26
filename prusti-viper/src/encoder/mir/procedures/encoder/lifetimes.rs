@@ -273,13 +273,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             true,
             None,
         )?;
-        if !self
-            .reborrow_lifetimes_to_remove_for_block
-            .contains_key(&target)
-        {
-            self.reborrow_lifetimes_to_remove_for_block
-                .insert(target, BTreeSet::new());
-        }
+
+        self.reborrow_lifetimes_to_remove_for_block
+            .entry(target)
+            .or_insert_with(BTreeSet::new);
         let mut values = self
             .reborrow_lifetimes_to_remove_for_block
             .get(&self.current_basic_block.unwrap())
@@ -304,7 +301,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         shorten_lifetimes: bool,
         new_reborrow_lifetime_to_remove: Option<String>,
     ) -> SpannedEncodingResult<()> {
-        println!("--- encode_lft");
         let mut new_original_lifetimes: BTreeSet<String> = new_derived_lifetimes
             .clone()
             .into_values()
@@ -320,7 +316,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
                 &lifetimes_to_create,
             );
         }
-        dbg!(&self.reborrow_lifetimes_to_remove_for_block.get(&self.current_basic_block.unwrap()).unwrap());
         self.remove_reborrow_lifetimes_set(&mut lifetimes_to_create);
         self.remove_reborrow_lifetimes_set(&mut new_original_lifetimes);
         self.remove_reborrow_lifetimes_set(old_original_lifetimes);
@@ -499,7 +494,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             let lifetime_var = vir_high::VariableDecl::new(lifetime, vir_high::ty::Type::Lifetime);
             let backup_var =
                 vir_high::VariableDecl::new(backup_var_name, vir_high::ty::Type::Lifetime);
-            // println!("--- encode_lifetime_backups for {} = [{}]", backup_var_name, lifetime_var);
             let statement = self.set_statement_error(
                 location,
                 ErrorCtxt::LifetimeEncoding,
@@ -593,17 +587,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         for (lifetime, derived_from) in lifetimes_to_take {
             let encoded_target = self.encode_lft_variable(lifetime.clone())?;
             let mut lifetimes: Vec<vir_high::VariableDecl> = Vec::new();
-            // println!("--- encode_lft_take for lft_count = {}", derived_from.len());
-            if derived_from.len() == 0 {
-                // println!("skipping");
+            // FIXME: check why we try to encode LifetimeTake without arguments
+            if derived_from.is_empty() {
+                // don't create an empty LifetimeTake
                 continue;
             }
             for lifetime_name in derived_from {
                 lifetimes.push(self.encode_lft_variable(lifetime_name)?);
             }
-            dbg!(&location);
-            dbg!(&encoded_target);
-            // FIXME: why is lifetimes sometimes empty
             self.derived_lifetimes_yet_to_kill.remove(&lifetime[..]);
             block_builder.add_statement(self.set_statement_error(
                 location,

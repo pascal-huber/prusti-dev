@@ -638,8 +638,6 @@ impl IntoLow for vir_mid::Statement {
                     )];
                     Ok(statements)
                 } else {
-                    // println!("--- lifetime_take for {}", statement.value.len());
-                    // dbg!(&statement);
                     lowerer.encode_lft_tok_sep_take_method(statement.value.len())?;
                     let mut arguments: Vec<vir_low::Expression> = vec![];
                     for lifetime in &statement.value {

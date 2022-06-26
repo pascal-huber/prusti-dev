@@ -816,7 +816,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             acc(OwnedNonAliased<result_type>(target_place, target_address, result_value, operand_lifetime))
         };
 
-        let valid_result = self.encode_snapshot_valid_call_for_type(result_value.clone().into(), result_type)?;
+        let valid_result =
+            self.encode_snapshot_valid_call_for_type(result_value.clone().into(), result_type)?;
 
         let lifetime_token =
             self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
@@ -2776,7 +2777,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
 
             self.encode_lifetime_token_predicate()?;
             self.encode_lifetime_included()?;
-            // TODO: catch lft_count=0 here?
             self.encode_lifetime_intersect(lft_count)?;
             self.encode_lifetime_included_intersect_axiom(lft_count)?;
             use vir_low::macros::*;

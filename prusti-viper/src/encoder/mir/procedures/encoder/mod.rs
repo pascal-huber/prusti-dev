@@ -441,17 +441,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
         data: &mir::BasicBlockData<'tcx>,
     ) -> SpannedEncodingResult<()> {
         self.derived_lifetimes_yet_to_kill.clear();
-        if !self
-            .reborrow_lifetimes_to_remove_for_block
-            .contains_key(&bb)
-        {
-            self.reborrow_lifetimes_to_remove_for_block
-                .insert(bb, BTreeSet::new());
-        }
+        self.reborrow_lifetimes_to_remove_for_block
+            .entry(bb)
+            .or_insert_with(BTreeSet::new);
         self.current_basic_block = Some(bb);
-        // println!("### encode_basic_block");
-        // dbg!(&bb);
-        // dbg!(&self.reborrow_lifetimes_to_remove_for_block);
         let label = self.encode_basic_block_label(bb);
         let mut block_builder = procedure_builder.create_basic_block_builder(label);
         let mir::BasicBlockData {
