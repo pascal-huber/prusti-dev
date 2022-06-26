@@ -70,6 +70,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         expressions: &mut VecDeque<vir_low::Expression>,
     ) -> vir_low::Expression {
+        if expressions.len() == 0 {
+            println!("no expression for included_intersect axiom");
+        }
         if expressions.len() == 1 {
             return expressions.pop_front().unwrap();
         }
@@ -122,6 +125,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
             self.lifetimes_state
                 .encoded_lifetime_intersect
                 .insert(lft_count);
+            println!("--- encodde_lifetime_intersect for {}", lft_count);
             self.encode_lifetime_included()?;
             self.encode_lifetime_included_intersect_axiom(lft_count)?;
             let return_type = self.domain_type("Lifetime")?;
