@@ -47,6 +47,7 @@ pub(super) trait LifetimesEncoder<'tcx> {
     ) -> SpannedEncodingResult<()>;
     fn update_lifetimes_to_remove(
         &mut self,
+        old_original_lifetimes: &BTreeSet<String>,
         new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
         new_reborrow_lifetime_to_remove: String,
         lifetimes_to_create: &BTreeSet<String>,
@@ -309,6 +310,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         let mut lifetime_backups: BTreeMap<String, (String, vir_high::Local)> = BTreeMap::new();
         if let Some(new_reborrow_lifetime_to_remove) = new_reborrow_lifetime_to_remove {
             self.update_lifetimes_to_remove(
+                old_original_lifetimes,
                 new_derived_lifetimes,
                 new_reborrow_lifetime_to_remove,
                 &lifetimes_to_create,
@@ -357,14 +359,22 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
 
     fn update_lifetimes_to_remove(
         &mut self,
+        old_original_lifetimes: &BTreeSet<String>,
         new_derived_lifetimes: &BTreeMap<String, BTreeSet<String>>,
         lifetime_to_ignore: String,
         lifetimes_to_create: &BTreeSet<String>,
     ) {
         let mut new_lifetimes_to_ignore: BTreeSet<String> = BTreeSet::new();
         for (lifetime, derived_from) in new_derived_lifetimes.clone() {
-            // TODO: check if this makes sense
-            if lifetime == lifetime_to_ignore && derived_from.len() >= 2 {
+            // NOTE: if the lifetime is not derived from at least one already existing
+            //   original lifetime, we can not delete the lifetimes it is derived from.
+            let can_remove_lifetimes = !derived_from
+                .iter()
+                .filter(|&x| old_original_lifetimes.contains(x))
+                .cloned()
+                .collect::<BTreeSet<String>>()
+                .is_empty();
+            if lifetime == lifetime_to_ignore && can_remove_lifetimes {
                 new_lifetimes_to_ignore = derived_from
                     .clone()
                     .iter()
@@ -584,11 +594,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         for (lifetime, derived_from) in lifetimes_to_take {
             let encoded_target = self.encode_lft_variable(lifetime.clone())?;
             let mut lifetimes: Vec<vir_high::VariableDecl> = Vec::new();
-            // FIXME: check why we try to encode LifetimeTake without arguments
-            if derived_from.is_empty() {
-                // don't create an empty LifetimeTake
-                continue;
-            }
+            assert!(!derived_from.is_empty());
             for lifetime_name in derived_from {
                 lifetimes.push(self.encode_lft_variable(lifetime_name)?);
             }
