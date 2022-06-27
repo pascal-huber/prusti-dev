@@ -86,7 +86,6 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         BTreeMap::new();
     let points_to_reborrow: BTreeSet<vir_high::Local> = BTreeSet::new();
     let current_basic_block = None;
-    let special_reborrow_lifetimes: BTreeMap<String, String> = BTreeMap::new();
     let mut procedure_encoder = ProcedureEncoder {
         encoder,
         def_id,
@@ -111,7 +110,6 @@ pub(super) fn encode_procedure<'v, 'tcx: 'v>(
         points_to_reborrow,
         reborrow_lifetimes_to_remove_for_block,
         current_basic_block,
-        special_reborrow_lifetimes,
     };
     procedure_encoder.encode()
 }
@@ -147,7 +145,6 @@ struct ProcedureEncoder<'p, 'v: 'p, 'tcx: 'v> {
     points_to_reborrow: BTreeSet<vir_high::Local>,
     reborrow_lifetimes_to_remove_for_block: BTreeMap<mir::BasicBlock, BTreeSet<String>>,
     current_basic_block: Option<mir::BasicBlock>,
-    special_reborrow_lifetimes: BTreeMap<String, String>,
 }
 
 impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
