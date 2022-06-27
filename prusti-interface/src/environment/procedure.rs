@@ -77,6 +77,27 @@ impl<'tcx> Procedure<'tcx> {
 
     }
 
+    pub fn get_lifetime_of_var(&self, var: mir::Local) -> Option<String>{
+        let mir = self.get_mir();
+        for local in mir.vars_and_temps_iter() {
+            if local == var {
+                let ty_kind = mir.local_decls[local].ty.kind();
+                if let prusti_rustc_interface::middle::ty::TyKind::Ref(region, _ty, _mutability) = ty_kind {
+                    return Some(region.to_text());
+                }
+            }
+        }
+        for local in mir.args_iter() {
+            if local == var {
+                let ty_kind = mir.local_decls[local].ty.kind();
+                if let prusti_rustc_interface::middle::ty::TyKind::Ref(region, _ty, _mutability) = ty_kind {
+                    return Some(region.to_text());
+                }
+            }
+        }
+        None
+    }
+
     pub fn get_var_of_lifetime(&self, lft: &str) -> Option<mir::Local>{
         let mir = self.get_mir();
         for local in mir.vars_and_temps_iter() {
