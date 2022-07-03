@@ -1271,7 +1271,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         call write_address<ty>([target_address], source_value)
                     });
                 }
-                vir_mid::TypeDecl::TypeVar(_) | vir_mid::TypeDecl::Trusted(_) => {
+                vir_mid::TypeDecl::TypeVar(_) => {
+                    // TODO: fix this for Trusted
                     // move_place of a generic or trusted type has no body
                 }
                 vir_mid::TypeDecl::Tuple(decl) => {
@@ -1283,6 +1284,66 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         });
                     } else {
                         unimplemented!()
+                    }
+                }
+                vir_mid::TypeDecl::Trusted(decl) => {
+                    // copied from struct
+                    if decl.fields.is_empty() {
+                        self.encode_write_address_method(ty)?;
+                        statements.push(stmtp! { position =>
+                            // TODO: Replace with memcopy.
+                            call write_address<ty>([target_address], source_value)
+                        });
+                    } else {
+                        assert!(
+                            !ty.is_trusted() && !ty.is_type_var(),
+                            "Trying to split an abstract type."
+                        );
+                        self.encode_memory_block_split_method(ty)?;
+                        statements.push(stmtp! {
+                            position =>
+                            call memory_block_split<ty>(
+                                [target_address], [vir_low::Expression::full_permission()]
+                            )
+                        });
+                        for field in &decl.fields {
+                            let source_field_place = self.encode_field_place(
+                                ty,
+                                field,
+                                source_place.clone().into(),
+                                position,
+                            )?;
+                            let target_field_place = self.encode_field_place(
+                                ty,
+                                field,
+                                target_place.clone().into(),
+                                position,
+                            )?;
+                            let source_field_value = self.obtain_struct_field_snapshot(
+                                ty,
+                                field,
+                                source_value.clone().into(),
+                                position,
+                            )?;
+                            let field_type = &field.ty;
+                            self.encode_move_place_method(field_type)?;
+                            statements.push(stmtp! { position =>
+                                call move_place<field_type>(
+                                    [target_field_place],
+                                    target_root_address,
+                                    [source_field_place],
+                                    source_root_address,
+                                    [source_field_value]
+                                )
+                            });
+                        }
+                        self.encode_memory_block_join_method(ty)?;
+                        statements.push(stmtp! {
+                            position =>
+                            call memory_block_join<ty>(
+                                [source_address], [vir_low::Expression::full_permission()]
+                            )
+                        });
                     }
                 }
                 vir_mid::TypeDecl::Struct(decl) => {
@@ -2470,11 +2531,35 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                 // Primitive type. Nothing to do.
                             }
                             vir_mid::TypeDecl::TypeVar(_) => unreachable!("cannot convert abstract type into a memory block: {}", ty),
-                            vir_mid::TypeDecl::Trusted(_) => {
+                            vir_mid::TypeDecl::Tuple(decl) => {
+                                // TODO: Remove code duplication.
+                                for field in decl.iter_fields() {
+                                    let field_place = self.encode_field_place(
+                                        ty, &field, place.clone().into(), position
+                                    )?;
+                                    let field_value = self.obtain_struct_field_snapshot(
+                                        ty, &field, value.clone().into(), position
+                                    )?;
+                                    self.encode_into_memory_block_method(&field.ty)?;
+                                    let field_ty = &field.ty;
+                                    statements.push(stmtp! {
+                                        position =>
+                                        call into_memory_block<field_ty>([field_place], root_address, [field_value])
+                                    });
+                                }
+                                self.encode_memory_block_join_method(ty)?;
+                                statements.push(stmtp! {
+                                    position =>
+                                    call memory_block_join<ty>(
+                                        [address.clone()], [vir_low::Expression::full_permission()]
+                                    )
+                                });
+                            },
+                            vir_mid::TypeDecl::Trusted(decl) => {
                                 // into_memory_block for trusted types is
                                 // trusted and has no statements.
-                            },
-                            vir_mid::TypeDecl::Tuple(decl) => {
+                                // TODO: check if this is still okay?
+                                // copied from struct
                                 // TODO: Remove code duplication.
                                 for field in decl.iter_fields() {
                                     let field_place = self.encode_field_place(

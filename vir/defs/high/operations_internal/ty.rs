@@ -1,6 +1,9 @@
 use super::super::ast::{
     expression::{visitors::ExpressionFolder, *},
-    ty::{visitors::TypeFolder, *},
+    ty::{
+        visitors::{default_walk_reference, TypeFolder},
+        *,
+    },
     type_decl::DiscriminantValue,
 };
 use rustc_hash::FxHashMap;
@@ -74,19 +77,53 @@ impl Type {
             _ => false,
         }
     }
+    // FIXME: erase_lifetime is dangerous - it currently only deletes the lifetime of references
     pub fn erase_lifetime(&mut self) {
-        if let Type::Reference(reference) = self {
-            reference.lifetime = LifetimeConst::erased();
+        match self {
+            Type::MBool
+            | Type::MInt
+            | Type::MFloat32
+            | Type::MFloat64
+            | Type::MPerm
+            | Type::Lifetime
+            | Type::Bool
+            | Type::Int(_)
+            | Type::Sequence(_)
+            | Type::Map(_)
+            | Type::Float(_)
+            | Type::TypeVar(_)
+            | Type::Never
+            | Type::Str => {}
+            Type::Reference(reference) => {
+                reference.lifetime = LifetimeConst::erased();
+                let mut new_target_type = reference.target_type.clone();
+                new_target_type.erase_lifetime();
+                reference.target_type = new_target_type;
+            }
+            Type::Tuple(_) => {}
+            Type::Struct(_) => {}
+            Type::Enum(_) => {}
+            Type::Union(_) => {}
+            Type::Array(_) => {}
+            Type::Slice(_) => {}
+            Type::Pointer(_) => {}
+            Type::FnPointer => {}
+            Type::Closure(_) => {}
+            Type::FunctionDef(_) => {}
+            Type::Projection(_) => {}
+            Type::Unsupported(_) => {}
+            Type::Trusted(_) => {}
         }
     }
-    pub fn erase_lifetimes(self) -> Self {
+    #[must_use]
+    pub fn erase_lifetimes(&self) -> Self {
         struct DefaultLifetimeEraser {}
         impl TypeFolder for DefaultLifetimeEraser {
             fn fold_lifetime_const(&mut self, _lifetime: LifetimeConst) -> LifetimeConst {
                 LifetimeConst::erased()
             }
         }
-        DefaultLifetimeEraser {}.fold_type(self)
+        DefaultLifetimeEraser {}.fold_type(self.clone())
     }
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         if let Type::Reference(reference) = self {
@@ -105,6 +142,7 @@ impl Type {
             Self::Map(ty) => ty.key_type.is_type_var() || ty.val_type.is_type_var(),
             Self::TypeVar(_) => true,
             Self::Tuple(Tuple { arguments })
+            | Self::Trusted(Trusted { arguments, .. })
             | Self::Struct(Struct { arguments, .. })
             | Self::Enum(Enum { arguments, .. })
             | Self::Union(Union { arguments, .. })
@@ -118,7 +156,6 @@ impl Type {
                 unimplemented!();
             }
             Self::Unsupported(_) => true,
-            Self::Trusted(_) => true,
             _ => false,
         }
     }
