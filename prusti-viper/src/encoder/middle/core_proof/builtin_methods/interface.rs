@@ -956,6 +956,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         let predicate = expr! {
             acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
         };
+        // println!("------ assign");
+        // dbg!(&method_name);
+        // dbg!(&predicate);
         let reference_predicate = expr! {
             acc(OwnedNonAliased<result_type>(target_place, target_address, result_value, operand_lifetime))
         };

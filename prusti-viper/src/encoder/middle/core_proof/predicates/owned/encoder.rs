@@ -129,6 +129,8 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 let discriminant_call =
                     self.lowerer
                         .obtain_enum_discriminant(snapshot.clone().into(), ty, position)?;
+                let mut enum_lifetimes = vec![];
+                let mut j = 0;
                 for (&discriminant, variant) in decl.discriminant_values.iter().zip(&decl.variants)
                 {
                     let variant_index = variant.name.clone().into();
@@ -154,12 +156,28 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         self.encode_owned_non_aliased(&variant_type)?;
                     }
                     let variant_type = &variant_type;
+
+                    // get lifetimes
+                    let mut lifetimes = Vec::new();
+                    for (i, field) in variant.fields.iter().enumerate() {
+                        if let vir_mid::Type::Reference(_) = field.ty {
+                            let lifetime =
+                                vir_low::VariableDecl::new(format!("lft_field_variant_{}_lft_{}", j, i), ty!(Lifetime));
+                            lifetimes.push(lifetime.clone());
+                            enum_lifetimes.push(lifetime.clone());
+                        }
+                    }
+                    let lifetimes = lifetimes
+                        .into_iter()
+                        .map(|lifetime| lifetime.into());
+
                     let acc = expr! {
                         ([ discriminant_call.clone() ] == [ discriminant.into() ]) ==>
                         (acc(OwnedNonAliased<variant_type>(
-                            [variant_place], root_address, [variant_snapshot]
+                            [variant_place], root_address, [variant_snapshot]; lifetimes
                         )))
                     };
+                    j += 1;
                     variant_predicates.push(acc);
                 }
                 let discriminant_type = &decl.discriminant_type;
@@ -184,7 +202,12 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     position,
                 )?;
                 predicate! {
-                    OwnedNonAliased<ty>(place: Place, root_address: Address, snapshot: {snapshot_type})
+                    OwnedNonAliased<ty>(
+                        place: Place,
+                        root_address: Address,
+                        snapshot: {snapshot_type},
+                        *enum_lifetimes
+                    )
                     {(
                         ([validity]) &&
                         (acc(OwnedNonAliased<discriminant_type>(
@@ -245,7 +268,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 let element_type = &decl.element_type;
                 self.lowerer.encode_place_array_index_axioms(ty)?;
                 self.lowerer.ensure_type_definition(element_type)?;
-                let parameters = self.lowerer.extract_non_type_parameters_from_type(ty)?;
+                let parameters : Vec<vir_low::VariableDecl> = self.lowerer.extract_non_type_parameters_from_type(ty)?;
                 let parameters_validity: vir_low::Expression = self
                     .lowerer
                     .extract_non_type_parameters_from_type_validity(ty)?
@@ -338,8 +361,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         .reference_target_final_snapshot(ty, snapshot.into(), position)?;
                 let target_type = &reference.target_type;
                 let deref_place = self.lowerer.reference_deref_place(place.into(), position)?;
-                println!("---- encode_owned_non_aliased for:");
-                dbg!(&ty);
                 self.encode_unique_ref(target_type)?;
                 predicate! {
                     OwnedNonAliased<ty>(
@@ -749,11 +770,11 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             }
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_unique() => {
-                println!("############# WARNING ###############");
-                println!("no reference support in encode_unique_ref:");
-                dbg!(&ty);
-                dbg!(&reference);
-                println!("#####################################");
+                // println!("############# WARNING ###############");
+                // println!("no reference support in encode_unique_ref:");
+                // dbg!(&ty);
+                // dbg!(&reference);
+                // println!("#####################################");
                 let target_type = &reference.target_type;
                 self.encode_unique_ref(target_type)?;
                 let predicate = vir_low::PredicateDecl::new(
@@ -767,7 +788,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     ],
                     None,
                 );
-                dbg!(&predicate);
                 Some(predicate)
             }
             // vir_mid::TypeDecl::Never => {},

@@ -125,9 +125,17 @@ impl Type {
         }
         DefaultLifetimeEraser {}.fold_type(self.clone())
     }
+    // TODO: get lifetimes of types using a walker
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         if let Type::Reference(reference) = self {
             vec![reference.lifetime.clone()]
+        } else if let Type::Enum(Enum{arguments, ..}) = self {
+            let mut lifetimes = vec![];
+            for argument in arguments.iter() {
+                dbg!(&argument);
+                lifetimes.extend(argument.get_lifetimes());
+            }
+            lifetimes
         } else {
             Vec::new()
         }
