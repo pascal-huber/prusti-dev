@@ -356,6 +356,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut pre_write_statements = Vec::new();
             let mut post_write_statements = Vec::new();
             let mut encode_body = true;
+            // println!("--- assign");
+            // dbg!(&ty);
+            // dbg!(&value);
             match value {
                 vir_mid::Rvalue::CheckedBinaryOp(value) => {
                     self.encode_assign_method_rvalue_checked_binary_op(
@@ -401,13 +404,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     post_write_statements.push(stmtp! {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
-                    let lifetimes = self.extract_lifetime_arguments_from_rvalue(value)?;
+                    let mut lifetimes = self.extract_lifetime_arguments_from_rvalue(value)?;
+                    self.anonymize_lifetimes(&mut lifetimes);
+                    // let lifetime_exprs = lifetimes.iter().cloned().map(|x| x.into());
+                    dbg!(&lifetimes);
                     // FIXME: body is not encoded if we have additional lifetime
                     // parameters from structs.
                     // FIXME: As a workaround for #1065, we encode bodies only
                     // of types that do not contain generic bodies.
                     encode_body = lifetimes.is_empty() && !ty.contains_type_variables();
-                    args2.extend(lifetimes);
                     posts.push(
                         expr! { acc(OwnedNonAliased<ty>(target_place, target_address, result_value; args2)) },
                     );
@@ -427,6 +432,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         position,
                     )?;
                     parameters.extend(self.extract_non_type_parameters_from_type(ty)?);
+                    // TODO: this is kind of messy
+                    parameters.extend(lifetimes.clone());
                 }
             }
             let mut statements = pre_write_statements;
@@ -599,8 +606,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     operand_address: Address,
                     operand_value: { ty.to_snapshot(self)? }
                 };
+                // TODO: clean this
+                let mut lifetimes: Vec<vir_low::VariableDecl> = self.extract_lifetime_arguments_from_type(ty)?;
+                self.anonymize_lifetimes(&mut lifetimes);
+                let lifetime_exprs = lifetimes.iter().cloned().map(|x| x.into());
+                println!("---- x --");
+                dbg!(&ty);
+                dbg!(&lifetime_exprs);
                 let predicate = expr! {
-                    acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
+                    acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value; lifetime_exprs))
                 };
                 pres.push(predicate.clone());
                 posts.push(predicate);
@@ -2483,7 +2497,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 .conjoin();
             let mut arguments: Vec<vir_low::Expression> =
                 self.extract_non_type_parameters_from_type_as_exprs(ty)?;
+            println!("----- into_memory");
             let lifetimes = self.extract_lifetime_arguments_from_type(ty)?;
+            dbg!(&ty);
+            dbg!(&lifetimes);
             parameters.extend(lifetimes.clone());
             arguments.extend(
                 lifetimes
@@ -2723,7 +2740,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.extract_non_type_arguments_from_type_excluding_lifetimes(target.get_type())?,
         );
         let lifetimes = self.extract_lifetime_arguments_from_rvalue(&value)?;
-        arguments.extend(lifetimes);
+        let lifetime_exprs = lifetimes.iter().cloned().map(|x| x.into());
+        arguments.extend(lifetime_exprs);
         let target_value_type = target.get_type().to_snapshot(self)?;
         let result_value = self.create_new_temporary_variable(target_value_type)?;
         statements.push(vir_low::Statement::method_call(

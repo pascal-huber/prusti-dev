@@ -132,7 +132,7 @@ impl Type {
         } else if let Type::Enum(Enum{arguments, ..}) = self {
             let mut lifetimes = vec![];
             for argument in arguments.iter() {
-                dbg!(&argument);
+                // dbg!(&argument);
                 lifetimes.extend(argument.get_lifetimes());
             }
             lifetimes
