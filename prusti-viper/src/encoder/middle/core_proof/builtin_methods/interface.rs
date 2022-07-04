@@ -400,14 +400,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 }
                 _ => {
                     let args = self.extract_non_type_parameters_from_type_as_exprs(ty)?;
-                    let mut args2 = args.clone();
+                    let args2 = args.clone();
                     post_write_statements.push(stmtp! {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
                     let mut lifetimes = self.extract_lifetime_arguments_from_rvalue(value)?;
                     self.anonymize_lifetimes(&mut lifetimes);
-                    // let lifetime_exprs = lifetimes.iter().cloned().map(|x| x.into());
-                    dbg!(&lifetimes);
                     // FIXME: body is not encoded if we have additional lifetime
                     // parameters from structs.
                     // FIXME: As a workaround for #1065, we encode bodies only
@@ -607,12 +605,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     operand_value: { ty.to_snapshot(self)? }
                 };
                 // TODO: clean this
-                let mut lifetimes: Vec<vir_low::VariableDecl> = self.extract_lifetime_arguments_from_type(ty)?;
+                let mut lifetimes: Vec<vir_low::VariableDecl> =
+                    self.extract_lifetime_arguments_from_type(ty)?;
                 self.anonymize_lifetimes(&mut lifetimes);
                 let lifetime_exprs = lifetimes.iter().cloned().map(|x| x.into());
-                println!("---- x --");
-                dbg!(&ty);
-                dbg!(&lifetime_exprs);
+                // println!("---- x --");
+                // dbg!(&ty);
+                // dbg!(&lifetime_exprs);
                 let predicate = expr! {
                     acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value; lifetime_exprs))
                 };
@@ -2497,10 +2496,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 .conjoin();
             let mut arguments: Vec<vir_low::Expression> =
                 self.extract_non_type_parameters_from_type_as_exprs(ty)?;
-            println!("----- into_memory");
+            // println!("----- into_memory");
             let lifetimes = self.extract_lifetime_arguments_from_type(ty)?;
-            dbg!(&ty);
-            dbg!(&lifetimes);
+            // dbg!(&ty);
+            // dbg!(&lifetimes);
             parameters.extend(lifetimes.clone());
             arguments.extend(
                 lifetimes

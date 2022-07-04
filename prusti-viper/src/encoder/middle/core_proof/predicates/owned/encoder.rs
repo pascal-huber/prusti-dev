@@ -130,8 +130,11 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     self.lowerer
                         .obtain_enum_discriminant(snapshot.clone().into(), ty, position)?;
                 let mut enum_lifetimes = vec![];
-                let mut j = 0;
-                for (&discriminant, variant) in decl.discriminant_values.iter().zip(&decl.variants)
+                for (j, (&discriminant, variant)) in decl
+                    .discriminant_values
+                    .iter()
+                    .zip(&decl.variants)
+                    .enumerate()
                 {
                     let variant_index = variant.name.clone().into();
                     let variant_place = self.lowerer.encode_enum_variant_place(
@@ -161,15 +164,15 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     let mut lifetimes = Vec::new();
                     for (i, field) in variant.fields.iter().enumerate() {
                         if let vir_mid::Type::Reference(_) = field.ty {
-                            let lifetime =
-                                vir_low::VariableDecl::new(format!("lft_field_variant_{}_lft_{}", j, i), ty!(Lifetime));
+                            let lifetime = vir_low::VariableDecl::new(
+                                format!("lft_field_variant_{}_lft_{}", j, i),
+                                ty!(Lifetime),
+                            );
                             lifetimes.push(lifetime.clone());
                             enum_lifetimes.push(lifetime.clone());
                         }
                     }
-                    let lifetimes = lifetimes
-                        .into_iter()
-                        .map(|lifetime| lifetime.into());
+                    let lifetimes = lifetimes.into_iter().map(|lifetime| lifetime.into());
 
                     let acc = expr! {
                         ([ discriminant_call.clone() ] == [ discriminant.into() ]) ==>
@@ -177,7 +180,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                             [variant_place], root_address, [variant_snapshot]; lifetimes
                         )))
                     };
-                    j += 1;
                     variant_predicates.push(acc);
                 }
                 let discriminant_type = &decl.discriminant_type;
@@ -268,7 +270,8 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 let element_type = &decl.element_type;
                 self.lowerer.encode_place_array_index_axioms(ty)?;
                 self.lowerer.ensure_type_definition(element_type)?;
-                let parameters : Vec<vir_low::VariableDecl> = self.lowerer.extract_non_type_parameters_from_type(ty)?;
+                let parameters: Vec<vir_low::VariableDecl> =
+                    self.lowerer.extract_non_type_parameters_from_type(ty)?;
                 let parameters_validity: vir_low::Expression = self
                     .lowerer
                     .extract_non_type_parameters_from_type_validity(ty)?

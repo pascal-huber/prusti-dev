@@ -129,7 +129,7 @@ impl Type {
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         if let Type::Reference(reference) = self {
             vec![reference.lifetime.clone()]
-        } else if let Type::Enum(Enum{arguments, ..}) = self {
+        } else if let Type::Enum(Enum { arguments, .. }) = self {
             let mut lifetimes = vec![];
             for argument in arguments.iter() {
                 // dbg!(&argument);
