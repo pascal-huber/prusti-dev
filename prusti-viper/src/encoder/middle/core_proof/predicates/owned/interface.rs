@@ -42,7 +42,8 @@ pub(in super::super::super) trait PredicatesOwnedInterface {
     fn extract_lifetime_arguments_from_rvalue(
         &mut self,
         value: &vir_mid::Rvalue,
-    ) -> SpannedEncodingResult<Vec<vir_low::Expression>>;
+    ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>>;
+    fn anonymize_lifetimes(&mut self, lifetimes: &mut Vec<vir_low::VariableDecl>);
     fn extract_lifetime_arguments_from_type(
         &mut self,
         ty: &vir_mid::Type,
@@ -128,8 +129,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
     fn extract_lifetime_arguments_from_rvalue(
         &mut self,
         value: &vir_mid::Rvalue,
-    ) -> SpannedEncodingResult<Vec<vir_low::Expression>> {
-        let mut lifetimes: Vec<vir_low::Expression> = vec![];
+    ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>> {
+        let mut lifetimes: Vec<vir_low::VariableDecl> = vec![];
         if let vir_mid::Rvalue::Aggregate(value) = value {
             for operand in &value.operands {
                 match operand.kind {
@@ -138,11 +139,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
                         if let vir_mid::ty::Type::Reference(reference) = operand_ty {
                             let lifetime = self
                                 .encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-                            lifetimes.push(lifetime.into());
+                            lifetimes.push(lifetime);
                         }
                     }
                     _ => {}
                 }
+            }
+        } else if let vir_mid::Rvalue::Discriminant(vir_mid::ast::rvalue::Discriminant {
+            place: vir_mid::Expression::Local(vir_mid::Local { variable, .. }),
+        }) = value
+        {
+            let var_lifetimes = variable.ty.get_lifetimes();
+            for lifetime_const in var_lifetimes {
+                let lifetime = self.encode_lifetime_const_into_variable(lifetime_const)?;
+                lifetimes.push(lifetime);
             }
         }
         Ok(lifetimes)
@@ -157,6 +167,32 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
             if let vir_mid::TypeDecl::Struct(decl) = type_decl {
                 for field in decl.iter_fields() {
+                    if let vir_mid::Type::Reference(reference) = &field.ty {
+                        let lifetime =
+                            self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+                        lifetimes.push(lifetime)
+                    }
+                }
+            }
+        } else if ty.is_enum() {
+            // let ty_lifetimes = ty.get_lifetimes();
+            // for lifetime in ty_lifetimes {
+            //     lifetimes.push(self.encode_lifetime_const_into_variable(lifetime.clone())?);
+            // }
+            let type_decl = self.encoder.get_type_decl_mid(ty)?;
+            if let vir_mid::TypeDecl::Enum(decl) = type_decl {
+                for (_discriminant, variant) in decl.discriminant_values.iter().zip(&decl.variants)
+                {
+                    for field in variant.fields.iter() {
+                        if let vir_mid::Type::Reference(r) = &field.ty {
+                            lifetimes.push(
+                                self.encode_lifetime_const_into_variable(r.lifetime.clone())?,
+                            );
+                        }
+                    }
+                }
+            } else if let vir_mid::TypeDecl::Struct(strct) = type_decl {
+                for field in strct.iter_fields() {
                     if let vir_mid::Type::Reference(reference) = &field.ty {
                         let lifetime =
                             self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
@@ -187,6 +223,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
             Ok(vec![self.size_constant(ty.length)?])
         } else {
             Ok(Vec::new())
+        }
+    }
+
+    fn anonymize_lifetimes(&mut self, lifetimes: &mut Vec<vir_low::VariableDecl>) {
+        for (i, lifetime) in lifetimes.iter_mut().enumerate() {
+            lifetime.name = format!("lft_{}", i);
         }
     }
 

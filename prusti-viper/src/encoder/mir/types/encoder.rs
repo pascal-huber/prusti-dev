@@ -385,8 +385,17 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                     }
                 }
             }
-            ty::TyKind::Adt(adt_def, _) if self.is_trusted_type(adt_def.did()) => {
-                vir::TypeDecl::trusted(encode_trusted_name(self.encoder, adt_def.did()))
+            ty::TyKind::Adt(adt_def, substs) if self.is_trusted_type(adt_def.did()) => {
+                // dbg!(&adt_def);
+
+                let name = encode_trusted_name(self.encoder, adt_def.did());
+                let variant = &adt_def.variants()[0usize.into()];
+                vir::TypeDecl::Trusted(encode_variant_trusted(self.encoder, name, substs, variant)?)
+
+                // vir::TypeDecl::trusted(
+                //     encode_trusted_name(self.encoder, adt_def.did()),
+                //     self.encode_substs(substs),
+                // )
             }
             ty::TyKind::Adt(adt_def, substs) => {
                 encode_adt_def(self.encoder, *adt_def, substs, None)?
@@ -581,6 +590,26 @@ fn encode_variant<'v, 'tcx: 'v>(
         fields.push(field);
     }
     let variant = vir::type_decl::Struct::new(name, fields);
+    Ok(variant)
+}
+
+// FIXME: this is highly redundant with "encode_variant"
+fn encode_variant_trusted<'v, 'tcx: 'v>(
+    encoder: &Encoder<'v, 'tcx>,
+    name: String,
+    substs: ty::subst::SubstsRef<'tcx>,
+    variant: &ty::VariantDef,
+) -> SpannedEncodingResult<vir::type_decl::Trusted> {
+    let tcx = encoder.env().tcx();
+    let mut fields = Vec::new();
+    for (field_index, field) in variant.fields.iter().enumerate() {
+        let field_name = crate::encoder::encoder::encode_field_name(field.ident(tcx).as_str());
+        let field_ty = field.ty(tcx, substs);
+        let field =
+            vir::FieldDecl::new(field_name, field_index, encoder.encode_type_high(field_ty)?);
+        fields.push(field);
+    }
+    let variant = vir::type_decl::Trusted::new(name, fields);
     Ok(variant)
 }
 
