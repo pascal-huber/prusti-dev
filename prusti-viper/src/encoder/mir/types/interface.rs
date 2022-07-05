@@ -2,8 +2,9 @@ use super::TypeEncoder;
 use crate::encoder::{
     errors::{EncodingError, EncodingResult, SpannedEncodingError, SpannedEncodingResult},
     high::types::HighTypeEncoderInterface,
+    mir::types::interface::ty::SubstsRef,
 };
-
+use prusti_interface::environment::debug_utils::to_text::ToText;
 use prusti_rustc_interface::{
     errors::MultiSpan,
     middle::{mir, ty},
@@ -38,6 +39,18 @@ pub(crate) trait MirTypeEncoderInterface<'tcx> {
         declaration_span: Span,
     ) -> SpannedEncodingResult<vir_high::FieldDecl>;
     fn encode_value_field_high(&self, ty: ty::Ty<'tcx>) -> EncodingResult<vir_high::FieldDecl>;
+    fn get_lifetimes_substs(
+        &self,
+        substs: &SubstsRef<'tcx>,
+    ) -> SpannedEncodingResult<Vec<vir_high::ty::LifetimeConst>>;
+    fn get_lifetimes_substs_as_type_decl(
+        &self,
+        substs: &SubstsRef<'tcx>,
+    ) -> SpannedEncodingResult<Vec<vir_high::type_decl::LifetimeConst>>;
+    fn get_lifetimes_high(
+        &self,
+        ty: &ty::Ty<'tcx>,
+    ) -> SpannedEncodingResult<Vec<vir_high::ty::LifetimeConst>>;
     fn encode_type_high(&self, ty: ty::Ty<'tcx>) -> SpannedEncodingResult<vir_high::Type>;
     fn encode_place_type_high(&self, ty: mir::tcx::PlaceTy<'tcx>)
         -> EncodingResult<vir_high::Type>;
@@ -149,6 +162,68 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
         self.ensure_type_predicate_encoded(ty)?;
         let encoded_type = self.encode_type_high(ty)?;
         crate::encoder::high::types::create_value_field(encoded_type)
+    }
+    // TODO: check if the following 3 functions belong here
+    fn get_lifetimes_substs(
+        &self,
+        substs: &SubstsRef<'tcx>,
+    ) -> SpannedEncodingResult<Vec<vir_high::ty::LifetimeConst>> {
+        let mut lifetimes = vec![];
+        for kind in substs.iter() {
+            if let ty::subst::GenericArgKind::Type(arg_ty) = kind.unpack() {
+                lifetimes.extend(self.get_lifetimes_high(&arg_ty)?);
+            }
+        }
+        Ok(lifetimes)
+    }
+    fn get_lifetimes_substs_as_type_decl(
+        &self,
+        substs: &SubstsRef<'tcx>,
+    ) -> SpannedEncodingResult<Vec<vir_high::type_decl::LifetimeConst>> {
+        let lifetime_const = self.get_lifetimes_substs(substs)?;
+        let mut lifetimes = vec![];
+        for lifetime in lifetime_const {
+            lifetimes.push(vir_high::type_decl::LifetimeConst {
+                name: lifetime.name.clone(),
+            })
+        }
+        Ok(lifetimes)
+    }
+    fn get_lifetimes_high(
+        &self,
+        ty: &ty::Ty<'tcx>,
+    ) -> SpannedEncodingResult<Vec<vir_high::ty::LifetimeConst>> {
+        let lifetimes = match ty.kind() {
+            ty::TyKind::Adt(_, substs)
+            | ty::TyKind::Closure(_, substs)
+            | ty::TyKind::Opaque(_, substs)
+            | ty::TyKind::FnDef(_, substs)
+            | ty::TyKind::Generator(_, substs, _) => self.get_lifetimes_substs(substs)?,
+            ty::TyKind::Array(ty, _) | ty::TyKind::Slice(ty) => self.get_lifetimes_high(ty)?,
+            ty::TyKind::Dynamic(_, region) | ty::TyKind::Ref(region, _, _) => {
+                vec![vir_high::ty::LifetimeConst {
+                    name: region.to_text(),
+                }]
+            }
+            ty::TyKind::Projection(projection_ty) => {
+                self.get_lifetimes_substs(&projection_ty.substs)?
+            }
+            ty::TyKind::Tuple(ty_list) => {
+                let mut lifetimes = vec![];
+                for item_ty in ty_list.iter() {
+                    lifetimes.extend(self.get_lifetimes_high(&item_ty)?);
+                }
+                lifetimes
+            }
+            ty::TyKind::RawPtr(type_and_mut) => self.get_lifetimes_high(&type_and_mut.ty)?,
+            ty::TyKind::GeneratorWitness(_binder) => {
+                unimplemented!();
+            }
+            _ => {
+                vec![]
+            }
+        };
+        Ok(lifetimes)
     }
     fn encode_type_high(&self, ty: ty::Ty<'tcx>) -> SpannedEncodingResult<vir_high::Type> {
         if !self
@@ -271,12 +346,15 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
                     variant: Some(variant),
                     name,
                     arguments,
+                    lifetimes,
                 }) => {
                     let encoded_enum = self
                         .encode_type_def(&vir_high::Type::enum_(
                             name.clone(),
                             arguments.clone(),
                             None,
+                            // TODO: right?
+                            lifetimes.clone(),
                         ))?
                         .unwrap_enum();
                     vir_high::TypeDecl::Struct(encoded_enum.into_variant(&variant.index).unwrap())
@@ -285,12 +363,14 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
                     variant: Some(variant),
                     name,
                     arguments,
+                    lifetimes,
                 }) => {
                     let encoded_union = self
                         .encode_type_def(&vir_high::Type::union_(
                             name.clone(),
                             arguments.clone(),
                             None,
+                            lifetimes.clone(),
                         ))?
                         .unwrap_union();
                     vir_high::TypeDecl::Struct(encoded_union.into_variant(&variant.index).unwrap())

@@ -64,12 +64,14 @@ pub enum Int {
 #[display(fmt = "Sequence({})", element_type)]
 pub struct Sequence {
     pub element_type: Box<Type>,
+    pub lifetimes: Vec<LifetimeConst>,
 }
 
 #[display(fmt = "Map({} -> {})", key_type, val_type)]
 pub struct Map {
     pub key_type: Box<Type>,
     pub val_type: Box<Type>,
+    pub lifetimes: Vec<LifetimeConst>,
 }
 
 pub enum Float {
@@ -106,6 +108,7 @@ pub enum TypeVar {
 pub struct Tuple {
     /// Type arguments.
     pub arguments: Vec<Type>,
+    pub lifetimes: Vec<LifetimeConst>,
 }
 
 #[display(fmt = "{}<{}>", name, "display::cjoin(arguments)")]
@@ -113,6 +116,7 @@ pub struct Struct {
     pub name: String,
     /// Type arguments.
     pub arguments: Vec<Type>,
+    pub lifetimes: Vec<LifetimeConst>,
 }
 
 #[derive(derive_more::From)]
@@ -132,6 +136,7 @@ pub struct Enum {
     pub arguments: Vec<Type>,
     /// A specific variant of the enum that this type represents.
     pub variant: Option<VariantIndex>,
+    pub lifetimes: Vec<LifetimeConst>,
 }
 
 #[display(fmt = "{}<{}>", name, "display::cjoin(arguments)")]
@@ -141,17 +146,20 @@ pub struct Union {
     pub arguments: Vec<Type>,
     /// A specific field of the union that this type represents.
     pub variant: Option<VariantIndex>,
+    pub lifetimes: Vec<LifetimeConst>,
 }
 
 #[display(fmt = "Array({}, {})", length, element_type)]
 pub struct Array {
     pub length: u64,
     pub element_type: Box<Type>,
+    pub lifetimes: Vec<LifetimeConst>,
 }
 
 #[display(fmt = "Slice({})", element_type)]
 pub struct Slice {
     pub element_type: Box<Type>,
+    pub lifetimes: Vec<LifetimeConst>,
 }
 
 #[derive(Copy, derive_more::IsVariant)]
@@ -193,6 +201,7 @@ pub struct Projection {
     pub name: String,
     /// Type arguments.
     pub arguments: Vec<Type>,
+    pub lifetimes: Vec<LifetimeConst>,
 }
 
 #[display(fmt = "{}", name)]
@@ -205,4 +214,5 @@ pub struct Trusted {
     pub name: String,
     /// Type arguments.
     pub arguments: Vec<Type>,
+    pub lifetimes: Vec<LifetimeConst>,
 }

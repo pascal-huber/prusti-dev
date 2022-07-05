@@ -605,10 +605,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     operand_value: { ty.to_snapshot(self)? }
                 };
                 // TODO: clean this
-                let mut lifetimes: Vec<vir_low::VariableDecl> =
-                    self.extract_lifetime_arguments_from_type(ty)?;
-                self.anonymize_lifetimes(&mut lifetimes);
-                let lifetime_exprs = lifetimes.iter().cloned().map(|x| x.into());
+                // let mut lifetimes: Vec<vir_low::VariableDecl> =
+                //     self.extract_lifetime_arguments_from_type(ty)?;
+                let lifetimes = ty.get_lifetimes_as_var();
+                // self.anonymize_lifetimes(&mut lifetimes);
+                let lifetime_exprs = lifetimes.iter().cloned().map(
+                    // TODO: is there no better way for this?
+                    |x| {
+                        vir_low::VariableDecl {
+                            name: x.name,
+                            ty: ty!(Lifetime),
+                        }
+                        .into()
+                    },
+                );
                 // println!("---- x --");
                 // dbg!(&ty);
                 // dbg!(&lifetime_exprs);
@@ -2496,17 +2506,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 .conjoin();
             let mut arguments: Vec<vir_low::Expression> =
                 self.extract_non_type_parameters_from_type_as_exprs(ty)?;
-            // println!("----- into_memory");
-            let lifetimes = self.extract_lifetime_arguments_from_type(ty)?;
-            // dbg!(&ty);
-            // dbg!(&lifetimes);
-            parameters.extend(lifetimes.clone());
-            arguments.extend(
-                lifetimes
-                    .iter()
-                    .map(|x| x.clone().into())
-                    .collect::<Vec<vir_low::Expression>>(),
-            );
+            let lifetime_params = self.extract_lifetime_variables_anonymise(ty)?;
+            parameters.extend(lifetime_params);
+            let lifetimes: Vec<vir_low::Expression> = self
+                .extract_lifetime_variables(ty)?
+                .iter()
+                .cloned()
+                .map(|lifetime| lifetime.into())
+                .collect();
+            arguments.extend(lifetimes.clone());
 
             let arguments2 = arguments.clone();
             let mut method = method! {
