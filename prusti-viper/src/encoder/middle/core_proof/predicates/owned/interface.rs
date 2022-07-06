@@ -124,34 +124,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
         ))
     }
 
+    // TODO: move this to other extract_lifetime functions?
     fn extract_lifetime_arguments_from_rvalue(
         &mut self,
         value: &vir_mid::Rvalue,
     ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>> {
-        let mut lifetimes: Vec<vir_low::VariableDecl> = vec![];
-        if let vir_mid::Rvalue::Aggregate(value) = value {
-            for operand in &value.operands {
-                match operand.kind {
-                    vir_mid::OperandKind::Copy | vir_mid::OperandKind::Move => {
-                        let operand_ty = operand.expression.get_type();
-                        if let vir_mid::ty::Type::Reference(reference) = operand_ty {
-                            let lifetime = self
-                                .encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-                            lifetimes.push(lifetime);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        } else if let vir_mid::Rvalue::Discriminant(vir_mid::ast::rvalue::Discriminant {
-            place: vir_mid::Expression::Local(vir_mid::Local { variable, .. }),
-        }) = value
-        {
-            let var_lifetimes = variable.ty.get_lifetimes();
-            for lifetime_const in var_lifetimes {
-                let lifetime = self.encode_lifetime_const_into_variable(lifetime_const)?;
-                lifetimes.push(lifetime);
-            }
+        let mut lifetimes = Vec::new();
+        for lifetime in value.get_lifetimes() {
+            lifetimes.push(self.encode_lifetime_const_into_variable(lifetime)?);
         }
         Ok(lifetimes)
     }

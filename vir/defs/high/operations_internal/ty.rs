@@ -133,7 +133,6 @@ impl Type {
         }
         DefaultLifetimeEraser {}.fold_type(self.clone())
     }
-    // TODO: get lifetimes of types using a walker
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         match self {
             Type::Reference(reference) => vec![reference.lifetime.clone()],
