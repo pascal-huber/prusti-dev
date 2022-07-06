@@ -1,7 +1,7 @@
 use super::super::ast::{
     expression::Expression,
     position::Position,
-    rvalue::{visitors::RvalueWalker, Rvalue, OperandKind},
+    rvalue::{visitors::RvalueWalker, OperandKind, Rvalue},
     ty::*,
     variable::*,
 };

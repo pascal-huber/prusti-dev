@@ -190,7 +190,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         let lifetimes_const = value.get_lifetimes();
         let mut lifetimes = vec![];
         for lifetime in lifetimes_const {
-            let lft: vir_low::Expression = self.encode_lifetime_const_into_variable(lifetime)?.into();
+            let lft: vir_low::Expression =
+                self.encode_lifetime_const_into_variable(lifetime)?.into();
             lifetimes.push(lft);
         }
         match value {
@@ -2507,16 +2508,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 .conjoin();
             let mut arguments: Vec<vir_low::Expression> =
                 self.extract_non_type_parameters_from_type_as_exprs(ty)?;
-            let lifetimes = self.extract_lifetime_variables(ty)?;
-            // let lifetime_params = self.extract_lifetime_variables_anonymise(ty)?;
-            // parameters.extend(lifetime_params.clone());
-            // let lifetimes: Vec<vir_low::Expression> = lifetime_params
-            //     .iter()
-            //     .cloned()
-            //     .map(|lifetime| lifetime.into())
-            //     .collect();
-            // arguments.extend(lifetimes.clone());
+            let lifetimes: Vec<vir_low::Expression> = self
+                .extract_lifetime_variables_anonymise(ty)?
+                .iter()
+                .cloned()
+                .map(|x| x.into())
+                .collect();
+            arguments.extend(lifetimes.clone());
             let arguments2 = arguments.clone();
+            let lifetime_params = self.extract_lifetime_variables_anonymise(ty)?;
+            parameters.extend(lifetime_params);
             let mut method = method! {
                 into_memory_block<ty>(
                     place: Place,

@@ -9,7 +9,6 @@ use rustc_hash::FxHashSet;
 use vir_crate::{
     low::{self as vir_low},
     middle as vir_mid,
-    middle::operations::ty::Typed,
 };
 
 use super::encoder::PredicateEncoder;
@@ -170,10 +169,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>> {
         // FIXME: Figure out how to avoid these magic variable names.
         let parameters = match ty {
-            vir_mid::Type::Reference(_) => {
-                use vir_low::macros::*;
-                vec![var! { lifetime: Lifetime }]
-            }
+            // this is done differently now
+            // vir_mid::Type::Reference(_) => {
+            //     use vir_low::macros::*;
+            //     vec![var! { lifetime: Lifetime }]
+            // }
             vir_mid::Type::Array(_) => {
                 vec![self.array_length_variable()?]
             }
