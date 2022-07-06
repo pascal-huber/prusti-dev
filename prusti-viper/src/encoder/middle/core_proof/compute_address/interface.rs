@@ -96,8 +96,15 @@ pub(in super::super) trait ComputeAddressInterface {
 
 impl<'p, 'v: 'p, 'tcx: 'v> ComputeAddressInterface for Lowerer<'p, 'v, 'tcx> {
     fn encode_compute_address(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
-        if !self.compute_address_state.encoded_types.contains(ty) {
-            self.compute_address_state.encoded_types.insert(ty.clone());
+        let ty_without_lifetime = ty.clone().erase_lifetimes();
+        if !self
+            .compute_address_state
+            .encoded_types
+            .contains(&ty_without_lifetime)
+        {
+            self.compute_address_state
+                .encoded_types
+                .insert(ty_without_lifetime);
 
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
             match type_decl {

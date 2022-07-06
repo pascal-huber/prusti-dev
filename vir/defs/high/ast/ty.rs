@@ -61,13 +61,18 @@ pub enum Int {
     Unbounded,
 }
 
-#[display(fmt = "Sequence({})", element_type)]
+#[display(fmt = "Sequence({}, {})", element_type, "display::cjoin(lifetimes)")]
 pub struct Sequence {
     pub element_type: Box<Type>,
     pub lifetimes: Vec<LifetimeConst>,
 }
 
-#[display(fmt = "Map({} -> {})", key_type, val_type)]
+#[display(
+    fmt = "Map({} -> {}, {})",
+    key_type,
+    val_type,
+    "display::cjoin(lifetimes)"
+)]
 pub struct Map {
     pub key_type: Box<Type>,
     pub val_type: Box<Type>,
@@ -104,14 +109,23 @@ pub enum TypeVar {
     GenericType(GenericType),
 }
 
-#[display(fmt = "({})", "display::cjoin(arguments)")]
+#[display(
+    fmt = "({}, {})",
+    "display::cjoin(arguments)",
+    "display::cjoin(lifetimes)"
+)]
 pub struct Tuple {
     /// Type arguments.
     pub arguments: Vec<Type>,
     pub lifetimes: Vec<LifetimeConst>,
 }
 
-#[display(fmt = "{}<{}>", name, "display::cjoin(arguments)")]
+#[display(
+    fmt = "{}<{}>[{}]",
+    name,
+    "display::cjoin(arguments)",
+    "display::cjoin(lifetimes)"
+)]
 pub struct Struct {
     pub name: String,
     /// Type arguments.
@@ -125,10 +139,11 @@ pub struct VariantIndex {
 }
 
 #[display(
-    fmt = "{}{}<{}>",
+    fmt = "{}{}<{}>[{}]",
     name,
     "display::option!(variant, \"[{}]\", \"\")",
-    "display::cjoin(arguments)"
+    "display::cjoin(arguments)",
+    "display::cjoin(lifetimes)"
 )]
 pub struct Enum {
     pub name: String,
@@ -139,7 +154,12 @@ pub struct Enum {
     pub lifetimes: Vec<LifetimeConst>,
 }
 
-#[display(fmt = "{}<{}>", name, "display::cjoin(arguments)")]
+#[display(
+    fmt = "{}<{}>[{}]",
+    name,
+    "display::cjoin(arguments)",
+    "display::cjoin(lifetimes)"
+)]
 pub struct Union {
     pub name: String,
     /// Type arguments.
@@ -149,14 +169,19 @@ pub struct Union {
     pub lifetimes: Vec<LifetimeConst>,
 }
 
-#[display(fmt = "Array({}, {})", length, element_type)]
+#[display(
+    fmt = "Array({}, {}, {})",
+    length,
+    element_type,
+    "display::cjoin(lifetimes)"
+)]
 pub struct Array {
     pub length: u64,
     pub element_type: Box<Type>,
     pub lifetimes: Vec<LifetimeConst>,
 }
 
-#[display(fmt = "Slice({})", element_type)]
+#[display(fmt = "Slice({}, {})", element_type, "display::cjoin(lifetimes)")]
 pub struct Slice {
     pub element_type: Box<Type>,
     pub lifetimes: Vec<LifetimeConst>,
@@ -196,7 +221,12 @@ pub struct FunctionDef {
     // pub arguments: Vec<Type>,
 }
 
-#[display(fmt = "{}<{}>", name, "display::cjoin(arguments)")]
+#[display(
+    fmt = "{}<{}>[{}]",
+    name,
+    "display::cjoin(arguments)",
+    "display::cjoin(lifetimes)"
+)]
 pub struct Projection {
     pub name: String,
     /// Type arguments.
@@ -209,7 +239,12 @@ pub struct Unsupported {
     pub name: String,
 }
 
-#[display(fmt = "{}<{}>", name, "display::cjoin(arguments)")]
+#[display(
+    fmt = "{}<{}>[{}]",
+    name,
+    "display::cjoin(arguments)",
+    "display::cjoin(lifetimes)"
+)]
 pub struct Trusted {
     pub name: String,
     /// Type arguments.

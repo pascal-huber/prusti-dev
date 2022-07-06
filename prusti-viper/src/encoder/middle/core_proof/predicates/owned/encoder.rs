@@ -55,8 +55,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
         &mut self,
         ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
-        ty.erase_lifetime();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone().erase_lifetimes();
         if self.encoded_owned_predicates.contains(ty) {
             return Ok(());
         }

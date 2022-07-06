@@ -85,43 +85,47 @@ impl Type {
             _ => false,
         }
     }
-    // FIXME: erase_lifetime is dangerous - it currently only deletes the lifetime of references
-    pub fn erase_lifetime(&mut self) {
+    fn erase_lifetime_vec(&mut self) {
         match self {
-            Type::MBool
-            | Type::MInt
-            | Type::MFloat32
-            | Type::MFloat64
-            | Type::MPerm
-            | Type::Lifetime
-            | Type::Bool
-            | Type::Int(_)
-            | Type::Sequence(_)
-            | Type::Map(_)
-            | Type::Float(_)
-            | Type::TypeVar(_)
-            | Type::Never
-            | Type::Str => {}
-            Type::Reference(reference) => {
-                reference.lifetime = LifetimeConst::erased();
-                let mut new_target_type = reference.target_type.clone();
-                new_target_type.erase_lifetime();
-                reference.target_type = new_target_type;
+            // Type::MBool
+            // | Type::MInt
+            // | Type::MFloat32
+            // | Type::MFloat64
+            // | Type::MPerm
+            // | Type::Lifetime
+            // | Type::Bool
+            // | Type::Int(_)
+            // | Type::Float(_)
+            // | Type::TypeVar(_)
+            // | Type::Never
+            // | Type::Str => {}
+            // Type::Reference(reference) => {
+            //     reference.lifetime = LifetimeConst::erased();
+            //     let mut new_target_type = reference.target_type.clone();
+            //     new_target_type.erase_lifetimes();
+            //     reference.target_type = new_target_type;
+            // }
+            Type::Tuple(Tuple { lifetimes, .. })
+            | Type::Struct(Struct { lifetimes, .. })
+            | Type::Sequence(Sequence { lifetimes, .. })
+            | Type::Map(Map { lifetimes, .. })
+            | Type::Enum(Enum { lifetimes, .. })
+            | Type::Array(Array { lifetimes, .. })
+            | Type::Slice(Slice { lifetimes, .. })
+            | Type::Projection(Projection { lifetimes, .. })
+            | Type::Trusted(Trusted { lifetimes, .. })
+            | Type::Union(Union { lifetimes, .. }) => {
+                for lifetime in lifetimes.iter_mut() {
+                    lifetime.name = "pure_erased".to_string();
+                }
             }
-            Type::Tuple(_) => {}
-            Type::Struct(_) => {}
-            Type::Enum(_) => {}
-            Type::Union(_) => {}
-            Type::Array(_) => {}
-            Type::Slice(_) => {}
-            Type::Pointer(_) => {}
-            Type::FnPointer => {}
-            Type::Closure(_) => {}
-            Type::FunctionDef(_) => {}
-            Type::Projection(_) => {}
-            Type::Unsupported(_) => {}
-            Type::Trusted(_) => {}
+            _ => {} // Type::Pointer(_) => {}
+                    // Type::FnPointer => {}
+                    // Type::Closure(_) => {}
+                    // Type::FunctionDef(_) => {}
+                    // Type::Unsupported(_) => {}
         }
+        dbg!(&self);
     }
     #[must_use]
     pub fn erase_lifetimes(&self) -> Self {
@@ -131,13 +135,16 @@ impl Type {
                 LifetimeConst::erased()
             }
         }
-        DefaultLifetimeEraser {}.fold_type(self.clone())
+        let mut self_erased = DefaultLifetimeEraser {}.fold_type(self.clone());
+        self_erased.erase_lifetime_vec();
+        self_erased
     }
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         match self {
             Type::Reference(reference) => vec![reference.lifetime.clone()],
-            Type::Enum(Enum { lifetimes, .. }) |
-            Type::Struct(Struct { lifetimes, .. }) => lifetimes.clone(),
+            Type::Enum(Enum { lifetimes, .. }) | Type::Struct(Struct { lifetimes, .. }) => {
+                lifetimes.clone()
+            }
             _ => vec![],
         }
     }

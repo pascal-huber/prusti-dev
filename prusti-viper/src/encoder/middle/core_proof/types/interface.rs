@@ -341,8 +341,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> TypesInterface for Lowerer<'p, 'v, 'tcx> {
             return Ok(());
         }
         // FIXME: We should avoid these copies in some smarter way.
-        let mut ty_no_lifetime = ty.clone();
-        ty_no_lifetime.erase_lifetime();
+        let ty_no_lifetime = ty.clone().erase_lifetimes();
         if !self
             .types_state
             .ensured_definitions

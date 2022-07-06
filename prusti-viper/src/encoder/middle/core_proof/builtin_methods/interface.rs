@@ -447,8 +447,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         position,
                     )?;
                     parameters.extend(self.extract_non_type_parameters_from_type(ty)?);
-                    // TODO: this is kind of messy
-                    parameters.extend(lifetimes_rvalue.clone());
+                    parameters.extend(lifetimes_rvalue);
                 }
             }
             let mut statements = pre_write_statements;
@@ -1218,8 +1217,7 @@ pub(in super::super) trait BuiltinMethodsInterface {
 
 impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     fn encode_write_address_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
-        let mut ty_without_lifetime = ty.clone();
-        ty_without_lifetime.erase_lifetime();
+        let ty_without_lifetime = ty.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_write_address_methods
@@ -2043,12 +2041,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         ty: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let mut ty_without_lifetime = ty.clone();
-        ty_without_lifetime.erase_lifetime();
+        let ty_without_lifetime = &ty.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_owned_non_aliased_havoc_methods
-            .contains(ty)
+            .contains(ty_without_lifetime)
         {
             use vir_low::macros::*;
             let method_name = self.encode_havoc_owned_non_aliased_method_name(ty)?;
@@ -2074,7 +2071,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.declare_method(method)?;
             self.builtin_methods_state
                 .encoded_owned_non_aliased_havoc_methods
-                .insert(ty.clone());
+                .insert(ty_without_lifetime.clone());
         }
         Ok(())
     }
@@ -2464,8 +2461,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         ty: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let mut ty_without_lifetime = ty.clone();
-        ty_without_lifetime.erase_lifetime();
+        let ty_without_lifetime = ty.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_memory_block_havoc_methods
@@ -2494,8 +2490,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
-        ty.erase_lifetime();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_into_memory_block_methods
@@ -2529,9 +2524,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 .cloned()
                 .map(|x| x.into())
                 .collect();
-            // println!("---- into_memory_block");
-            // dbg!(&ty);
-            // dbg!(&lifetimes);
             arguments.extend(lifetimes.clone());
             let arguments2 = arguments.clone();
             let lifetime_params = self.extract_lifetime_variables_anonymise(ty)?;
@@ -3279,8 +3271,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
-        ty.erase_lifetime();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_bor_shorten_methods
