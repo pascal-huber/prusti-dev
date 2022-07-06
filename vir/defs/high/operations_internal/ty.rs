@@ -125,7 +125,6 @@ impl Type {
                     // Type::FunctionDef(_) => {}
                     // Type::Unsupported(_) => {}
         }
-        dbg!(&self);
     }
     #[must_use]
     pub fn erase_lifetimes(&self) -> Self {
@@ -142,9 +141,16 @@ impl Type {
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         match self {
             Type::Reference(reference) => vec![reference.lifetime.clone()],
-            Type::Enum(Enum { lifetimes, .. }) | Type::Struct(Struct { lifetimes, .. }) => {
-                lifetimes.clone()
-            }
+            Type::Tuple(Tuple { lifetimes, .. })
+            | Type::Struct(Struct { lifetimes, .. })
+            | Type::Sequence(Sequence { lifetimes, .. })
+            | Type::Map(Map { lifetimes, .. })
+            | Type::Enum(Enum { lifetimes, .. })
+            | Type::Array(Array { lifetimes, .. })
+            | Type::Slice(Slice { lifetimes, .. })
+            | Type::Projection(Projection { lifetimes, .. })
+            | Type::Trusted(Trusted { lifetimes, .. })
+            | Type::Union(Union { lifetimes, .. }) => lifetimes.clone(),
             _ => vec![],
         }
     }
