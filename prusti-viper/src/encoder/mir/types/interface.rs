@@ -170,8 +170,17 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
     ) -> SpannedEncodingResult<Vec<vir_high::ty::LifetimeConst>> {
         let mut lifetimes = vec![];
         for kind in substs.iter() {
-            if let ty::subst::GenericArgKind::Type(arg_ty) = kind.unpack() {
-                lifetimes.extend(self.get_lifetimes_high(&arg_ty)?);
+            match kind.unpack(){
+                ty::subst::GenericArgKind::Type(arg_ty) => {
+                    let lifetime = self.get_lifetimes_high(&arg_ty)?;
+                    lifetimes.extend(lifetime);
+                }
+                ty::subst::GenericArgKind::Lifetime(region) => {
+                    lifetimes.push(vir_high::ty::LifetimeConst {
+                        name: region.to_text(),
+                    });
+                }
+                ty::subst::GenericArgKind::Const(_) => {}
             }
         }
         Ok(lifetimes)

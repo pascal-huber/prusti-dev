@@ -136,7 +136,8 @@ impl Type {
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         match self {
             Type::Reference(reference) => vec![reference.lifetime.clone()],
-            Type::Enum(Enum { lifetimes, .. }) => lifetimes.clone(),
+            Type::Enum(Enum { lifetimes, .. }) |
+            Type::Struct(Struct { lifetimes, .. }) => lifetimes.clone(),
             _ => vec![],
         }
     }

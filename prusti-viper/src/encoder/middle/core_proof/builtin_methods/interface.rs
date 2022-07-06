@@ -367,6 +367,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             // println!("--- assign");
             // dbg!(&ty);
             // dbg!(&value);
+            // let lifetimes_ty = self.extract_lifetime_variables_anonymise(ty)?;
+            let lifetimes_rvalue = self.extract_lifetime_arguments_from_rvalue_anonymise(value)?;
+            // dbg!(&lifetimes_ty);
+            // dbg!(&lifetimes_rvalue);
             match value {
                 vir_mid::Rvalue::CheckedBinaryOp(value) => {
                     self.encode_assign_method_rvalue_checked_binary_op(
@@ -408,17 +412,22 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 }
                 _ => {
                     let args = self.extract_non_type_parameters_from_type_as_exprs(ty)?;
-                    let args2 = args.clone();
+                    let mut args2 = args.clone();
                     post_write_statements.push(stmtp! {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
-                    let mut lifetimes = self.extract_lifetime_arguments_from_rvalue(value)?;
-                    self.anonymize_lifetimes(&mut lifetimes);
+                    let lifetimes: Vec<vir_low::Expression> = self
+                        .extract_lifetime_arguments_from_rvalue_anonymise(value)?
+                        .iter()
+                        .cloned()
+                        .map(|x| x.into())
+                        .collect();
+                    args2.extend(lifetimes);
                     // FIXME: body is not encoded if we have additional lifetime
                     // parameters from structs.
                     // FIXME: As a workaround for #1065, we encode bodies only
                     // of types that do not contain generic bodies.
-                    encode_body = lifetimes.is_empty() && !ty.contains_type_variables();
+                    encode_body = lifetimes_rvalue.is_empty() && !ty.contains_type_variables();
                     posts.push(
                         expr! { acc(OwnedNonAliased<ty>(target_place, target_address, result_value; args2)) },
                     );
@@ -439,7 +448,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     )?;
                     parameters.extend(self.extract_non_type_parameters_from_type(ty)?);
                     // TODO: this is kind of messy
-                    parameters.extend(lifetimes.clone());
+                    parameters.extend(lifetimes_rvalue.clone());
                 }
             }
             let mut statements = pre_write_statements;
@@ -1074,15 +1083,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         use vir_low::macros::*;
         let value = self.encode_assign_operand_snapshot(operand_counter, operand)?;
         let ty = operand.expression.get_type();
+        let lifetimes_ty = self.extract_lifetime_variables_anonymise(ty)?;
+        let lifetimes: Vec<vir_low::Expression> =
+            lifetimes_ty.iter().cloned().map(|x| x.into()).collect();
         match operand.kind {
             vir_mid::OperandKind::Copy | vir_mid::OperandKind::Move => {
                 let place = self.encode_assign_operand_place(operand_counter)?;
                 let root_address = self.encode_assign_operand_address(operand_counter)?;
                 if let vir_mid::ty::Type::Reference(reference) = ty {
-                    let lifetime =
+                    let mut lifetime =
                         self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+                    // FIXME: this is so wrong? :(
+                    lifetime.name = "lft_0".to_string();
                     pres.push(
-                        expr! { acc(OwnedNonAliased<ty>(place, root_address, value, lifetime)) },
+                        expr! { acc(OwnedNonAliased<ty>(place, root_address, value; lifetimes)) },
                     );
                 } else {
                     pres.push(expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) });
@@ -1112,10 +1126,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         }
         pres.push(self.encode_snapshot_valid_call_for_type(value.clone().into(), ty)?);
         parameters.push(value.clone());
-        if let vir_mid::ty::Type::Reference(reference) = ty {
-            let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-            parameters.push(lifetime);
-        }
+        // TODO: this doesn't happen here anymore
+        // if let vir_mid::ty::Type::Reference(reference) = ty {
+        //     let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
+        //     parameters.push(lifetime);
+        // }
         Ok(value)
     }
     fn encode_assign_operand_place(
@@ -2514,6 +2529,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 .cloned()
                 .map(|x| x.into())
                 .collect();
+            // println!("---- into_memory_block");
+            // dbg!(&ty);
+            // dbg!(&lifetimes);
             arguments.extend(lifetimes.clone());
             let arguments2 = arguments.clone();
             let lifetime_params = self.extract_lifetime_variables_anonymise(ty)?;
