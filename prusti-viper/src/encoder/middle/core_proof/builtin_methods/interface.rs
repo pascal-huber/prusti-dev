@@ -364,13 +364,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut pre_write_statements = Vec::new();
             let mut post_write_statements = Vec::new();
             let mut encode_body = true;
-            // println!("--- assign");
-            // dbg!(&ty);
-            // dbg!(&value);
-            // let lifetimes_ty = self.extract_lifetime_variables_anonymise(ty)?;
             let lifetimes_rvalue = self.extract_lifetime_arguments_from_rvalue_anonymise(value)?;
-            // dbg!(&lifetimes_ty);
-            // dbg!(&lifetimes_rvalue);
             match value {
                 vir_mid::Rvalue::CheckedBinaryOp(value) => {
                     self.encode_assign_method_rvalue_checked_binary_op(
@@ -482,6 +476,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut pres = Vec::new();
             let mut posts = Vec::new();
             self.encode_assign_operand(&mut parameters, &mut pres, &mut posts, None, 1, operand)?;
+            let ty = operand.expression.get_type();
+            let lifetimes_ty = self.extract_lifetime_variables_anonymise(ty)?;
+            parameters.extend(lifetimes_ty);
             let method =
                 vir_low::MethodDecl::new(method_name, parameters, Vec::new(), pres, posts, None);
             self.declare_method(method)?;
@@ -983,9 +980,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         let predicate = expr! {
             acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
         };
-        // println!("------ assign");
-        // dbg!(&method_name);
-        // dbg!(&predicate);
         let reference_predicate = expr! {
             acc(OwnedNonAliased<result_type>(target_place, target_address, result_value, operand_lifetime))
         };
@@ -1089,17 +1083,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             vir_mid::OperandKind::Copy | vir_mid::OperandKind::Move => {
                 let place = self.encode_assign_operand_place(operand_counter)?;
                 let root_address = self.encode_assign_operand_address(operand_counter)?;
-                if let vir_mid::ty::Type::Reference(reference) = ty {
-                    let mut lifetime =
-                        self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-                    // FIXME: this is so wrong? :(
-                    lifetime.name = "lft_0".to_string();
-                    pres.push(
-                        expr! { acc(OwnedNonAliased<ty>(place, root_address, value; lifetimes)) },
-                    );
-                } else {
-                    pres.push(expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) });
-                }
+                pres.push(
+                    expr! { acc(OwnedNonAliased<ty>(place, root_address, value; lifetimes)) },
+                );
                 let post_predicate = if operand.kind == vir_mid::OperandKind::Copy {
                     expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) }
                 } else {
@@ -1125,11 +1111,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         }
         pres.push(self.encode_snapshot_valid_call_for_type(value.clone().into(), ty)?);
         parameters.push(value.clone());
-        // TODO: this doesn't happen here anymore
-        // if let vir_mid::ty::Type::Reference(reference) = ty {
-        //     let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-        //     parameters.push(lifetime);
-        // }
         Ok(value)
     }
     fn encode_assign_operand_place(
