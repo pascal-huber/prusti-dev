@@ -43,7 +43,6 @@ impl<P: fmt::Debug> BorrowInfo<P> {
 
 impl<P: fmt::Debug> fmt::Display for BorrowInfo<P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: use to_text()
         let lifetime = match self.region {
             None => "static".to_string(),
             Some(ty::BoundRegionKind::BrAnon(id)) => format!("#{}", id),

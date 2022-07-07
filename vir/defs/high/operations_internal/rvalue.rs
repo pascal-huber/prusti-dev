@@ -27,8 +27,6 @@ impl Rvalue {
                 vec![reference.lifetime.clone()]
             }
             Rvalue::Aggregate(value) => {
-                // TODO: not sure about this
-                // value.ty.get_lifetimes()
                 let mut lifetimes: Vec<LifetimeConst> = vec![];
                 for operand in &value.operands {
                     match operand.kind {
@@ -43,19 +41,6 @@ impl Rvalue {
                 lifetimes
             }
             // Rvalue::Discriminant(discriminant) => {}
-            //
-            // something like this for discrimanant:
-            // } else if let vir_mid::Rvalue::Discriminant(vir_mid::ast::rvalue::Discriminant {
-            //     place: vir_mid::Expression::Local(vir_mid::Local { variable, .. }),
-            // }) = value
-            // {
-            //     let var_lifetimes = variable.ty.get_lifetimes();
-            //     for lifetime_const in var_lifetimes {
-            //         let lifetime = self.encode_lifetime_const_into_variable(lifetime_const)?;
-            //         lifetimes.push(lifetime);
-            //     }
-            // }
-            // Ok(lifetimes)
             _ => vec![],
         }
     }

@@ -401,16 +401,9 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 }
             }
             ty::TyKind::Adt(adt_def, substs) if self.is_trusted_type(adt_def.did()) => {
-                // dbg!(&adt_def);
-
                 let name = encode_trusted_name(self.encoder, adt_def.did());
                 let variant = &adt_def.variants()[0usize.into()];
                 vir::TypeDecl::Trusted(encode_variant_trusted(self.encoder, name, substs, variant)?)
-
-                // vir::TypeDecl::trusted(
-                //     encode_trusted_name(self.encoder, adt_def.did()),
-                //     self.encode_substs(substs),
-                // )
             }
             ty::TyKind::Adt(adt_def, substs) => {
                 encode_adt_def(self.encoder, *adt_def, substs, None)?
@@ -608,7 +601,7 @@ fn encode_variant<'v, 'tcx: 'v>(
     Ok(variant)
 }
 
-// FIXME: this is highly redundant with "encode_variant"
+// FIXME: Remove redundancy with "encode_variant"
 fn encode_variant_trusted<'v, 'tcx: 'v>(
     encoder: &Encoder<'v, 'tcx>,
     name: String,
@@ -635,10 +628,6 @@ pub(super) fn encode_adt_def<'v, 'tcx>(
     variant_index: Option<prusti_rustc_interface::target::abi::VariantIdx>,
 ) -> SpannedEncodingResult<vir::TypeDecl> {
     let lifetimes = encoder.get_lifetimes_substs_as_type_decl(&substs)?;
-    // let mut lifetimes = vec![];
-    // for lifetime in lifetime_consts {
-    //     lifetimes.push(encoder.encode_type_def(lifetime)?);
-    // }
     let tcx = encoder.env().tcx();
     if adt_def.is_box() {
         debug!("ADT {:?} is a box", adt_def);

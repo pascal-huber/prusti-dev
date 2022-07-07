@@ -1309,7 +1309,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     }
                 }
                 vir_mid::TypeDecl::Trusted(decl) => {
-                    // copied from struct
+                    // FIXME: Remove duplication with vir_mid::TypeDecl::Struct
                     if decl.fields.is_empty() {
                         self.encode_write_address_method(ty)?;
                         statements.push(stmtp! { position =>
@@ -2579,9 +2579,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                             vir_mid::TypeDecl::Trusted(decl) => {
                                 // into_memory_block for trusted types is
                                 // trusted and has no statements.
-                                // TODO: check if this is still okay?
-                                // copied from struct
-                                // TODO: Remove code duplication.
+                                // FIXME: Remove duplication with vir_mid::TypeDecl::Struct
                                 for field in decl.iter_fields() {
                                     let field_place = self.encode_field_place(
                                         ty, &field, place.clone().into(), position
@@ -2740,11 +2738,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         arguments.extend(
             self.extract_non_type_arguments_from_type_excluding_lifetimes(target.get_type())?,
         );
-
-        // let lifetimes = self.extract_lifetime_arguments_from_rvalue(&value)?;
-        // let lifetime_exprs = lifetimes.iter().cloned().map(|x| x.into());
-        // arguments.extend(lifetime_exprs);
-
         let target_value_type = target.get_type().to_snapshot(self)?;
         let result_value = self.create_new_temporary_variable(target_value_type)?;
         statements.push(vir_low::Statement::method_call(

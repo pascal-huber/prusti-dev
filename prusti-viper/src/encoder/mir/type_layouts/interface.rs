@@ -52,7 +52,6 @@ impl<'v, 'tcx: 'v> MirTypeLayoutsEncoderInterface<'tcx> for super::super::super:
             .borrow()
             .contains(&encoded_ty)
         {
-            // dbg!(&encoded_ty);
             let encoded_ty_clone = encoded_ty.clone();
             let usize = vir_high::Type::Int(vir_high::ty::Int::Usize);
             self.register_function_constructor_mir(

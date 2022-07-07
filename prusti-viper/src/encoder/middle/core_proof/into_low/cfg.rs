@@ -139,9 +139,6 @@ impl IntoLow for vir_mid::Statement {
                 let address = lowerer.extract_root_address(&statement.place)?;
                 let snapshot = statement.place.to_procedure_snapshot(lowerer)?;
                 let arguments = lowerer.extract_non_type_arguments_from_type(ty)?;
-                // println!("---- UnfoldOwned");
-                // dbg!(&ty);
-                // dbg!(&arguments);
                 let low_statement = if let Some(condition) = statement.condition {
                     let low_condition = lowerer.lower_block_marker_condition(condition)?;
                     stmtp! {

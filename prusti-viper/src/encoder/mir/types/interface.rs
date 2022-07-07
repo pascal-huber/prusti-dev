@@ -163,7 +163,6 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
         let encoded_type = self.encode_type_high(ty)?;
         crate::encoder::high::types::create_value_field(encoded_type)
     }
-    // TODO: check if the following 3 functions belong here
     fn get_lifetimes_substs(
         &self,
         substs: &SubstsRef<'tcx>,
@@ -335,7 +334,6 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
         {
             *ty
         } else {
-            // FIXME: ?????
             unreachable!("failed to decode: {}", ty)
         }
     }
@@ -376,7 +374,6 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
                             name.clone(),
                             arguments.clone(),
                             None,
-                            // TODO: right?
                             lifetimes.clone(),
                         ))?
                         .unwrap_enum();

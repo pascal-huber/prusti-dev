@@ -45,10 +45,6 @@ pub(in super::super::super) trait PredicatesOwnedInterface {
         value: &vir_mid::Rvalue,
     ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>>;
     fn anonymize_lifetimes(&mut self, lifetimes: &mut Vec<vir_low::VariableDecl>);
-    // fn extract_lifetime_arguments_from_type(
-    //     &mut self,
-    //     ty: &vir_mid::Type,
-    // ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>>;
     fn extract_non_type_arguments_from_type(
         &mut self,
         ty: &vir_mid::Type,
@@ -127,7 +123,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
         ))
     }
 
-    // TODO: move this to other extract_lifetime functions?
     fn extract_lifetime_arguments_from_rvalue(
         &mut self,
         value: &vir_mid::Rvalue,
@@ -184,11 +179,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
     ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>> {
         // FIXME: Figure out how to avoid these magic variable names.
         let parameters = match ty {
-            // this is done differently now
-            // vir_mid::Type::Reference(_) => {
-            //     use vir_low::macros::*;
-            //     vec![var! { lifetime: Lifetime }]
-            // }
             vir_mid::Type::Array(_) => {
                 vec![self.array_length_variable()?]
             }

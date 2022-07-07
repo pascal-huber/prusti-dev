@@ -158,8 +158,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         self.encode_owned_non_aliased(&variant_type)?;
                     }
                     let variant_type = &variant_type;
-
-                    // get lifetimes
                     let mut lifetimes = Vec::new();
                     for (i, field) in variant.fields.iter().enumerate() {
                         if let vir_mid::Type::Reference(_) = field.ty {
@@ -172,7 +170,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         }
                     }
                     let lifetimes = lifetimes.into_iter().map(|lifetime| lifetime.into());
-
                     let acc = expr! {
                         ([ discriminant_call.clone() ] == [ discriminant.into() ]) ==>
                         (acc(OwnedNonAliased<variant_type>(
@@ -595,7 +592,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             }
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_unique() => {
-                dbg!(&ty);
                 unimplemented!();
             }
             // vir_mid::TypeDecl::Never => {},
@@ -685,11 +681,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     field_predicates.push(acc);
                 }
                 if field_predicates.is_empty() {
-                    println!("############# WARNING ###############");
-                    println!("no field predicates for trusted in encode_unique_ref:");
-                    dbg!(&trusted);
-                    println!("#####################################");
-                    // unimplemented!();
+                    // FIXME: predicates should still have underlying memory blocks
                 }
                 Some(vir_low::PredicateDecl::new(
                     predicate_name! {UniqueRef<ty>},
@@ -700,11 +692,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         current_snapshot,
                         final_snapshot,
                     ],
-                    None, // Some(expr! {
-                          //     [current_validity] &&
-                          //     [final_validity] &&
-                          //     [field_predicates.into_iter().conjoin()]
-                          // }),
+                    None,
                 ))
             }
             vir_mid::TypeDecl::Struct(decl) => {
@@ -742,11 +730,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     field_predicates.push(acc);
                 }
                 if field_predicates.is_empty() {
-                    println!("############# WARNING ###############");
-                    println!("no field predicates for struct in encode_unique_ref:");
-                    dbg!(&decl);
-                    println!("#####################################");
-                    // unimplemented!();
+                    // FIXME: predicates should still have underlying memory blocks
                 }
                 Some(vir_low::PredicateDecl::new(
                     predicate_name! {UniqueRef<ty>},
@@ -772,11 +756,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             }
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_unique() => {
-                // println!("############# WARNING ###############");
-                // println!("no reference support in encode_unique_ref:");
-                // dbg!(&ty);
-                // dbg!(&reference);
-                // println!("#####################################");
                 let target_type = &reference.target_type;
                 self.encode_unique_ref(target_type)?;
                 let predicate = vir_low::PredicateDecl::new(
@@ -795,10 +774,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             // vir_mid::TypeDecl::Never => {},
             // vir_mid::TypeDecl::Closure(Closure) => {},
             // vir_mid::TypeDecl::Unsupported(Unsupported) => {},
-            x => {
-                dbg!(&x);
-                unimplemented!("{}", x)
-            }
+            x => unimplemented!("{}", x),
         };
         if let Some(predicate) = predicate {
             self.predicates.push(predicate);

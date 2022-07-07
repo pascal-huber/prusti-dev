@@ -168,7 +168,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotAdtsInterface for Lowerer<'p, 'v, 'tcx> {
         domain_name: &str,
         parameters: Vec<vir_low::VariableDecl>,
     ) -> SpannedEncodingResult<()> {
-        // here
         self.adt_register_main_constructor(domain_name, parameters, true, Some(valid_call2))
     }
     fn register_alternative_constructor(

@@ -87,24 +87,6 @@ impl Type {
     }
     fn erase_lifetime_vec(&mut self) {
         match self {
-            // Type::MBool
-            // | Type::MInt
-            // | Type::MFloat32
-            // | Type::MFloat64
-            // | Type::MPerm
-            // | Type::Lifetime
-            // | Type::Bool
-            // | Type::Int(_)
-            // | Type::Float(_)
-            // | Type::TypeVar(_)
-            // | Type::Never
-            // | Type::Str => {}
-            // Type::Reference(reference) => {
-            //     reference.lifetime = LifetimeConst::erased();
-            //     let mut new_target_type = reference.target_type.clone();
-            //     new_target_type.erase_lifetimes();
-            //     reference.target_type = new_target_type;
-            // }
             Type::Tuple(Tuple { lifetimes, .. })
             | Type::Struct(Struct { lifetimes, .. })
             | Type::Sequence(Sequence { lifetimes, .. })
@@ -119,11 +101,7 @@ impl Type {
                     lifetime.name = "pure_erased".to_string();
                 }
             }
-            _ => {} // Type::Pointer(_) => {}
-                    // Type::FnPointer => {}
-                    // Type::Closure(_) => {}
-                    // Type::FunctionDef(_) => {}
-                    // Type::Unsupported(_) => {}
+            _ => {}
         }
     }
     #[must_use]

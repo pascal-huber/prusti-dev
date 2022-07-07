@@ -121,7 +121,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     ))
                 }
                 vir_mid::TypeDecl::Trusted(decl) => {
-                    // copied from struct
+                    // FIXME: Remove duplication with vir_mid::TypeDecl::Struct
                     let place_field = place.clone().unwrap_field(); // FIXME: Implement a macro that takes a reference to avoid clonning.
                     for field in decl.iter_fields() {
                         if field.as_ref() != &place_field.field {
@@ -143,7 +143,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         }
                     }
                     Ok((
-                        // TODO: rename this because trusted + struct support
                         self.obtain_struct_field_snapshot(
                             parent_type,
                             &place_field.field,
