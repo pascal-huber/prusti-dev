@@ -1317,10 +1317,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                             call write_address<ty>([target_address], source_value)
                         });
                     } else {
-                        assert!(
-                            !ty.is_trusted() && !ty.is_type_var(),
-                            "Trying to split an abstract type."
-                        );
+                        // FIXME: support encode_memory_block_split_method for abstract types
+                        // assert!(
+                        //     !ty.is_trusted() && !ty.is_type_var(),
+                        //     "Trying to split an abstract type."
+                        // );
                         self.encode_memory_block_split_method(ty)?;
                         statements.push(stmtp! {
                             position =>
@@ -2065,10 +2066,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             .encoded_memory_block_split_methods
             .contains(ty)
         {
-            assert!(
-                !ty.is_trusted() && !ty.is_type_var(),
-                "Trying to split an abstract type."
-            );
+            // FIXME: support encode_memory_block_split_method for abstract types
+            // assert!(
+            //     !ty.is_trusted() && !ty.is_type_var(),
+            //     "Trying to split an abstract type."
+            // );
             use vir_low::macros::*;
             let method = if ty.has_variants() {
                 // TODO: remove code duplication with encode_memory_block_join_method
