@@ -225,8 +225,22 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
                 lifetimes
             }
             ty::TyKind::RawPtr(type_and_mut) => self.get_lifetimes_high(&type_and_mut.ty)?,
-            ty::TyKind::GeneratorWitness(_binder) => {
-                unimplemented!();
+            ty::TyKind::GeneratorWitness(binder) => {
+                // FIXME: Check if Lifetimes extraction of GeneratorWitness is okay like this
+                let bound_vars = binder.bound_vars();
+                let mut lifetimes = vec![];
+                for bound_var in bound_vars.iter() {
+                    match bound_var {
+                        ty::BoundVariableKind::Region(bound_region_kind) => {
+                            lifetimes.push(vir_high::ty::LifetimeConst {
+                                name: bound_region_kind.to_text(),
+                            });
+                        }
+                        ty::BoundVariableKind::Ty(_bound_ty_kind) => {}
+                        ty::BoundVariableKind::Const => {}
+                    }
+                }
+                lifetimes
             }
             _ => {
                 vec![]
