@@ -1294,7 +1294,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                     });
                 }
                 vir_mid::TypeDecl::TypeVar(_) => {
-                    // TODO: fix this for Trusted
                     // move_place of a generic or trusted type has no body
                 }
                 vir_mid::TypeDecl::Tuple(decl) => {

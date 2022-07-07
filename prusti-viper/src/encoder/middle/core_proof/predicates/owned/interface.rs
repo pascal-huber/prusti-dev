@@ -44,7 +44,6 @@ pub(in super::super::super) trait PredicatesOwnedInterface {
         &mut self,
         value: &vir_mid::Rvalue,
     ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>>;
-    fn anonymize_lifetimes(&mut self, lifetimes: &mut Vec<vir_low::VariableDecl>);
     fn extract_non_type_arguments_from_type(
         &mut self,
         ty: &vir_mid::Type,
@@ -164,12 +163,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
             Ok(vec![self.size_constant(ty.length)?])
         } else {
             Ok(Vec::new())
-        }
-    }
-
-    fn anonymize_lifetimes(&mut self, lifetimes: &mut Vec<vir_low::VariableDecl>) {
-        for (i, lifetime) in lifetimes.iter_mut().enumerate() {
-            lifetime.name = format!("lft_{}", i);
         }
     }
 

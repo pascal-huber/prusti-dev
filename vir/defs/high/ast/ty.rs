@@ -61,14 +61,14 @@ pub enum Int {
     Unbounded,
 }
 
-#[display(fmt = "Sequence({}, {})", element_type, "display::cjoin(lifetimes)")]
+#[display(fmt = "Sequence({})<{}>", element_type, "display::cjoin(lifetimes)")]
 pub struct Sequence {
     pub element_type: Box<Type>,
     pub lifetimes: Vec<LifetimeConst>,
 }
 
 #[display(
-    fmt = "Map({} -> {}, {})",
+    fmt = "Map({} -> {})<{}>",
     key_type,
     val_type,
     "display::cjoin(lifetimes)"
@@ -110,7 +110,7 @@ pub enum TypeVar {
 }
 
 #[display(
-    fmt = "({}, {})",
+    fmt = "({})<{}>",
     "display::cjoin(arguments)",
     "display::cjoin(lifetimes)"
 )]
@@ -121,7 +121,7 @@ pub struct Tuple {
 }
 
 #[display(
-    fmt = "{}<{}>[{}]",
+    fmt = "{}<{}, {}>",
     name,
     "display::cjoin(arguments)",
     "display::cjoin(lifetimes)"
@@ -139,7 +139,7 @@ pub struct VariantIndex {
 }
 
 #[display(
-    fmt = "{}{}<{}>[{}]",
+    fmt = "{}{}<{}, {}>",
     name,
     "display::option!(variant, \"[{}]\", \"\")",
     "display::cjoin(arguments)",
@@ -155,7 +155,7 @@ pub struct Enum {
 }
 
 #[display(
-    fmt = "{}<{}>[{}]",
+    fmt = "{}<{}, {}>",
     name,
     "display::cjoin(arguments)",
     "display::cjoin(lifetimes)"
@@ -170,7 +170,7 @@ pub struct Union {
 }
 
 #[display(
-    fmt = "Array({}, {}, {})",
+    fmt = "Array({}, {})<{}>",
     length,
     element_type,
     "display::cjoin(lifetimes)"
@@ -181,7 +181,7 @@ pub struct Array {
     pub lifetimes: Vec<LifetimeConst>,
 }
 
-#[display(fmt = "Slice({}, {})", element_type, "display::cjoin(lifetimes)")]
+#[display(fmt = "Slice({})<{}>", element_type, "display::cjoin(lifetimes)")]
 pub struct Slice {
     pub element_type: Box<Type>,
     pub lifetimes: Vec<LifetimeConst>,
@@ -222,7 +222,7 @@ pub struct FunctionDef {
 }
 
 #[display(
-    fmt = "{}<{}>[{}]",
+    fmt = "{}<{}, {}>",
     name,
     "display::cjoin(arguments)",
     "display::cjoin(lifetimes)"
@@ -240,7 +240,7 @@ pub struct Unsupported {
 }
 
 #[display(
-    fmt = "{}<{}>[{}]",
+    fmt = "{}<{}, {}>",
     name,
     "display::cjoin(arguments)",
     "display::cjoin(lifetimes)"
