@@ -210,6 +210,7 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
             | ty::TyKind::Float(_)
             | ty::TyKind::Foreign(_)
             | ty::TyKind::Str
+            | ty::TyKind::Error(_)
             | ty::TyKind::Never => {
                 vec![]
             }
@@ -243,7 +244,16 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
                 }
                 lifetimes
             }
-            _ => {
+            ty::TyKind::Param(_param_ty) => {
+                // FIXME: extract lifetimes from TyKind::Param()
+                vec![]
+            }
+            ty::TyKind::Projection(_)
+            | ty::TyKind::Bound(_, _)
+            | ty::TyKind::Placeholder(_)
+            | ty::TyKind::Infer(_)
+            | ty::TyKind::Generator(..)
+            | ty::TyKind::GeneratorWitness(_) => {
                 return Err(SpannedEncodingError::unsupported(
                     format!("Extracting lifetimes not supported for {:?}", ty.kind()),
                     self.get_type_definition_span(*ty),
