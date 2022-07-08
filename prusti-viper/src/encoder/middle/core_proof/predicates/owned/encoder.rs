@@ -55,8 +55,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
         &mut self,
         ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
-        ty.erase_lifetime();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone().erase_lifetimes();
         if self.encoded_owned_predicates.contains(ty) {
             return Ok(());
         }
@@ -98,19 +97,24 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     )}
                 }
             }
-            vir_mid::TypeDecl::TypeVar(_) | vir_mid::TypeDecl::Trusted(_) => {
-                vir_low::PredicateDecl::new(
-                    predicate_name! { OwnedNonAliased<ty> },
-                    vars! { place: Place, root_address: Address, snapshot: {snapshot_type} },
-                    None,
-                )
-            }
+            vir_mid::TypeDecl::TypeVar(_) => vir_low::PredicateDecl::new(
+                predicate_name! { OwnedNonAliased<ty> },
+                vars! { place: Place, root_address: Address, snapshot: {snapshot_type} },
+                None,
+            ),
             vir_mid::TypeDecl::Tuple(tuple_decl) => self.encode_owned_non_aliased_with_fields(
                 ty,
                 snapshot,
                 snapshot_type,
                 validity,
                 tuple_decl.iter_fields(),
+            )?,
+            vir_mid::TypeDecl::Trusted(decl) => self.encode_owned_non_aliased_with_fields(
+                ty,
+                snapshot,
+                snapshot_type,
+                validity,
+                decl.iter_fields(),
             )?,
             vir_mid::TypeDecl::Struct(struct_decl) => self.encode_owned_non_aliased_with_fields(
                 ty,
@@ -124,7 +128,12 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 let discriminant_call =
                     self.lowerer
                         .obtain_enum_discriminant(snapshot.clone().into(), ty, position)?;
-                for (&discriminant, variant) in decl.discriminant_values.iter().zip(&decl.variants)
+                let mut enum_lifetimes = vec![];
+                for (j, (&discriminant, variant)) in decl
+                    .discriminant_values
+                    .iter()
+                    .zip(&decl.variants)
+                    .enumerate()
                 {
                     let variant_index = variant.name.clone().into();
                     let variant_place = self.lowerer.encode_enum_variant_place(
@@ -149,10 +158,22 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         self.encode_owned_non_aliased(&variant_type)?;
                     }
                     let variant_type = &variant_type;
+                    let mut lifetimes = Vec::new();
+                    for (i, field) in variant.fields.iter().enumerate() {
+                        if let vir_mid::Type::Reference(_) = field.ty {
+                            let lifetime = vir_low::VariableDecl::new(
+                                format!("lft_field_variant_{}_lft_{}", j, i),
+                                ty!(Lifetime),
+                            );
+                            lifetimes.push(lifetime.clone());
+                            enum_lifetimes.push(lifetime.clone());
+                        }
+                    }
+                    let lifetimes = lifetimes.into_iter().map(|lifetime| lifetime.into());
                     let acc = expr! {
                         ([ discriminant_call.clone() ] == [ discriminant.into() ]) ==>
                         (acc(OwnedNonAliased<variant_type>(
-                            [variant_place], root_address, [variant_snapshot]
+                            [variant_place], root_address, [variant_snapshot]; lifetimes
                         )))
                     };
                     variant_predicates.push(acc);
@@ -179,7 +200,12 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     position,
                 )?;
                 predicate! {
-                    OwnedNonAliased<ty>(place: Place, root_address: Address, snapshot: {snapshot_type})
+                    OwnedNonAliased<ty>(
+                        place: Place,
+                        root_address: Address,
+                        snapshot: {snapshot_type},
+                        *enum_lifetimes
+                    )
                     {(
                         ([validity]) &&
                         (acc(OwnedNonAliased<discriminant_type>(
@@ -240,7 +266,8 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 let element_type = &decl.element_type;
                 self.lowerer.encode_place_array_index_axioms(ty)?;
                 self.lowerer.ensure_type_definition(element_type)?;
-                let parameters = self.lowerer.extract_non_type_parameters_from_type(ty)?;
+                let parameters: Vec<vir_low::VariableDecl> =
+                    self.lowerer.extract_non_type_parameters_from_type(ty)?;
                 let parameters_validity: vir_low::Expression = self
                     .lowerer
                     .extract_non_type_parameters_from_type_validity(ty)?
@@ -661,8 +688,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             | vir_mid::TypeDecl::Pointer(_)
             | vir_mid::TypeDecl::Sequence(_)
             | vir_mid::TypeDecl::Map(_)
-            | vir_mid::TypeDecl::TypeVar(_)
-            | vir_mid::TypeDecl::Trusted(_) => vir_low::PredicateDecl::new(
+            | vir_mid::TypeDecl::TypeVar(_) => vir_low::PredicateDecl::new(
                 predicate_name! {UniqueRef<ty>},
                 vec![
                     lifetime,
@@ -674,6 +700,55 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 None,
             ),
             vir_mid::TypeDecl::Tuple(_decl) => unimplemented!(),
+            vir_mid::TypeDecl::Trusted(trusted) => {
+                let mut field_predicates = Vec::new();
+                for field in &trusted.fields {
+                    let field_place = self.lowerer.encode_field_place(
+                        ty,
+                        field,
+                        place.clone().into(),
+                        Default::default(),
+                    )?;
+                    let current_field_snapshot = self.lowerer.obtain_struct_field_snapshot(
+                        ty,
+                        field,
+                        current_snapshot.clone().into(),
+                        Default::default(),
+                    )?;
+                    let final_field_snapshot = self.lowerer.obtain_struct_field_snapshot(
+                        ty,
+                        field,
+                        final_snapshot.clone().into(),
+                        Default::default(),
+                    )?;
+                    let field_ty = &field.ty;
+                    self.encode_unique_ref(field_ty)?;
+                    let acc = expr! {
+                        acc(UniqueRef<field_ty>(
+                            lifetime,
+                            [field_place],
+                            root_address,
+                            [current_field_snapshot],
+                            [final_field_snapshot]
+                        ))
+                    };
+                    field_predicates.push(acc);
+                }
+                if field_predicates.is_empty() {
+                    // FIXME: predicates should still have underlying memory blocks
+                }
+                vir_low::PredicateDecl::new(
+                    predicate_name! {UniqueRef<ty>},
+                    vec![
+                        lifetime,
+                        place,
+                        root_address,
+                        current_snapshot,
+                        final_snapshot,
+                    ],
+                    None,
+                )
+            }
             vir_mid::TypeDecl::Struct(decl) => {
                 let mut field_predicates = Vec::new();
                 for field in &decl.fields {
@@ -814,7 +889,19 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             }
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) if reference.uniqueness.is_unique() => {
-                unimplemented!();
+                let target_type = &reference.target_type;
+                self.encode_unique_ref(target_type)?;
+                vir_low::PredicateDecl::new(
+                    predicate_name! {UniqueRef<ty>},
+                    vec![
+                        lifetime,
+                        place,
+                        root_address,
+                        current_snapshot,
+                        final_snapshot,
+                    ],
+                    None,
+                )
             }
             // vir_mid::TypeDecl::Never => {},
             // vir_mid::TypeDecl::Closure(Closure) => {},

@@ -73,9 +73,10 @@ pub macro expr {
             )
         }
     },
-    ( acc($predicate_name:ident<$ty:tt>( $($argument:tt),*), $perm:tt) ) => {
+    ( acc($predicate_name:ident<$ty:tt>( $($argument:tt),* $(; $argument_list:ident )?), $perm:tt) ) => {
         {
             let mut arguments = vec![ $( $crate::low::macros::expr!( $argument ) ),* ];
+            $( arguments.extend($argument_list); )?
             $crate::low::ast::expression::Expression::predicate_access_predicate_no_pos(
                 format!(
                     "{}${}",
