@@ -341,15 +341,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> TypesInterface for Lowerer<'p, 'v, 'tcx> {
             return Ok(());
         }
         // FIXME: We should avoid these copies in some smarter way.
-        let ty_no_lifetime = ty.clone().erase_lifetimes();
+        let ty_without_lifetime = ty.clone().erase_lifetimes();
         if !self
             .types_state
             .ensured_definitions
-            .contains(&ty_no_lifetime)
+            .contains(&ty_without_lifetime)
         {
             // We insert before doing the actual work to break infinite
             // recursion.
-            self.types_state.ensured_definitions.insert(ty_no_lifetime);
+            self.types_state
+                .ensured_definitions
+                .insert(ty_without_lifetime);
 
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
             self.ensure_type_definition_for_decl(ty, &type_decl)?;
