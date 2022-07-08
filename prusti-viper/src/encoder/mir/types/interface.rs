@@ -231,6 +231,18 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
                 lifetimes
             }
             ty::TyKind::RawPtr(type_and_mut) => self.get_lifetimes_high(&type_and_mut.ty)?,
+            ty::TyKind::FnPtr(poly_fn_sig) => {
+                let ty_list = poly_fn_sig.inputs_and_output().bound_vars();
+                let mut lifetimes = vec![];
+                for bound_variable_kind in ty_list.iter() {
+                    if let ty::BoundVariableKind::Region(bound_region_kind) = bound_variable_kind {
+                        lifetimes.push(vir_high::ty::LifetimeConst {
+                            name: bound_region_kind.to_text(),
+                        });
+                    }
+                }
+                lifetimes
+            }
             _ => {
                 return Err(SpannedEncodingError::unsupported(
                     format!("Extracting lifetimes not supported for {:?}", ty.kind()),
