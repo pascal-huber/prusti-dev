@@ -170,6 +170,7 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
         let mut lifetimes = vec![];
         for kind in substs.iter() {
             match kind.unpack() {
+                // FIXME: try taking this out
                 ty::subst::GenericArgKind::Type(arg_ty) => {
                     let lifetime = self.get_lifetimes_high(&arg_ty)?;
                     lifetimes.extend(lifetime);
@@ -202,19 +203,25 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
         ty: &ty::Ty<'tcx>,
     ) -> SpannedEncodingResult<Vec<vir_high::ty::LifetimeConst>> {
         let lifetimes = match ty.kind() {
+            ty::TyKind::Bool
+            | ty::TyKind::Char
+            | ty::TyKind::Int(_)
+            | ty::TyKind::Uint(_)
+            | ty::TyKind::Float(_)
+            | ty::TyKind::Foreign(_)
+            | ty::TyKind::Str
+            | ty::TyKind::Never => {
+                vec![]
+            }
             ty::TyKind::Adt(_, substs)
             | ty::TyKind::Closure(_, substs)
             | ty::TyKind::Opaque(_, substs)
-            | ty::TyKind::FnDef(_, substs)
-            | ty::TyKind::Generator(_, substs, _) => self.get_lifetimes_substs(substs)?,
+            | ty::TyKind::FnDef(_, substs) => self.get_lifetimes_substs(substs)?,
             ty::TyKind::Array(ty, _) | ty::TyKind::Slice(ty) => self.get_lifetimes_high(ty)?,
             ty::TyKind::Dynamic(_, region) | ty::TyKind::Ref(region, _, _) => {
                 vec![vir_high::ty::LifetimeConst {
                     name: region.to_text(),
                 }]
-            }
-            ty::TyKind::Projection(projection_ty) => {
-                self.get_lifetimes_substs(&projection_ty.substs)?
             }
             ty::TyKind::Tuple(ty_list) => {
                 let mut lifetimes = vec![];
@@ -224,25 +231,11 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
                 lifetimes
             }
             ty::TyKind::RawPtr(type_and_mut) => self.get_lifetimes_high(&type_and_mut.ty)?,
-            ty::TyKind::GeneratorWitness(binder) => {
-                // FIXME: Check if Lifetimes extraction of GeneratorWitness is okay like this
-                let bound_vars = binder.bound_vars();
-                let mut lifetimes = vec![];
-                for bound_var in bound_vars.iter() {
-                    match bound_var {
-                        ty::BoundVariableKind::Region(bound_region_kind) => {
-                            lifetimes.push(vir_high::ty::LifetimeConst {
-                                name: bound_region_kind.to_text(),
-                            });
-                        }
-                        ty::BoundVariableKind::Ty(_bound_ty_kind) => {}
-                        ty::BoundVariableKind::Const => {}
-                    }
-                }
-                lifetimes
-            }
             _ => {
-                vec![]
+                return Err(SpannedEncodingError::unsupported(
+                    format!("Extracting lifetimes not supported for {:?}", ty.kind()),
+                    self.get_type_definition_span(*ty),
+                ));
             }
         };
         Ok(lifetimes)

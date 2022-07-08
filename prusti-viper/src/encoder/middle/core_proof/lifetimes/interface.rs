@@ -55,10 +55,6 @@ pub(in super::super) trait LifetimesInterface {
         lifetime: vir_low::VariableDecl,
         permission: vir_low::Expression,
     ) -> SpannedEncodingResult<vir_low::Expression>;
-    fn extract_lifetime_variables_anonymise(
-        &mut self,
-        ty: &vir_mid::Type,
-    ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>>;
     fn extract_lifetime_variables(
         &mut self,
         ty: &vir_mid::Type,
@@ -294,17 +290,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesInterface for Lowerer<'p, 'v, 'tcx> {
             vec![lifetime.into()],
             permission,
         ))
-    }
-
-    fn extract_lifetime_variables_anonymise(
-        &mut self,
-        ty: &vir_mid::Type,
-    ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>> {
-        let mut lifetimes = self.extract_lifetime_variables(ty)?;
-        for (i, lifetime) in lifetimes.iter_mut().enumerate() {
-            lifetime.name = format!("lft_{}", i);
-        }
-        Ok(lifetimes)
     }
 
     fn extract_lifetime_variables(

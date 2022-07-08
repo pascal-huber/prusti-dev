@@ -447,6 +447,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
         // let lifetimes_anonymised = self.lowerer.extract_lifetime_variables_anonymise(ty)?;
 
         // FIXME: put this into a function
+        // Can't use self.lowerer.extract_lifetime_variables here
         let mut lifetimes = vec![];
         for lifetime in ty.get_lifetimes() {
             lifetimes.push(vir_low::VariableDecl {
