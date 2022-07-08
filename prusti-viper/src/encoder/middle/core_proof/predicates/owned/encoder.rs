@@ -441,11 +441,21 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             root_address: Address
         }
         let mut field_predicates = Vec::new();
-        let mut lifetimes = Vec::new();
+        // let mut lifetimes = Vec::new();
         // FIXME: owned_non_aliased lifetime params don't always work
         // let lifetimes_with_name = self.lowerer.extract_lifetime_variables(ty)?;
         // let lifetimes_anonymised = self.lowerer.extract_lifetime_variables_anonymise(ty)?;
-        for (i, field) in fields.enumerate() {
+
+        // FIXME: put this into a function
+        let mut lifetimes = vec![];
+        for lifetime in ty.get_lifetimes() {
+            lifetimes.push(vir_low::VariableDecl {
+                name: lifetime.name.clone(),
+                ty: ty!(Lifetime),
+            });
+        }
+
+        for field in fields {
             let field_place = self.lowerer.encode_field_place(
                 ty,
                 &field,
@@ -467,24 +477,24 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 // encode it as abstract predicate.
                 self.encode_owned_non_aliased(field_ty)?;
             }
-            if let vir_mid::Type::Reference(_) = field_ty {
-                // FIXME: handle lifetimes of fields properly
-                let lifetime = vir_low::VariableDecl::new(format!("lft_{}", i), ty!(Lifetime));
-                lifetimes.push(lifetime.clone());
-                let acc = expr! {
-                    acc(OwnedNonAliased<field_ty>(
-                        [field_place], root_address, [field_value], [lifetime.into()]
-                    ))
-                };
-                field_predicates.push(acc);
-            } else {
-                let acc = expr! {
-                    acc(OwnedNonAliased<field_ty>(
-                        [field_place], root_address, [field_value]
-                    ))
-                };
-                field_predicates.push(acc);
-            }
+            // TODO: ...nasty
+            let lifetimes: Vec<vir_low::Expression> = field_ty
+                .get_lifetimes()
+                .iter()
+                .map(|x| {
+                    vir_low::VariableDecl {
+                        name: x.name.clone(),
+                        ty: ty!(Lifetime),
+                    }
+                    .into()
+                })
+                .collect();
+            let acc = expr! {
+                acc(OwnedNonAliased<field_ty>(
+                    [field_place], root_address, [field_value]; lifetimes
+                ))
+            };
+            field_predicates.push(acc);
         }
         if field_predicates.is_empty() {
             // TODO: Extract this into a separate method and deduplicate with
@@ -506,6 +516,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 (([bytes]) == (Snap<ty>::to_bytes(snapshot)))
             });
         }
+
         let predicate_decl = predicate! {
             OwnedNonAliased<ty>(place: Place, root_address: Address, snapshot: {snapshot_type}, *lifetimes)
             {(
