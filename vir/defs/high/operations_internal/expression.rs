@@ -159,6 +159,7 @@ impl Expression {
             fn fold_type(&mut self, ty: Type) -> Type {
                 ty.erase_lifetimes()
             }
+            // TODO: check if fold_variable_decl is necessary here
             fn fold_variable_decl(&mut self, variable_decl: VariableDecl) -> VariableDecl {
                 VariableDecl {
                     name: variable_decl.name,

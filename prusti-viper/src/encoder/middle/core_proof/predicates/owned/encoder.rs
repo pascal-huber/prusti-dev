@@ -53,13 +53,14 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
 
     pub(super) fn encode_owned_non_aliased(
         &mut self,
-        ty_with_lifetime: &vir_mid::Type,
+        ty: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone().erase_lifetimes();
-        if self.encoded_owned_predicates.contains(ty) {
+        let ty_without_lifetime: &mut vir_mid::Type = &mut ty.clone().erase_lifetimes();
+        if self.encoded_owned_predicates.contains(ty_without_lifetime) {
             return Ok(());
         }
-        self.encoded_owned_predicates.insert(ty.clone());
+        self.encoded_owned_predicates
+            .insert(ty_without_lifetime.clone());
         self.lowerer.encode_compute_address(ty)?;
         use vir_low::macros::*;
         let position = Default::default();
@@ -441,6 +442,9 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
         }
         let mut field_predicates = Vec::new();
         let mut lifetimes = Vec::new();
+        // FIXME: owned_non_aliased lifetime params don't always work
+        // let lifetimes_with_name = self.lowerer.extract_lifetime_variables(ty)?;
+        // let lifetimes_anonymised = self.lowerer.extract_lifetime_variables_anonymise(ty)?;
         for (i, field) in fields.enumerate() {
             let field_place = self.lowerer.encode_field_place(
                 ty,
@@ -464,8 +468,8 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 self.encode_owned_non_aliased(field_ty)?;
             }
             if let vir_mid::Type::Reference(_) = field_ty {
-                let lifetime =
-                    vir_low::VariableDecl::new(format!("lft_field_{}", i), ty!(Lifetime));
+                // FIXME: handle lifetimes of fields properly
+                let lifetime = vir_low::VariableDecl::new(format!("lft_{}", i), ty!(Lifetime));
                 lifetimes.push(lifetime.clone());
                 let acc = expr! {
                     acc(OwnedNonAliased<field_ty>(

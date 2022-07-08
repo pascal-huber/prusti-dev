@@ -1813,6 +1813,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let address = expr! { ComputeAddress::compute_address(place, root_address) };
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
             self.mark_owned_non_aliased_as_unfolded(ty)?;
+
+            // FIXME: fix lifetime args for encode_write_place
+            // let lifetime_args = self.extract_lifetime_variables_anonymise(ty)?;
             let mut lifetime_args: Vec<vir_low::VariableDecl> = vec![];
             match &type_decl {
                 vir_mid::TypeDecl::Bool
@@ -2523,19 +2526,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     }
     // FIXME: This method has to be inlined if the converted type has a resource
     // invariant in it. Otherwise, that resource would be leaked.
-    fn encode_into_memory_block_method(
-        &mut self,
-        ty_with_lifetime: &vir_mid::Type,
-    ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone().erase_lifetimes();
+    fn encode_into_memory_block_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        let ty_without_lifetime: &mut vir_mid::Type = &mut ty.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_into_memory_block_methods
-            .contains(ty)
+            .contains(ty_without_lifetime)
         {
             self.builtin_methods_state
                 .encoded_into_memory_block_methods
-                .insert(ty.clone());
+                .insert(ty_without_lifetime.clone());
             use vir_low::macros::*;
             self.mark_owned_non_aliased_as_unfolded(ty)?;
             let size_of = self.encode_type_size_expression(ty)?;

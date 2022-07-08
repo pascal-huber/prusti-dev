@@ -85,25 +85,6 @@ impl Type {
             _ => false,
         }
     }
-    fn erase_lifetime_vec(&mut self) {
-        match self {
-            Type::Tuple(Tuple { lifetimes, .. })
-            | Type::Struct(Struct { lifetimes, .. })
-            | Type::Sequence(Sequence { lifetimes, .. })
-            | Type::Map(Map { lifetimes, .. })
-            | Type::Enum(Enum { lifetimes, .. })
-            | Type::Array(Array { lifetimes, .. })
-            | Type::Slice(Slice { lifetimes, .. })
-            | Type::Projection(Projection { lifetimes, .. })
-            | Type::Trusted(Trusted { lifetimes, .. })
-            | Type::Union(Union { lifetimes, .. }) => {
-                for lifetime in lifetimes.iter_mut() {
-                    lifetime.name = "pure_erased".to_string();
-                }
-            }
-            _ => {}
-        }
-    }
     #[must_use]
     pub fn erase_lifetimes(&self) -> Self {
         struct DefaultLifetimeEraser {}
@@ -112,9 +93,7 @@ impl Type {
                 LifetimeConst::erased()
             }
         }
-        let mut self_erased = DefaultLifetimeEraser {}.fold_type(self.clone());
-        self_erased.erase_lifetime_vec();
-        self_erased
+        DefaultLifetimeEraser {}.fold_type(self.clone())
     }
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         match self {
