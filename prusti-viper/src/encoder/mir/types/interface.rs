@@ -255,7 +255,7 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
             | ty::TyKind::Generator(..)
             | ty::TyKind::GeneratorWitness(_) => {
                 return Err(SpannedEncodingError::unsupported(
-                    format!("Extracting lifetimes not supported for {:?}", ty.kind()),
+                    format!("Unsupported type to extract lifetimes: {:?}", ty.kind()),
                     self.get_type_definition_span(*ty),
                 ));
             }
