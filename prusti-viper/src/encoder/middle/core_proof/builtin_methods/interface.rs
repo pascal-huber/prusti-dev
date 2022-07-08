@@ -392,7 +392,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut pre_write_statements = Vec::new();
             let mut post_write_statements = Vec::new();
             let mut encode_body = true;
-            let lifetimes_rvalue = self.extract_lifetime_arguments_from_rvalue_anonymise(value)?;
+            let lifetimes_rvalue = self.extract_lifetime_arguments_from_rvalue(value)?;
             match value {
                 vir_mid::Rvalue::CheckedBinaryOp(value) => {
                     self.encode_assign_method_rvalue_checked_binary_op(
@@ -439,7 +439,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
                     let lifetimes: Vec<vir_low::Expression> = self
-                        .extract_lifetime_arguments_from_rvalue_anonymise(value)?
+                        .extract_lifetime_arguments_from_rvalue(value)?
                         .iter()
                         .cloned()
                         .map(|x| x.into())
@@ -514,7 +514,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 position,
             )?;
             let ty = operand.expression.get_type();
-            let lifetimes_ty = self.extract_lifetime_variables_anonymise(ty)?;
+            let lifetimes_ty = self.extract_lifetime_variables(ty)?;
             parameters.extend(lifetimes_ty);
             let method =
                 vir_low::MethodDecl::new(method_name, parameters, Vec::new(), pres, posts, None);
@@ -659,7 +659,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     operand_permission: Perm,
                     operand_value: { ty.to_snapshot(self)? }
                 };
-                let lifetimes = self.extract_lifetime_variables_anonymise(ty)?;
+                let lifetimes = self.extract_lifetime_variables(ty)?;
                 let lifetime_exprs: Vec<vir_low::Expression> = lifetimes
                     .iter()
                     .cloned()
@@ -1034,7 +1034,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         };
         let lifetime_token =
             self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
-        let lifetimes = self.extract_lifetime_variables_anonymise(ty)?;
+        let lifetimes = self.extract_lifetime_variables(ty)?;
         let lifetime_exprs: Vec<vir_low::Expression> = lifetimes
             .iter()
             .cloned()
@@ -1126,7 +1126,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         use vir_low::macros::*;
         let value = self.encode_assign_operand_snapshot(operand_counter, operand)?;
         let ty = operand.expression.get_type();
-        let lifetimes_ty = self.extract_lifetime_variables_anonymise(ty)?;
+        let lifetimes_ty = self.extract_lifetime_variables(ty)?;
         let lifetimes: Vec<vir_low::Expression> =
             lifetimes_ty.iter().cloned().map(|x| x.into()).collect();
         match operand.kind {
@@ -1372,10 +1372,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         });
                     } else {
                         // FIXME: support encode_memory_block_split_method for abstract types
-                        // assert!(
-                        //     !ty.is_trusted() && !ty.is_type_var(),
-                        //     "Trying to split an abstract type."
-                        // );
+                        assert!(
+                            !ty.is_trusted() && !ty.is_type_var(),
+                            "Trying to split an abstract type."
+                        );
                         self.encode_memory_block_split_method(ty)?;
                         statements.push(stmtp! {
                             position =>
@@ -1815,7 +1815,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.mark_owned_non_aliased_as_unfolded(ty)?;
 
             // FIXME: fix lifetime args for encode_write_place
-            // let lifetime_args = self.extract_lifetime_variables_anonymise(ty)?;
+            // let lifetime_args = self.extract_lifetime_variables(ty)?;
             let mut lifetime_args: Vec<vir_low::VariableDecl> = vec![];
             match &type_decl {
                 vir_mid::TypeDecl::Bool
@@ -2124,10 +2124,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             .contains(ty)
         {
             // FIXME: support encode_memory_block_split_method for abstract types
-            // assert!(
-            //     !ty.is_trusted() && !ty.is_type_var(),
-            //     "Trying to split an abstract type."
-            // );
+            assert!(
+                !ty.is_trusted() && !ty.is_type_var(),
+                "Trying to split an abstract type."
+            );
             use vir_low::macros::*;
             let method = if ty.has_variants() {
                 // TODO: remove code duplication with encode_memory_block_join_method
@@ -2556,14 +2556,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let mut arguments: Vec<vir_low::Expression> =
                 self.extract_non_type_parameters_from_type_as_exprs(ty)?;
             let lifetimes: Vec<vir_low::Expression> = self
-                .extract_lifetime_variables_anonymise(ty)?
+                .extract_lifetime_variables(ty)?
                 .iter()
                 .cloned()
                 .map(|x| x.into())
                 .collect();
             arguments.extend(lifetimes.clone());
             let arguments2 = arguments.clone();
-            let lifetime_params = self.extract_lifetime_variables_anonymise(ty)?;
+            let lifetime_params = self.extract_lifetime_variables(ty)?;
             parameters.extend(lifetime_params);
             let mut method = method! {
                 into_memory_block<ty>(

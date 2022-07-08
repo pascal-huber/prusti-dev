@@ -117,6 +117,7 @@ impl<'p, 'v, 'r: 'v, 'tcx: 'v> TypeEncoder<'p, 'v, 'tcx> {
                 vir::Type::pointer(self.encoder.encode_type_high(*ty)?)
             }
 
+            // FIXME: add the full lifetimes vector to vir::Type::Reference instead of the first lifetime
             ty::TyKind::Ref(_region, ty, mutability) => {
                 let lifetime = lifetimes.first().unwrap().clone();
                 let uniqueness = self.encode_uniqueness(*mutability);
@@ -639,6 +640,7 @@ pub(super) fn encode_adt_def<'v, 'tcx>(
     substs: ty::subst::SubstsRef<'tcx>,
     variant_index: Option<prusti_rustc_interface::target::abi::VariantIdx>,
 ) -> SpannedEncodingResult<vir::TypeDecl> {
+    // FIXME: check if this is needed - can we not just get the lifetimes from AdtDef?
     let lifetimes = encoder.get_lifetimes_substs_as_type_decl(&substs)?;
     let tcx = encoder.env().tcx();
     if adt_def.is_box() {

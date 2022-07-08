@@ -89,6 +89,7 @@ impl<'v, 'tcx: 'v> HighPureFunctionEncoderInterface<'tcx>
     }
 
     /// Encode subslicing of an array/slice.
+    // FIXME: check if encode_subslice_call is every used or tested
     fn encode_subslice_call(
         &self,
         container: vir_high::Expression,
