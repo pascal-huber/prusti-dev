@@ -64,6 +64,20 @@ impl ToText
     }
 }
 
+impl ToText for prusti_rustc_interface::middle::ty::BoundRegionKind {
+    fn to_text(&self) -> String {
+        match self {
+            prusti_rustc_interface::middle::ty::BoundRegionKind::BrAnon(id) => {
+                format!("lft_anon_{}", id)
+            }
+            prusti_rustc_interface::middle::ty::BoundRegionKind::BrNamed(_, name) => {
+                name.to_string()
+            }
+            prusti_rustc_interface::middle::ty::BoundRegionKind::BrEnv => "lft_br_env".to_string(),
+        }
+    }
+}
+
 impl ToText for BTreeSet<prusti_rustc_interface::middle::ty::RegionVid> {
     fn to_text(&self) -> String {
         let strings: Vec<_> = self.iter().map(|r| r.to_text()).collect();

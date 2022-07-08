@@ -187,6 +187,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         arguments: &mut Vec<vir_low::Expression>,
         value: &vir_mid::Rvalue,
     ) -> SpannedEncodingResult<()> {
+        let lifetimes_const = value.get_lifetimes();
+        let mut lifetimes = vec![];
+        for lifetime in lifetimes_const {
+            let lft: vir_low::Expression =
+                self.encode_lifetime_const_into_variable(lifetime)?.into();
+            lifetimes.push(lft);
+        }
         match value {
             vir_mid::Rvalue::Repeat(value) => {
                 self.encode_operand_arguments(arguments, &value.argument)?;
@@ -244,6 +251,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 for operand in &value.operands {
                     self.encode_operand_arguments(arguments, operand)?;
                 }
+                arguments.extend(lifetimes);
             }
         }
         Ok(())
@@ -356,6 +364,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut pre_write_statements = Vec::new();
             let mut post_write_statements = Vec::new();
             let mut encode_body = true;
+            let lifetimes_rvalue = self.extract_lifetime_arguments_from_rvalue_anonymise(value)?;
             match value {
                 vir_mid::Rvalue::CheckedBinaryOp(value) => {
                     self.encode_assign_method_rvalue_checked_binary_op(
@@ -401,13 +410,18 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     post_write_statements.push(stmtp! {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
-                    let lifetimes = self.extract_lifetime_arguments_from_rvalue(value)?;
+                    let lifetimes: Vec<vir_low::Expression> = self
+                        .extract_lifetime_arguments_from_rvalue_anonymise(value)?
+                        .iter()
+                        .cloned()
+                        .map(|x| x.into())
+                        .collect();
+                    args2.extend(lifetimes);
                     // FIXME: body is not encoded if we have additional lifetime
                     // parameters from structs.
                     // FIXME: As a workaround for #1065, we encode bodies only
                     // of types that do not contain generic bodies.
-                    encode_body = lifetimes.is_empty() && !ty.contains_type_variables();
-                    args2.extend(lifetimes);
+                    encode_body = lifetimes_rvalue.is_empty() && !ty.contains_type_variables();
                     posts.push(
                         expr! { acc(OwnedNonAliased<ty>(target_place, target_address, result_value; args2)) },
                     );
@@ -427,6 +441,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                         position,
                     )?;
                     parameters.extend(self.extract_non_type_parameters_from_type(ty)?);
+                    parameters.extend(lifetimes_rvalue);
                 }
             }
             let mut statements = pre_write_statements;
@@ -461,6 +476,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut pres = Vec::new();
             let mut posts = Vec::new();
             self.encode_assign_operand(&mut parameters, &mut pres, &mut posts, None, 1, operand)?;
+            let ty = operand.expression.get_type();
+            let lifetimes_ty = self.extract_lifetime_variables_anonymise(ty)?;
+            parameters.extend(lifetimes_ty);
             let method =
                 vir_low::MethodDecl::new(method_name, parameters, Vec::new(), pres, posts, None);
             self.declare_method(method)?;
@@ -599,8 +617,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     operand_address: Address,
                     operand_value: { ty.to_snapshot(self)? }
                 };
+                let lifetimes = self.extract_lifetime_variables_anonymise(ty)?;
+                let lifetime_exprs: Vec<vir_low::Expression> = lifetimes
+                    .iter()
+                    .cloned()
+                    .map(|lifetime| lifetime.into())
+                    .collect();
                 let predicate = expr! {
-                    acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value))
+                    acc(OwnedNonAliased<ty>(operand_place, operand_address, operand_value; lifetime_exprs))
                 };
                 pres.push(predicate.clone());
                 posts.push(predicate);
@@ -961,6 +985,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         };
         let lifetime_token =
             self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
+        let lifetimes = self.extract_lifetime_variables_anonymise(ty)?;
+        let lifetime_exprs: Vec<vir_low::Expression> = lifetimes
+            .iter()
+            .cloned()
+            .map(|lifetime| lifetime.into())
+            .collect();
         let restoration = {
             let restoration_snapshot = if value.is_mut {
                 self.reference_target_final_snapshot(
@@ -981,7 +1011,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 wand(
                     (acc(DeadLifetimeToken(operand_lifetime))) --* (
                         (acc(OwnedNonAliased<ty>(
-                            operand_place, operand_address, [restoration_snapshot]
+                            operand_place, operand_address, [restoration_snapshot]; lifetime_exprs
                         ))) &&
                         [validity] &&
                         // DeadLifetimeToken is duplicable and does not get consumed.
@@ -1046,19 +1076,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         use vir_low::macros::*;
         let value = self.encode_assign_operand_snapshot(operand_counter, operand)?;
         let ty = operand.expression.get_type();
+        let lifetimes_ty = self.extract_lifetime_variables_anonymise(ty)?;
+        let lifetimes: Vec<vir_low::Expression> =
+            lifetimes_ty.iter().cloned().map(|x| x.into()).collect();
         match operand.kind {
             vir_mid::OperandKind::Copy | vir_mid::OperandKind::Move => {
                 let place = self.encode_assign_operand_place(operand_counter)?;
                 let root_address = self.encode_assign_operand_address(operand_counter)?;
-                if let vir_mid::ty::Type::Reference(reference) = ty {
-                    let lifetime =
-                        self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-                    pres.push(
-                        expr! { acc(OwnedNonAliased<ty>(place, root_address, value, lifetime)) },
-                    );
-                } else {
-                    pres.push(expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) });
-                }
+                pres.push(
+                    expr! { acc(OwnedNonAliased<ty>(place, root_address, value; lifetimes)) },
+                );
                 let post_predicate = if operand.kind == vir_mid::OperandKind::Copy {
                     expr! { acc(OwnedNonAliased<ty>(place, root_address, value)) }
                 } else {
@@ -1084,10 +1111,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         }
         pres.push(self.encode_snapshot_valid_call_for_type(value.clone().into(), ty)?);
         parameters.push(value.clone());
-        if let vir_mid::ty::Type::Reference(reference) = ty {
-            let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-            parameters.push(lifetime);
-        }
         Ok(value)
     }
     fn encode_assign_operand_place(
@@ -1179,8 +1202,7 @@ pub(in super::super) trait BuiltinMethodsInterface {
 
 impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
     fn encode_write_address_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
-        let mut ty_without_lifetime = ty.clone();
-        ty_without_lifetime.erase_lifetime();
+        let ty_without_lifetime = ty.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_write_address_methods
@@ -1275,7 +1297,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         call write_address<ty>([target_address], source_value)
                     });
                 }
-                vir_mid::TypeDecl::TypeVar(_) | vir_mid::TypeDecl::Trusted(_) => {
+                vir_mid::TypeDecl::TypeVar(_) => {
                     // move_place of a generic or trusted type has no body
                 }
                 vir_mid::TypeDecl::Tuple(decl) => {
@@ -1287,6 +1309,67 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         });
                     } else {
                         unimplemented!()
+                    }
+                }
+                vir_mid::TypeDecl::Trusted(decl) => {
+                    // FIXME: Remove duplication with vir_mid::TypeDecl::Struct
+                    if decl.fields.is_empty() {
+                        self.encode_write_address_method(ty)?;
+                        statements.push(stmtp! { position =>
+                            // TODO: Replace with memcopy.
+                            call write_address<ty>([target_address], source_value)
+                        });
+                    } else {
+                        // FIXME: support encode_memory_block_split_method for abstract types
+                        // assert!(
+                        //     !ty.is_trusted() && !ty.is_type_var(),
+                        //     "Trying to split an abstract type."
+                        // );
+                        self.encode_memory_block_split_method(ty)?;
+                        statements.push(stmtp! {
+                            position =>
+                            call memory_block_split<ty>(
+                                [target_address], [vir_low::Expression::full_permission()]
+                            )
+                        });
+                        for field in &decl.fields {
+                            let source_field_place = self.encode_field_place(
+                                ty,
+                                field,
+                                source_place.clone().into(),
+                                position,
+                            )?;
+                            let target_field_place = self.encode_field_place(
+                                ty,
+                                field,
+                                target_place.clone().into(),
+                                position,
+                            )?;
+                            let source_field_value = self.obtain_struct_field_snapshot(
+                                ty,
+                                field,
+                                source_value.clone().into(),
+                                position,
+                            )?;
+                            let field_type = &field.ty;
+                            self.encode_move_place_method(field_type)?;
+                            statements.push(stmtp! { position =>
+                                call move_place<field_type>(
+                                    [target_field_place],
+                                    target_root_address,
+                                    [source_field_place],
+                                    source_root_address,
+                                    [source_field_value]
+                                )
+                            });
+                        }
+                        self.encode_memory_block_join_method(ty)?;
+                        statements.push(stmtp! {
+                            position =>
+                            call memory_block_join<ty>(
+                                [source_address], [vir_low::Expression::full_permission()]
+                            )
+                        });
                     }
                 }
                 vir_mid::TypeDecl::Struct(decl) => {
@@ -1943,12 +2026,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         ty: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let mut ty_without_lifetime = ty.clone();
-        ty_without_lifetime.erase_lifetime();
+        let ty_without_lifetime = &ty.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_owned_non_aliased_havoc_methods
-            .contains(ty)
+            .contains(ty_without_lifetime)
         {
             use vir_low::macros::*;
             let method_name = self.encode_havoc_owned_non_aliased_method_name(ty)?;
@@ -1974,7 +2056,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.declare_method(method)?;
             self.builtin_methods_state
                 .encoded_owned_non_aliased_havoc_methods
-                .insert(ty.clone());
+                .insert(ty_without_lifetime.clone());
         }
         Ok(())
     }
@@ -1987,10 +2069,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             .encoded_memory_block_split_methods
             .contains(ty)
         {
-            assert!(
-                !ty.is_trusted() && !ty.is_type_var(),
-                "Trying to split an abstract type."
-            );
+            // FIXME: support encode_memory_block_split_method for abstract types
+            // assert!(
+            //     !ty.is_trusted() && !ty.is_type_var(),
+            //     "Trying to split an abstract type."
+            // );
             use vir_low::macros::*;
             let method = if ty.has_variants() {
                 // TODO: remove code duplication with encode_memory_block_join_method
@@ -2364,8 +2447,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         ty: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let mut ty_without_lifetime = ty.clone();
-        ty_without_lifetime.erase_lifetime();
+        let ty_without_lifetime = ty.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_memory_block_havoc_methods
@@ -2394,8 +2476,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
-        ty.erase_lifetime();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_into_memory_block_methods
@@ -2423,16 +2504,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 .conjoin();
             let mut arguments: Vec<vir_low::Expression> =
                 self.extract_non_type_parameters_from_type_as_exprs(ty)?;
-            let lifetimes = self.extract_lifetime_arguments_from_type(ty)?;
-            parameters.extend(lifetimes.clone());
-            arguments.extend(
-                lifetimes
-                    .iter()
-                    .map(|x| x.clone().into())
-                    .collect::<Vec<vir_low::Expression>>(),
-            );
-
+            let lifetimes: Vec<vir_low::Expression> = self
+                .extract_lifetime_variables_anonymise(ty)?
+                .iter()
+                .cloned()
+                .map(|x| x.into())
+                .collect();
+            arguments.extend(lifetimes.clone());
             let arguments2 = arguments.clone();
+            let lifetime_params = self.extract_lifetime_variables_anonymise(ty)?;
+            parameters.extend(lifetime_params);
             let mut method = method! {
                 into_memory_block<ty>(
                     place: Place,
@@ -2474,12 +2555,34 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                 // Primitive type. Nothing to do.
                             }
                             vir_mid::TypeDecl::TypeVar(_) => unreachable!("cannot convert abstract type into a memory block: {}", ty),
-                            vir_mid::TypeDecl::Trusted(_) => {
-                                // into_memory_block for trusted types is
-                                // trusted and has no statements.
-                            },
                             vir_mid::TypeDecl::Tuple(decl) => {
                                 // TODO: Remove code duplication.
+                                for field in decl.iter_fields() {
+                                    let field_place = self.encode_field_place(
+                                        ty, &field, place.clone().into(), position
+                                    )?;
+                                    let field_value = self.obtain_struct_field_snapshot(
+                                        ty, &field, value.clone().into(), position
+                                    )?;
+                                    self.encode_into_memory_block_method(&field.ty)?;
+                                    let field_ty = &field.ty;
+                                    statements.push(stmtp! {
+                                        position =>
+                                        call into_memory_block<field_ty>([field_place], root_address, [field_value])
+                                    });
+                                }
+                                self.encode_memory_block_join_method(ty)?;
+                                statements.push(stmtp! {
+                                    position =>
+                                    call memory_block_join<ty>(
+                                        [address.clone()], [vir_low::Expression::full_permission()]
+                                    )
+                                });
+                            },
+                            vir_mid::TypeDecl::Trusted(decl) => {
+                                // into_memory_block for trusted types is
+                                // trusted and has no statements.
+                                // FIXME: Remove duplication with vir_mid::TypeDecl::Struct
                                 for field in decl.iter_fields() {
                                     let field_place = self.encode_field_place(
                                         ty, &field, place.clone().into(), position
@@ -2638,8 +2741,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         arguments.extend(
             self.extract_non_type_arguments_from_type_excluding_lifetimes(target.get_type())?,
         );
-        let lifetimes = self.extract_lifetime_arguments_from_rvalue(&value)?;
-        arguments.extend(lifetimes);
         let target_value_type = target.get_type().to_snapshot(self)?;
         let result_value = self.create_new_temporary_variable(target_value_type)?;
         statements.push(vir_low::Statement::method_call(
@@ -3149,8 +3250,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         &mut self,
         ty_with_lifetime: &vir_mid::Type,
     ) -> SpannedEncodingResult<()> {
-        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone();
-        ty.erase_lifetime();
+        let ty: &mut vir_mid::Type = &mut ty_with_lifetime.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_bor_shorten_methods
