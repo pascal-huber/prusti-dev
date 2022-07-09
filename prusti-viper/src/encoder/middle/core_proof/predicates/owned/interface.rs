@@ -40,6 +40,10 @@ pub(in super::super::super) trait PredicatesOwnedInterface {
         &mut self,
         value: &vir_mid::Rvalue,
     ) -> SpannedEncodingResult<Vec<vir_low::VariableDecl>>;
+    fn extract_lifetime_arguments_from_rvalue_as_expr(
+        &mut self,
+        value: &vir_mid::Rvalue,
+    ) -> SpannedEncodingResult<Vec<vir_low::Expression>>;
     fn extract_non_type_arguments_from_type(
         &mut self,
         ty: &vir_mid::Type,
@@ -126,6 +130,19 @@ impl<'p, 'v: 'p, 'tcx: 'v> PredicatesOwnedInterface for Lowerer<'p, 'v, 'tcx> {
         for lifetime in value.get_lifetimes() {
             lifetimes.push(self.encode_lifetime_const_into_variable(lifetime)?);
         }
+        Ok(lifetimes)
+    }
+
+    fn extract_lifetime_arguments_from_rvalue_as_expr(
+        &mut self,
+        value: &vir_mid::Rvalue,
+    ) -> SpannedEncodingResult<Vec<vir_low::Expression>> {
+        let lifetimes = self
+            .extract_lifetime_arguments_from_rvalue(value)?
+            .iter()
+            .cloned()
+            .map(|x| x.into())
+            .collect();
         Ok(lifetimes)
     }
 

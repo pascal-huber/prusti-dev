@@ -195,13 +195,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         arguments: &mut Vec<vir_low::Expression>,
         value: &vir_mid::Rvalue,
     ) -> SpannedEncodingResult<()> {
-        let lifetimes_const = value.get_lifetimes();
-        let mut lifetimes = vec![];
-        for lifetime in lifetimes_const {
-            let lft: vir_low::Expression =
-                self.encode_lifetime_const_into_variable(lifetime)?.into();
-            lifetimes.push(lft);
-        }
         match value {
             vir_mid::Rvalue::Repeat(value) => {
                 self.encode_operand_arguments(arguments, &value.argument)?;
@@ -253,16 +246,18 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 self.encode_operand_arguments(arguments, &value.right)?;
             }
             vir_mid::Rvalue::Discriminant(value) => {
+                // FIXME: add lifetimes for Rvalue::Discriminant
                 self.encode_place_arguments_with_permission(
                     arguments,
                     &value.place,
                     &value.source_permission,
                 )?;
             }
-            vir_mid::Rvalue::Aggregate(value) => {
-                for operand in &value.operands {
+            vir_mid::Rvalue::Aggregate(aggr_value) => {
+                for operand in &aggr_value.operands {
                     self.encode_operand_arguments(arguments, operand)?;
                 }
+                let lifetimes = self.extract_lifetime_arguments_from_rvalue_as_expr(value)?;
                 arguments.extend(lifetimes);
             }
         }
@@ -392,7 +387,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut pre_write_statements = Vec::new();
             let mut post_write_statements = Vec::new();
             let mut encode_body = true;
-            let lifetimes_rvalue = self.extract_lifetime_arguments_from_rvalue(value)?;
             match value {
                 vir_mid::Rvalue::CheckedBinaryOp(value) => {
                     self.encode_assign_method_rvalue_checked_binary_op(
@@ -438,13 +432,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     post_write_statements.push(stmtp! {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
-                    let lifetimes: Vec<vir_low::Expression> = self
-                        .extract_lifetime_arguments_from_rvalue(value)?
-                        .iter()
-                        .cloned()
-                        .map(|x| x.into())
-                        .collect();
-                    args2.extend(lifetimes);
+                    // FIXME: two calls to get the lifetimes is an overkill
+                    let lifetimes_rvalue = self.extract_lifetime_arguments_from_rvalue(value)?;
+                    let lifetimes_rvalue_expr =
+                        self.extract_lifetime_arguments_from_rvalue_as_expr(value)?;
+                    args2.extend(lifetimes_rvalue_expr);
                     // FIXME: body is not encoded if we have additional lifetime
                     // parameters from structs.
                     // FIXME: As a workaround for #1065, we encode bodies only
@@ -1126,13 +1118,11 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         use vir_low::macros::*;
         let value = self.encode_assign_operand_snapshot(operand_counter, operand)?;
         let ty = operand.expression.get_type();
-        let lifetimes_ty = self.extract_lifetime_variables(ty)?;
-        let lifetimes: Vec<vir_low::Expression> =
-            lifetimes_ty.iter().cloned().map(|x| x.into()).collect();
         match operand.kind {
             vir_mid::OperandKind::Copy | vir_mid::OperandKind::Move => {
                 let place = self.encode_assign_operand_place(operand_counter)?;
                 let root_address = self.encode_assign_operand_address(operand_counter)?;
+                let lifetimes = self.extract_lifetime_variables_as_expr(ty)?;
                 pres.push(
                     expr! { acc(OwnedNonAliased<ty>(place, root_address, value; lifetimes)) },
                 );
