@@ -248,8 +248,10 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
                 // FIXME: extract lifetimes from TyKind::Param()
                 vec![]
             }
-            ty::TyKind::Projection(_)
-            | ty::TyKind::Bound(_, _)
+            ty::TyKind::Projection(projection_ty) => {
+                self.get_lifetimes_substs(&projection_ty.substs)?
+            }
+            ty::TyKind::Bound(_, _)
             | ty::TyKind::Placeholder(_)
             | ty::TyKind::Infer(_)
             | ty::TyKind::Generator(..)
