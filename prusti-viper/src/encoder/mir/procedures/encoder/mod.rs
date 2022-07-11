@@ -615,32 +615,28 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 );
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place, None)?;
                 let region_name = region.to_text();
+                let operand_lifetime = vir_high::ty::LifetimeConst { name: region_name };
+
+                let root: vir_high::Expression = self.encoder.encode_local_high(self.mir, place.local)?.into();
+                let place_lifetimes = root.get_lifetimes();
+
                 let encoded_rvalue = if is_reborrow {
-                    let root = self.encoder.encode_local_high(self.mir, place.local)?;
-                    let place_lifetime_name = self.lifetime_name(root.into());
-                    if let Some(place_lifetime_name) = place_lifetime_name {
-                        if let vir_high::Expression::Local(local) = &encoded_target {
-                            self.points_to_reborrow.insert(local.clone());
-                        }
-                        let place_lifetime = vir_high::ty::LifetimeConst {
-                            name: place_lifetime_name,
-                        };
-                        let operand_lifetime = vir_high::ty::LifetimeConst { name: region_name };
-                        vir_high::Rvalue::reborrow(
-                            encoded_place,
-                            operand_lifetime,
-                            place_lifetime,
-                            is_mut,
-                            self.lifetime_token_fractional_permission(self.lifetime_count),
-                            encoded_target.clone(),
-                        )
-                    } else {
-                        unreachable!()
+                    if let vir_high::Expression::Local(local) = &encoded_target {
+                        self.points_to_reborrow.insert(local.clone());
                     }
+                    vir_high::Rvalue::reborrow(
+                        encoded_place,
+                        operand_lifetime,
+                        place_lifetimes,
+                        is_mut,
+                        self.lifetime_token_fractional_permission(self.lifetime_count),
+                        encoded_target.clone(),
+                    )
                 } else {
                     vir_high::Rvalue::ref_(
                         encoded_place,
-                        vir_high::ty::LifetimeConst::new(region_name),
+                        operand_lifetime,
+                        place_lifetimes,
                         is_mut,
                         self.lifetime_token_fractional_permission(self.lifetime_count),
                         encoded_target.clone(),
@@ -1450,9 +1446,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             for arg in args {
                 if let &mir::Operand::Move(place) = arg {
                     let place_high = self.encoder.encode_place_high(self.mir, place, None)?;
-                    let lifetime_name = self.lifetime_name(place_high);
-                    if let Some(lifetime_name) = lifetime_name {
-                        subst_lifetimes.push(lifetime_name);
+                    // let lifetime_name = self.lifetime_name(place_high);
+                    // if let Some(lifetime_name) = lifetime_name {
+                    //     subst_lifetimes.push(lifetime_name);
+                    // }
+                    let lifetimes = place_high.get_lifetimes();
+                    assert!(lifetimes.len() == 1);
+                    for lifetime in lifetimes {
+                        subst_lifetimes.push(lifetime.name.clone());
                     }
                 }
             }

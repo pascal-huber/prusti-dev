@@ -176,7 +176,7 @@ pub(super) trait LifetimesEncoder<'tcx> {
     fn encode_lifetime_specifications(
         &mut self,
     ) -> SpannedEncodingResult<(Vec<vir_high::Statement>, Vec<vir_high::Statement>)>;
-    fn lifetime_name(&mut self, variable: vir_high::Expression) -> Option<String>;
+    // fn lifetime_name(&mut self, variable: vir_high::Expression) -> Option<String>;
     fn identical_lifetimes_map(
         &mut self,
         existing_lifetimes: BTreeSet<String>,
@@ -1019,20 +1019,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
         Ok((preconditions, postconditions))
     }
 
-    fn lifetime_name(&mut self, expression: vir_high::Expression) -> Option<String> {
-        if let vir_high::Expression::Local(vir_high::Local {
-            variable:
-                vir_high::VariableDecl {
-                    name: _,
-                    ty: vir_high::ty::Type::Reference(vir_high::ty::Reference { lifetime, .. }),
-                },
-            ..
-        }) = expression
-        {
-            return Some(lifetime.name);
-        }
-        None
-    }
+    // fn lifetime_name(&mut self, expression: vir_high::Expression) -> Option<String> {
+    //     if let vir_high::Expression::Local(vir_high::Local {
+    //         variable:
+    //             vir_high::VariableDecl {
+    //                 name: _,
+    //                 ty: vir_high::ty::Type::Reference(vir_high::ty::Reference { lifetime, .. }),
+    //             },
+    //         ..
+    //     }) = expression
+    //     {
+    //         return Some(lifetime.name);
+    //     }
+    //     None
+    // }
 
     fn identical_lifetimes_map(
         &mut self,

@@ -396,12 +396,16 @@ impl IntoLow for vir_mid::Statement {
                 let snapshot = statement.place.to_procedure_snapshot(lowerer)?;
                 let lifetime = lowerer.encode_lifetime_const_into_variable(statement.lifetime)?;
                 let validity = lowerer.encode_snapshot_valid_call_for_type(snapshot.clone(), ty)?;
+
+                // FIXME: add place lifetimes?
+                let place_lifetimes = vec![];
+
                 let low_statement = if let Some(condition) = statement.condition {
                     let low_condition = lowerer.lower_block_marker_condition(condition)?;
                     stmtp! {
                         statement.position =>
                         apply<low_condition> (acc(DeadLifetimeToken(lifetime))) --* (
-                            (acc(OwnedNonAliased<ty>([place], [address], [snapshot]))) &&
+                            (acc(OwnedNonAliased<ty>([place], [address], [snapshot]; place_lifetimes))) &&
                             [validity] &&
                             (acc(DeadLifetimeToken(lifetime)))
                         )
@@ -410,7 +414,7 @@ impl IntoLow for vir_mid::Statement {
                     stmtp! {
                         statement.position =>
                         apply (acc(DeadLifetimeToken(lifetime))) --* (
-                            (acc(OwnedNonAliased<ty>([place], [address], [snapshot]))) &&
+                            (acc(OwnedNonAliased<ty>([place], [address], [snapshot]; place_lifetimes))) &&
                             [validity] &&
                             (acc(DeadLifetimeToken(lifetime)))
                         )
@@ -425,6 +429,7 @@ impl IntoLow for vir_mid::Statement {
                 let target_ty_without_lifetime = target_ty.clone().erase_lifetimes();
                 let source_ty_without_lifetime = source_ty.clone().erase_lifetimes();
                 assert_eq!(target_ty_without_lifetime, source_ty_without_lifetime);
+                // here 2
                 lowerer.encode_move_place_method(target_ty)?;
                 let target_place = lowerer.encode_expression_as_place(&statement.target)?;
                 let target_address = lowerer.extract_root_address(&statement.target)?;
@@ -592,7 +597,7 @@ impl IntoLow for vir_mid::Statement {
                         statements.push(stmtp! {
                             statement.position =>
                             exhale (acc(UniqueRef<ty>(
-                                lifetime, [place], [address], [current_snapshot.clone()], [final_snapshot.clone()];
+                                [place], [address], [current_snapshot.clone()], [final_snapshot.clone()], lifetime;
                                 lifetimes)))
                         });
                         statements.push(stmtp! {

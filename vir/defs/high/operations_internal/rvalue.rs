@@ -2,12 +2,42 @@ use super::{
     super::ast::{
         expression::Expression,
         position::Position,
-        rvalue::{visitors::RvalueWalker, OperandKind, Rvalue},
+        rvalue::{visitors::RvalueWalker, OperandKind, Rvalue, Ref, Aggregate, Discriminant},
         ty::*,
         variable::*,
     },
     ty::Typed,
 };
+
+impl Ref {
+    // pub fn get_lifetimes(&self) -> Vec<LifetimeConst>{
+    //     // TODO: right?
+    //     self.place_lifetimes.clone()
+    // }
+}
+
+impl Aggregate {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst>{
+        let mut lifetimes: Vec<LifetimeConst> = vec![];
+        for operand in &self.operands {
+            match operand.kind {
+                OperandKind::Copy | OperandKind::Move => {
+                    let operand_ty = operand.expression.get_type();
+                    let operand_lifetimes = operand_ty.get_lifetimes();
+                    lifetimes.extend(operand_lifetimes);
+                }
+                _ => {}
+            }
+        }
+        lifetimes
+    }
+}
+
+impl Discriminant {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst>{
+        self.place.get_lifetimes()
+    }
+}
 
 impl Rvalue {
     pub fn check_no_default_position(&self) {
@@ -19,28 +49,19 @@ impl Rvalue {
         }
         Checker.walk_rvalue(self)
     }
-    // TODO: add lifetimes from mir into Rvalues (same as Type)
+
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         match self {
             // TODO: add missing rvalue lifetime cases
-            Rvalue::Ref(reference) => {
-                vec![reference.lifetime.clone()]
-            }
+            // Rvalue::Ref(reference) => {
+            //     reference.get_lifetimes()
+            // }
             Rvalue::Aggregate(value) => {
-                let mut lifetimes: Vec<LifetimeConst> = vec![];
-                for operand in &value.operands {
-                    match operand.kind {
-                        OperandKind::Copy | OperandKind::Move => {
-                            let operand_ty = operand.expression.get_type();
-                            let operand_lifetimes = operand_ty.get_lifetimes();
-                            lifetimes.extend(operand_lifetimes);
-                        }
-                        _ => {}
-                    }
-                }
-                lifetimes
+                value.get_lifetimes()
             }
-            // Rvalue::Discriminant(discriminant) => {}
+            Rvalue::Discriminant(discriminant) => {
+                discriminant.get_lifetimes()
+            }
             _ => vec![],
         }
     }
