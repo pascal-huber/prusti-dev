@@ -192,7 +192,7 @@ impl IntoLow for vir_mid::Statement {
                         stmtp! {
                             statement.position =>
                             fold<low_condition> UniqueRef<ty>(
-                                lifetime, [place], [address], [current_snapshot], [final_snapshot];
+                                [place], [address], [current_snapshot], [final_snapshot], lifetime;
                                 lifetimes
                             )
                         }
@@ -200,7 +200,7 @@ impl IntoLow for vir_mid::Statement {
                         stmtp! {
                             statement.position =>
                             fold UniqueRef<ty>(
-                                lifetime, [place], [address], [current_snapshot], [final_snapshot];
+                                [place], [address], [current_snapshot], [final_snapshot], lifetime;
                                 lifetimes
                             )
                         }
@@ -245,7 +245,7 @@ impl IntoLow for vir_mid::Statement {
                         stmtp! {
                             statement.position =>
                             unfold<low_condition> UniqueRef<ty>(
-                                lifetime, [place], [address], [current_snapshot], [final_snapshot];
+                                [place], [address], [current_snapshot], [final_snapshot], lifetime;
                                 lifetimes
                             )
                         }
@@ -253,7 +253,7 @@ impl IntoLow for vir_mid::Statement {
                         stmtp! {
                             statement.position =>
                             unfold UniqueRef<ty>(
-                                lifetime, [place], [address], [current_snapshot], [final_snapshot];
+                                [place], [address], [current_snapshot], [final_snapshot], lifetime;
                                 lifetimes
                             )
                         }

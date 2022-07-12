@@ -31,53 +31,53 @@ fn simple_struct_shared_assert_false() {
     assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 
-struct S2<'a> {
-    x: &'a mut u32,
-}
-fn struct_with_mut_reference () {
-    let mut n = 4;
-    let mut t = S2{ x: &mut n};
-}
-fn struct_with_mut_reference_assert_false () {
-    let mut n = 4;
-    let mut t = S2{ x: &mut n};
-    assert!(false);      //~ ERROR: the asserted expression might not hold
-}
+// struct S2<'a> {
+//     x: &'a mut u32,
+// }
+// fn struct_with_mut_reference () {
+//     let mut n = 4;
+//     let mut t = S2{ x: &mut n};
+// }
+// fn struct_with_mut_reference_assert_false () {
+//     let mut n = 4;
+//     let mut t = S2{ x: &mut n};
+//     assert!(false);      //~ ERROR: the asserted expression might not hold
+// }
 
-struct S3<'a> {
-    x: &'a u32,
-}
-fn struct_with_shared_reference () {
-    let mut n = 4;
-    let mut t = S3{ x: &n};
-    let mut u = S3{ x: &n};
-}
-fn struct_with_shared_reference_assert_false () {
-    let mut n = 4;
-    let mut t = S3{ x: &n};
-    let mut u = S3{ x: &n};
-    assert!(false);      //~ ERROR: the asserted expression might not hold
-}
+// struct S3<'a> {
+//     x: &'a u32,
+// }
+// fn struct_with_shared_reference () {
+//     let mut n = 4;
+//     let mut t = S3{ x: &n};
+//     let mut u = S3{ x: &n};
+// }
+// fn struct_with_shared_reference_assert_false () {
+//     let mut n = 4;
+//     let mut t = S3{ x: &n};
+//     let mut u = S3{ x: &n};
+//     assert!(false);      //~ ERROR: the asserted expression might not hold
+// }
 
-struct S4I<'a> {
-    x: &'a u32,
-}
-struct S4O<'a> {
-    x: &'a S4I<'a>,
-}
-fn nested_struct_with_shared_reference () {
-    let n = 4;
-    let i = S4I { x: &n };
-    let o = S4O { x: &i };
-    // let mut t = S3{ x: &n};
-    // let mut u = S3{ x: &n};
-}
-fn nested_struct_with_shared_reference_assert_false () {
-    let n = 4;
-    let i = S4I { x: &n };
-    let o = S4O { x: &i };
-    assert!(false);      //~ ERROR: the asserted expression might not hold
-}
+// struct S4I<'a> {
+//     x: &'a u32,
+// }
+// struct S4O<'a> {
+//     x: &'a S4I<'a>,
+// }
+// fn nested_struct_with_shared_reference () {
+//     let n = 4;
+//     let i = S4I { x: &n };
+//     let o = S4O { x: &i };
+//     // let mut t = S3{ x: &n};
+//     // let mut u = S3{ x: &n};
+// }
+// fn nested_struct_with_shared_reference_assert_false () {
+//     let n = 4;
+//     let i = S4I { x: &n };
+//     let o = S4O { x: &i };
+//     assert!(false);      //~ ERROR: the asserted expression might not hold
+// }
 
 // FIXME: accessing references of structs panics
 // struct S3<'a> {
