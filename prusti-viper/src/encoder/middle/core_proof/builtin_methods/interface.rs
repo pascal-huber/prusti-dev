@@ -401,7 +401,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut encode_body = true;
             match value {
                 vir_mid::Rvalue::CheckedBinaryOp(value) => {
-                    println!("---- assign binop: {}", method_name);
+                    // println!("---- assign binop: {}", method_name);
                     // dbg!(&ty);
                     self.encode_assign_method_rvalue_checked_binary_op(
                         &mut parameters,
@@ -415,7 +415,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     )?;
                 }
                 vir_mid::Rvalue::Reborrow(value) => {
-                    println!("---- assign reborrow: {}", method_name);
+                    // println!("---- assign reborrow: {}", method_name);
                     // dbg!(&ty);
                     // dbg!(&args2);
                     self.encode_assign_method_rvalue_reborrow(
@@ -431,7 +431,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     return Ok(());
                 }
                 vir_mid::Rvalue::Ref(value) => {
-                    println!("---- assign ref: {}", method_name);
+                    // println!("---- assign ref: {}", method_name);
                     // dbg!(&ty);
                     self.encode_assign_method_rvalue_ref(
                         method_name,
@@ -898,7 +898,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         use vir_low::macros::*;
         let reference_type = result_type.clone().unwrap_reference();
         let ty = value.place.get_type();
-
         var_decls! {
             target_place: Place,
             target_address: Address,
@@ -912,24 +911,15 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             name: value.operand_lifetime.name.clone(),
             ty: ty!(Lifetime),
         };
-        let place_lifetimes: Vec<vir_low::VariableDecl> = value.place_lifetimes.iter().map(|x| vir_low::VariableDecl {
-            name: x.name.clone(),
-            ty: ty!(Lifetime),
-        }).collect();
-        let place_lifetimes_expr: Vec<vir_low::Expression> = place_lifetimes.clone().into_iter().map(|x| x.into()).collect();
-
+        let mut place_lifetimes: Vec<vir_low::VariableDecl> = vec![];
+        for lifetime in value.place_lifetimes.iter() {
+            let snap = self.encode_lifetime_const_into_variable(lifetime.clone())?;
+            place_lifetimes.push(snap);
+        }
+        let place_lifetimes_expr: Vec<vir_low::Expression> = place_lifetimes.clone().iter().cloned().map(|x| x.into()).collect();
         let lifetime_token = self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
-        // let lifetime_exprs: Vec<vir_low::Expression> = lifetime_vars.clone().iter().cloned().map(|x| x.into()).collect();
-
         let lifetimes_ty = self.extract_lifetime_variables(ty)?;
         let lifetimes_ty_expr = self.extract_lifetime_variables_as_expr(ty)?;
-        //
-        // let reborrow_place_lifetimes = value.place_lifetimes.iter().cloned().map(|x| vir_low::VariableDecl {
-        //     name: x.name.clone(),
-        //     ty: ty!(Lifetime),
-        // });
-        // dbg!(&lifetime_ty);
-
         let predicate = if reference_type.uniqueness.is_unique() {
             expr! {
                 acc(UniqueRef<ty>(
@@ -953,11 +943,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         let valid_result =
             self.encode_snapshot_valid_call_for_type(result_value.clone().into(), result_type)?;
         let reference_predicate = expr! {
-            (acc(OwnedNonAliased<result_type>(target_place, target_address, result_value, operand_lifetime))) &&
+            (acc(OwnedNonAliased<result_type>(target_place, target_address, result_value, operand_lifetime; lifetimes_ty_expr))) &&
             [valid_result]
         };
-        // let lifetime_token =
-        //     self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
         let restoration = {
             let ty_value = &value.place.get_type().clone();
             let final_snapshot = self.reference_target_final_snapshot(
@@ -2933,7 +2921,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             };
             let lifetime_access = expr! { acc(LifetimeToken(lifetime), lifetime_perm) };
             let frac_ref_access = expr! {
-                acc(FracRef<target_type>(lifetime, place, address, current_snapshot))
+                acc(FracRef<target_type>(place, address, current_snapshot, lifetime))
             };
             let owned_access = expr! {
                 acc(OwnedNonAliased<target_type>(place, address, current_snapshot), owned_perm)
@@ -3385,18 +3373,18 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             } else {
                 pres.push(expr! {
                     acc(FracRef<target_type>(
-                        old_lft,
                         place,
                         address,
-                        current_snapshot
+                        current_snapshot,
+                        old_lft
                     ))
                 });
                 posts.push(expr! {
                     acc(FracRef<target_type>(
-                        lft,
                         place,
                         address,
-                        current_snapshot
+                        current_snapshot,
+                        lft
                     ))
                 });
             }

@@ -385,8 +385,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 let deref_place = self.lowerer.reference_deref_place(place.into(), position)?;
                 self.encode_unique_ref(target_type)?;
 
-                // lifetimes of ty
-                // TODO: is target_type right here?
                 let mut lifetimes_ty = vec![];
                 for lifetime in reference.target_type.get_lifetimes() {
                     lifetimes_ty.push(vir_low::VariableDecl {
@@ -394,9 +392,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         ty: ty!(Lifetime),
                     });
                 }
-                // println!("----- owned_non_aliased: {}", predicate_name!(OwnedNonAliased<ty>));
-                // dbg!(&ty);
-                // dbg!(&lifetimes_ty);
                 let lifetimes_ty_expr: Vec<vir_low::Expression> = lifetimes_ty.iter().cloned().map(|x| x.into()).collect();
                 predicate! {
                     OwnedNonAliased<ty>(
@@ -439,19 +434,28 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 // TODO: ??? this will fail
                 // self.encode_unique_ref(target_type)?;
                 self.encode_frac_ref(target_type)?;
+                let mut lifetimes_ty = vec![];
+                for lifetime in reference.target_type.get_lifetimes() {
+                    lifetimes_ty.push(vir_low::VariableDecl {
+                        name: lifetime.name.clone(),
+                        ty: ty!(Lifetime),
+                    });
+                }
+                let lifetimes_ty_expr: Vec<vir_low::Expression> = lifetimes_ty.iter().cloned().map(|x| x.into()).collect();
                 predicate! {
                     OwnedNonAliased<ty>(
                         place: Place,
                         root_address: Address,
                         snapshot: {snapshot_type},
-                        lifetime: Lifetime
+                        lifetime: Lifetime,
+                        *lifetimes_ty
                     )
                     {(
                         ([validity]) &&
                         (acc(MemoryBlock([compute_address], [size_of]))) &&
                         (([bytes]) == (Snap<address_type>::to_bytes([target_address_snapshot]))) &&
                         (acc(FracRef<target_type>(
-                            lifetime, [deref_place], [target_address], [current_snapshot]
+                            [deref_place], [target_address], [current_snapshot], lifetime; lifetimes_ty_expr
                         )))
                     )}
                 }
@@ -603,12 +607,11 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             // FIXME: implemente trusted frac ref
             | vir_mid::TypeDecl::Trusted(_) => vir_low::PredicateDecl::new(
                 predicate_name! {FracRef<ty>},
-                vec![lifetime, place, root_address, snapshot],
+                vec![place, root_address, snapshot, lifetime],
                 None,
             ),
             vir_mid::TypeDecl::Tuple(_decl) => unimplemented!(),
             vir_mid::TypeDecl::Struct(decl) => {
-                // TODO: test or add unimplemented!
                 let mut field_predicates = Vec::new();
                 for field in &decl.fields {
                     let field_place = self.lowerer.encode_field_place(
@@ -625,12 +628,18 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     )?;
                     let field_ty = &field.ty;
                     self.encode_frac_ref(field_ty)?;
+                    let lifetimes_field_ty: Vec<vir_low::VariableDecl> = field_ty.get_lifetimes().iter().map(|x| vir_low::VariableDecl{
+                        name: x.name.clone(),
+                        ty: ty!(Lifetime),
+                    }.into()).collect();
+                    let lifetimes_field_ty_expr: Vec<vir_low::Expression> = lifetimes_field_ty.clone().iter().cloned().map(|x| x.into()).collect();
                     let acc = expr! {
                         acc(FracRef<field_ty>(
-                            lifetime,
                             [field_place],
                             root_address,
-                            [field_snapshot]
+                            [field_snapshot],
+                            lifetime;
+                            lifetimes_field_ty_expr
                         ))
                     };
                     field_predicates.push(acc);
@@ -638,9 +647,22 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 if field_predicates.is_empty() {
                     // FIXME: Add backing MemoryBlock unimplemented!();
                 }
+                let mut arguments =
+                    vec![
+                        place,
+                        root_address,
+                        snapshot,
+                        lifetime,
+                    ];
+                let lifetimes_ty: Vec<vir_low::VariableDecl> = ty.get_lifetimes().iter().map(|x| vir_low::VariableDecl{
+                    name: x.name.clone(),
+                    ty: ty!(Lifetime),
+                }).collect();
+                arguments.extend(lifetimes_ty);
                 vir_low::PredicateDecl::new(
                     predicate_name! {FracRef<ty>},
-                    vec![lifetime, place, root_address, snapshot],
+                    arguments,
+                    // vec![place, root_address, snapshot, lifetime],
                     Some(expr! {
                         [current_validity] &&
                         [field_predicates.into_iter().conjoin()]
@@ -673,7 +695,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                     let acc = expr! {
                         ([ discriminant_call.clone() ] == [ discriminant.into() ]) ==>
                         (acc(FracRef<variant_type>(
-                            lifetime, [variant_place], root_address, [variant_snapshot]
+                            [variant_place], root_address, [variant_snapshot], lifetime
                         )))
                     };
                     variant_predicates.push(acc);
@@ -694,12 +716,12 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 )?;
                 vir_low::PredicateDecl::new(
                     predicate_name! {FracRef<ty>},
-                    vec![lifetime.clone(), place, root_address.clone(), snapshot],
+                    vec![place, root_address.clone(), snapshot, lifetime.clone()],
                     Some(expr! {
                         [current_validity] &&
                         (acc(FracRef<discriminant_type>(
-                            lifetime, [discriminant_place], root_address,
-                            [discriminant_snapshot]
+                            [discriminant_place], root_address,
+                            [discriminant_snapshot], lifetime
                         ))) &&
                         [variant_predicates.into_iter().conjoin()]
                     }),
@@ -717,10 +739,10 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 self.encode_frac_ref(target_type)?;
                 // TODO: is this right?
                 let mut parameters = vec![
-                    lifetime,
                     place,
                     root_address,
                     snapshot,
+                    lifetime,
                 ];
                 let lifetimes_ty: Vec<vir_low::VariableDecl> = ty.get_lifetimes().iter().map(|x| vir_low::VariableDecl{
                     name: x.name.clone(),

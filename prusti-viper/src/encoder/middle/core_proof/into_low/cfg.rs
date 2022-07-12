@@ -172,7 +172,7 @@ impl IntoLow for vir_mid::Statement {
                         stmtp! {
                             statement.position =>
                             fold<low_condition> FracRef<ty>(
-                                lifetime, [place], [address], [current_snapshot];
+                                [place], [address], [current_snapshot], lifetime;
                                 lifetimes
                             )
                         }
@@ -180,7 +180,7 @@ impl IntoLow for vir_mid::Statement {
                         stmtp! {
                             statement.position =>
                             fold FracRef<ty>(
-                                lifetime, [place], [address], [current_snapshot];
+                                [place], [address], [current_snapshot], lifetime;
                                 lifetimes
                             )
                         }
@@ -225,7 +225,7 @@ impl IntoLow for vir_mid::Statement {
                         stmtp! {
                             statement.position =>
                             unfold<low_condition> FracRef<ty>(
-                                lifetime, [place], [address], [current_snapshot];
+                                [place], [address], [current_snapshot], lifetime;
                                 lifetimes
                             )
                         }
@@ -398,14 +398,14 @@ impl IntoLow for vir_mid::Statement {
                 let validity = lowerer.encode_snapshot_valid_call_for_type(snapshot.clone(), ty)?;
 
                 // FIXME: add place lifetimes?
-                let place_lifetimes = vec![];
+                let ty_lifetimes = lowerer.extract_lifetime_variables_as_expr(ty)?;
 
                 let low_statement = if let Some(condition) = statement.condition {
                     let low_condition = lowerer.lower_block_marker_condition(condition)?;
                     stmtp! {
                         statement.position =>
                         apply<low_condition> (acc(DeadLifetimeToken(lifetime))) --* (
-                            (acc(OwnedNonAliased<ty>([place], [address], [snapshot]; place_lifetimes))) &&
+                            (acc(OwnedNonAliased<ty>([place], [address], [snapshot]; ty_lifetimes))) &&
                             [validity] &&
                             (acc(DeadLifetimeToken(lifetime)))
                         )
@@ -414,7 +414,7 @@ impl IntoLow for vir_mid::Statement {
                     stmtp! {
                         statement.position =>
                         apply (acc(DeadLifetimeToken(lifetime))) --* (
-                            (acc(OwnedNonAliased<ty>([place], [address], [snapshot]; place_lifetimes))) &&
+                            (acc(OwnedNonAliased<ty>([place], [address], [snapshot]; ty_lifetimes))) &&
                             [validity] &&
                             (acc(DeadLifetimeToken(lifetime)))
                         )
@@ -609,7 +609,7 @@ impl IntoLow for vir_mid::Statement {
                         statements.push(stmtp! {
                             statement.position =>
                             exhale (acc(FracRef<ty>(
-                                lifetime, [place], [address], [current_snapshot];
+                                [place], [address], [current_snapshot], lifetime;
                                 lifetimes)))
                         });
                     }
@@ -772,7 +772,7 @@ impl IntoLow for vir_mid::Statement {
                         )
                     ) --* (
                         (acc(LifetimeToken(lifetime), [perm_amount])) &&
-                        (acc(FracRef<ty>(lifetime, [place], [address], [current_snapshot])))
+                        (acc(FracRef<ty>([place], [address], [current_snapshot], lifetime)))
                     )
                 }])
             }
