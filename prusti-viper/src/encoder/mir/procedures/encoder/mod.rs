@@ -1449,12 +1449,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             for arg in args {
                 if let &mir::Operand::Move(place) = arg {
                     let place_high = self.encoder.encode_place_high(self.mir, place, None)?;
-                    // let lifetime_name = self.lifetime_name(place_high);
-                    // if let Some(lifetime_name) = lifetime_name {
-                    //     subst_lifetimes.push(lifetime_name);
-                    // }
                     let lifetimes = place_high.get_lifetimes();
-                    assert!(lifetimes.len() == 1);
                     for lifetime in lifetimes {
                         subst_lifetimes.push(lifetime.name.clone());
                     }

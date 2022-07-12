@@ -3314,19 +3314,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         }
         Ok(())
     }
-    fn encode_bor_shorten_method(
-        &mut self,
-        ty_with_lifetime: &vir_mid::Type,
-    ) -> SpannedEncodingResult<()> {
-        let ty = &ty_with_lifetime.clone().erase_lifetimes();
+    fn encode_bor_shorten_method(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
+        let ty_without_lifetime = ty.clone().erase_lifetimes();
         if !self
             .builtin_methods_state
             .encoded_bor_shorten_methods
-            .contains(ty)
+            .contains(&ty_without_lifetime)
         {
             self.builtin_methods_state
                 .encoded_bor_shorten_methods
-                .insert(ty.clone());
+                .insert(ty_without_lifetime);
             use vir_low::macros::*;
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
             let reference_type = type_decl.unwrap_reference();
@@ -3356,6 +3353,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 expr! { acc(LifetimeToken(lft), lifetime_perm)},
             ];
             let mut posts = vec![expr! { acc(LifetimeToken(lft), lifetime_perm)}];
+            let lifetimes_target_type_expr =
+                self.extract_lifetime_variables_as_expr(target_type)?;
             if reference_type.uniqueness.is_unique() {
                 pres.push(expr! {
                     acc(UniqueRef<target_type>(
@@ -3363,7 +3362,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         address,
                         current_snapshot,
                         final_snapshot,
-                        old_lft
+                        old_lft;
+                        lifetimes_target_type_expr
                     ))
                 });
                 posts.push(expr! {
@@ -3372,7 +3372,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         address,
                         current_snapshot,
                         final_snapshot,
-                        lft
+                        lft;
+                        lifetimes_target_type_expr
                     ))
                 });
                 parameters.push(final_snapshot);
@@ -3382,7 +3383,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         place,
                         address,
                         current_snapshot,
-                        old_lft
+                        old_lft;
+                        lifetimes_target_type_expr
                     ))
                 });
                 posts.push(expr! {
@@ -3390,10 +3392,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         place,
                         address,
                         current_snapshot,
-                        lft
+                        lft;
+                        lifetimes_target_type_expr
                     ))
                 });
             }
+            let lifetimes_target_type = self.extract_lifetime_variables(target_type)?;
+            parameters.extend(lifetimes_target_type);
             let method = vir_low::MethodDecl::new(
                 method_name! { bor_shorten<ty> },
                 parameters,

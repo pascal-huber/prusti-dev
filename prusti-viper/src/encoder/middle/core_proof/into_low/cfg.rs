@@ -847,11 +847,10 @@ impl IntoLow for vir_mid::Statement {
                     statement.position,
                 )?;
                 assert!(ty.is_reference(), "{:?}", ty);
-                if let vir_mid::Type::Reference(vir_mid::ty::Reference {
-                    uniqueness: vir_mid::ty::Uniqueness::Unique,
-                    ..
-                }) = ty
-                {
+                let reference = ty.clone().unwrap_reference();
+                let reference_target_type_lifetimes =
+                    lowerer.extract_lifetime_variables_as_expr(&reference.target_type)?;
+                if reference.uniqueness.is_unique() {
                     let final_snapshot = lowerer.reference_target_final_snapshot(
                         ty,
                         reference_value,
@@ -865,7 +864,8 @@ impl IntoLow for vir_mid::Statement {
                             [deref_place],
                             [address],
                             [current_snapshot],
-                            [final_snapshot]
+                            [final_snapshot];
+                            reference_target_type_lifetimes
                         )
                     }])
                 } else {
@@ -876,7 +876,8 @@ impl IntoLow for vir_mid::Statement {
                             [perm_amount],
                             [deref_place],
                             [address],
-                            [current_snapshot]
+                            [current_snapshot];
+                            reference_target_type_lifetimes
                         )
                     }])
                 }
