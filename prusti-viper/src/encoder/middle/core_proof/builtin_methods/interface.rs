@@ -446,28 +446,25 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     return Ok(());
                 }
                 _ => {
-                    println!("---- assign _: {}", method_name);
-                    // dbg!(&ty);
                     let args = self.extract_non_type_parameters_from_type_as_exprs(ty)?;
                     let mut args2 = args.clone();
                     post_write_statements.push(stmtp! {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
 
-                    let lifetimes_ty: Vec<vir_low::VariableDecl> = ty.get_lifetimes().iter().map(|x|
-                        vir_low::VariableDecl{
-                            name: x.name.clone(),
-                            ty: ty!(Lifetime),
-                        }
-                    ).collect();
-                    let lifetimes_ty_expr: Vec<vir_low::Expression> = lifetimes_ty.clone().iter().cloned().map(|x| x.into()).collect();
+                    // Get lifetimes of ty as snapshots
+                    let mut lifetimes_ty : Vec<vir_low::Expression> = vec![];
+                    for lifetime in ty.get_lifetimes() {
+                        let snap = self.encode_lifetime_const_into_variable(lifetime)?;
+                        lifetimes_ty.push(snap.into());
+                    }
+                    args2.extend(lifetimes_ty.clone());
 
-
-                    args2.extend(lifetimes_ty_expr);
-                    // FIXME: two calls to get the lifetimes is an overkill
+                    // Get lifetimes of rvalue (for parameters)
                     let lifetimes_rvalue = self.extract_lifetime_arguments_from_rvalue(value)?;
                     let lifetimes_rvalue_expr =
                         self.extract_lifetime_arguments_from_rvalue_as_expr(value)?;
+
                     // FIXME: body is not encoded if we have additional lifetime
                     // parameters from structs.
                     // FIXME: As a workaround for #1065, we encode bodies only
@@ -493,7 +490,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     )?;
                     parameters.extend(self.extract_non_type_parameters_from_type(ty)?);
                     parameters.extend(lifetimes_rvalue);
-                    parameters.extend(lifetimes_ty);
                 }
             }
             let mut statements = pre_write_statements;
@@ -912,11 +908,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             operand_value_final: { ty.to_snapshot(self)? }, // use only for unique references
             lifetime_perm: Perm
         };
-        println!("reborrow") ;
-        // dbg!(&value);
-        // dbg!(&ty);
-
-
         let operand_lifetime = vir_low::VariableDecl{
             name: value.operand_lifetime.name.clone(),
             ty: ty!(Lifetime),
@@ -926,8 +917,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             ty: ty!(Lifetime),
         }).collect();
         let place_lifetimes_expr: Vec<vir_low::Expression> = place_lifetimes.clone().into_iter().map(|x| x.into()).collect();
-        dbg!(&operand_lifetime);
-        dbg!(&place_lifetimes);
 
         let lifetime_token = self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
         // let lifetime_exprs: Vec<vir_low::Expression> = lifetime_vars.clone().iter().cloned().map(|x| x.into()).collect();
@@ -2827,9 +2816,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             self.extract_non_type_arguments_from_type_excluding_lifetimes(target.get_type())?,
         );
         let target_value_type = target.get_type().to_snapshot(self)?;
-        // already happens in encode_rvalue_arguments
-        // let lifetimes_ty = self.extract_lifetime_variables_as_expr(target.get_type())?;
-        // arguments.extend(lifetimes_ty);
         let result_value = self.create_new_temporary_variable(target_value_type)?;
         statements.push(vir_low::Statement::method_call(
             method_name,

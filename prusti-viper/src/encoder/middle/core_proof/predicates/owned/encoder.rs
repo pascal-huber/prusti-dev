@@ -394,9 +394,9 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         ty: ty!(Lifetime),
                     });
                 }
-                println!("----- owned_non_aliased: {}", predicate_name!(OwnedNonAliased<ty>));
-                dbg!(&ty);
-                dbg!(&lifetimes_ty);
+                // println!("----- owned_non_aliased: {}", predicate_name!(OwnedNonAliased<ty>));
+                // dbg!(&ty);
+                // dbg!(&lifetimes_ty);
                 let lifetimes_ty_expr: Vec<vir_low::Expression> = lifetimes_ty.iter().cloned().map(|x| x.into()).collect();
                 predicate! {
                     OwnedNonAliased<ty>(

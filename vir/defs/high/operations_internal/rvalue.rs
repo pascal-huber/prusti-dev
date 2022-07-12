@@ -29,6 +29,8 @@ impl Aggregate {
                 _ => {}
             }
         }
+        let lifetimes_ty = self.ty.get_lifetimes();
+        lifetimes.extend(lifetimes_ty);
         lifetimes
     }
 }
