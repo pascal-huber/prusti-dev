@@ -34,7 +34,12 @@ pub struct Repeat {
     pub count: u64,
 }
 
-#[display(fmt = "&{} {}<{}>", operand_lifetime, place, "display::cjoin(place_lifetimes)")]
+#[display(
+    fmt = "&{} {}<{}>",
+    operand_lifetime,
+    place,
+    "display::cjoin(place_lifetimes)"
+)]
 pub struct Ref {
     pub place: Expression,
     pub operand_lifetime: LifetimeConst,
@@ -44,7 +49,13 @@ pub struct Ref {
     pub target: Expression,
 }
 
-#[display(fmt = "{} := &'{} (*{}<{}>)", target, operand_lifetime, place, "display::cjoin(place_lifetimes)")]
+#[display(
+    fmt = "{} := &'{} (*{}<{}>)",
+    target,
+    operand_lifetime,
+    place,
+    "display::cjoin(place_lifetimes)"
+)]
 pub struct Reborrow {
     pub place: Expression,
     pub operand_lifetime: LifetimeConst,

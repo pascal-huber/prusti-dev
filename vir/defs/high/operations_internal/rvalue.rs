@@ -2,7 +2,7 @@ use super::{
     super::ast::{
         expression::Expression,
         position::Position,
-        rvalue::{visitors::RvalueWalker, OperandKind, Rvalue, Ref, Aggregate, Discriminant},
+        rvalue::{visitors::RvalueWalker, Aggregate, Discriminant, OperandKind, Ref, Rvalue},
         ty::*,
         variable::*,
     },
@@ -17,7 +17,7 @@ impl Ref {
 }
 
 impl Aggregate {
-    pub fn get_lifetimes(&self) -> Vec<LifetimeConst>{
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         let mut lifetimes: Vec<LifetimeConst> = vec![];
         for operand in &self.operands {
             match operand.kind {
@@ -36,7 +36,7 @@ impl Aggregate {
 }
 
 impl Discriminant {
-    pub fn get_lifetimes(&self) -> Vec<LifetimeConst>{
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         self.place.get_lifetimes()
     }
 }
@@ -58,12 +58,8 @@ impl Rvalue {
             // Rvalue::Ref(reference) => {
             //     reference.get_lifetimes()
             // }
-            Rvalue::Aggregate(value) => {
-                value.get_lifetimes()
-            }
-            Rvalue::Discriminant(discriminant) => {
-                discriminant.get_lifetimes()
-            }
+            Rvalue::Aggregate(value) => value.get_lifetimes(),
+            Rvalue::Discriminant(discriminant) => discriminant.get_lifetimes(),
             _ => vec![],
         }
     }

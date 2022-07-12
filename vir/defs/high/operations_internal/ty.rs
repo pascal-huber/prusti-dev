@@ -1,7 +1,7 @@
 use super::super::ast::{
     expression::{visitors::ExpressionFolder, *},
     ty::{
-        visitors::{default_walk_reference, TypeFolder, TypeWalker, default_walk_type},
+        visitors::{default_walk_reference, default_walk_type, TypeFolder, TypeWalker},
         *,
     },
     type_decl::DiscriminantValue,
@@ -103,7 +103,7 @@ impl Type {
                 let target_lifetimes = reference.target_type.get_lifetimes();
                 lifetimes.extend(target_lifetimes);
                 lifetimes
-            },
+            }
             Type::Tuple(Tuple { lifetimes, .. })
             | Type::Struct(Struct { lifetimes, .. })
             | Type::Sequence(Sequence { lifetimes, .. })

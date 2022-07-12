@@ -617,7 +617,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let region_name = region.to_text();
                 let operand_lifetime = vir_high::ty::LifetimeConst { name: region_name };
 
-                let root: vir_high::Expression = self.encoder.encode_local_high(self.mir, place.local)?.into();
+                let root: vir_high::Expression = self
+                    .encoder
+                    .encode_local_high(self.mir, place.local)?
+                    .into();
                 let place_lifetimes = root.get_lifetimes();
 
                 let encoded_rvalue = if is_reborrow {
