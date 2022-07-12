@@ -1838,6 +1838,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
             self.mark_owned_non_aliased_as_unfolded(ty)?;
             let lifetime_args = self.extract_lifetime_variables(ty)?;
+            let mut encode_body = true;
             match &type_decl {
                 vir_mid::TypeDecl::Bool
                 | vir_mid::TypeDecl::Int(_)
@@ -1884,6 +1885,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                 position,
                             )?;
                             let field_type = &field.ty;
+                            let field_lifetimes = self.extract_lifetime_variables(field_type)?;
+                            if !field_lifetimes.is_empty() {
+                                encode_body = false;
+                            }
+                            if field_type.is_type_var() || field_type.is_trusted() {
+                                encode_body = false;
+                            }
                             self.encode_write_place_method(field_type)?;
                             statements.push(stmtp! { position =>
                                 call write_place<field_type>(
@@ -1917,6 +1925,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                 position,
                             )?;
                             let field_type = &field.ty;
+                            let field_lifetimes = self.extract_lifetime_variables(field_type)?;
+                            if !field_lifetimes.is_empty() {
+                                encode_body = false;
+                            }
+                            if field_type.is_type_var() || field_type.is_trusted() {
+                                encode_body = false;
+                            }
                             self.encode_write_place_method(field_type)?;
                             statements.push(stmtp! { position =>
                                 call write_place<field_type>(
@@ -2045,7 +2060,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             statements.push(stmtp! { position =>
                 fold OwnedNonAliased<ty>(place, root_address, value)
             });
-            let body = if ty.is_array() || (ty.is_struct() && !lifetime_args.is_empty()) {
+            let body = if ty.is_array() || (ty.is_struct() && !lifetime_args.is_empty()) || !encode_body {
                 // TODO: We currently make write_place bodyless for arrays
                 // because we would need builtin methods to support loops if we
                 // wanted to implement the body.
