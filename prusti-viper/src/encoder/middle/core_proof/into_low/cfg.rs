@@ -215,7 +215,7 @@ impl IntoLow for vir_mid::Statement {
                 let place = lowerer.encode_expression_as_place(&statement.place)?;
                 let address = lowerer.extract_root_address(&statement.place)?;
                 let current_snapshot = statement.place.to_procedure_snapshot(lowerer)?;
-                let lifetimes = lowerer
+                let lifetimes_ty = lowerer
                     .extract_lifetime_variables(ty)?
                     .into_iter()
                     .map(|lifetime| lifetime.into());
@@ -226,15 +226,15 @@ impl IntoLow for vir_mid::Statement {
                             statement.position =>
                             unfold<low_condition> FracRef<ty>(
                                 [place], [address], [current_snapshot], lifetime;
-                                lifetimes
+                                lifetimes_ty
                             )
                         }
                     } else {
                         stmtp! {
                             statement.position =>
                             unfold FracRef<ty>(
-                                lifetime, [place], [address], [current_snapshot];
-                                lifetimes
+                                [place], [address], [current_snapshot], lifetime;
+                                lifetimes_ty
                             )
                         }
                     }
@@ -246,7 +246,7 @@ impl IntoLow for vir_mid::Statement {
                             statement.position =>
                             unfold<low_condition> UniqueRef<ty>(
                                 [place], [address], [current_snapshot], [final_snapshot], lifetime;
-                                lifetimes
+                                lifetimes_ty
                             )
                         }
                     } else {
@@ -254,7 +254,7 @@ impl IntoLow for vir_mid::Statement {
                             statement.position =>
                             unfold UniqueRef<ty>(
                                 [place], [address], [current_snapshot], [final_snapshot], lifetime;
-                                lifetimes
+                                lifetimes_ty
                             )
                         }
                     }
