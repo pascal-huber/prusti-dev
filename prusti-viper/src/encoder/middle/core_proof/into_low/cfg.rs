@@ -433,30 +433,18 @@ impl IntoLow for vir_mid::Statement {
                 let source_place = lowerer.encode_expression_as_place(&statement.source)?;
                 let source_address = lowerer.extract_root_address(&statement.source)?;
                 let value = statement.source.to_procedure_snapshot(lowerer)?;
-                let mut statements = if let vir_mid::Type::Reference(reference) = target_ty {
-                    let lifetime =
-                        lowerer.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-                    vec![stmtp! { statement.position =>
-                        call move_place<target_ty>(
-                            [target_place],
-                            [target_address],
-                            [source_place],
-                            [source_address],
-                            [value.clone()],
-                            [lifetime.into()]
-                        )
-                    }]
-                } else {
-                    vec![stmtp! { statement.position =>
-                        call move_place<target_ty>(
-                            [target_place],
-                            [target_address],
-                            [source_place],
-                            [source_address],
-                            [value.clone()]
-                        )
-                    }]
-                };
+                // TODO: is target_ty okay for lifetimes?
+                let lifetimes_ty_expr = lowerer.extract_lifetime_variables_as_expr(target_ty)?;
+                let mut statements = vec![stmtp! { statement.position =>
+                    call move_place<target_ty>(
+                        [target_place],
+                        [target_address],
+                        [source_place],
+                        [source_address],
+                        [value.clone()];
+                        lifetimes_ty_expr
+                    )
+                }];
                 lowerer.encode_snapshot_update(
                     &mut statements,
                     &statement.target,

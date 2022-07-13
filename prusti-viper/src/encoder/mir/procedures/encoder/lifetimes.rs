@@ -432,7 +432,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
                 new_derived_lifetimes,
                 &mut lifetime_backups,
             )?;
-            self.encode_obtain_mut_ref(block_builder, location, &lifetime_backups)?;
             self.encode_lifetime_backups(block_builder, location, &lifetime_backups)?;
         }
         self.encode_lft_return(
@@ -456,6 +455,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             &reborrow_lifetimes,
         )?;
         self.encode_dead_inclusion(block_builder, location, &new_original_lifetimes)?;
+        if shorten_lifetimes {
+            self.encode_obtain_mut_ref(block_builder, location, &lifetime_backups)?;
+        }
         self.encode_bor_shorten(block_builder, location, &lifetime_backups)?;
 
         *old_original_lifetimes = new_original_lifetimes.clone();

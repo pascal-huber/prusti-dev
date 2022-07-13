@@ -306,6 +306,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             arguments.push(vir_low::Expression::full_permission());
         }
         arguments.push(expression.to_procedure_snapshot(self)?);
+        let mut lifetimes_expr = vec![];
+        for lifetime in expression.get_lifetimes() {
+            let snap = self.encode_lifetime_const_into_variable(lifetime)?;
+            lifetimes_expr.push(snap.into());
+        }
+        arguments.extend(lifetimes_expr);
         Ok(())
     }
     fn encode_place_arguments(
@@ -1127,9 +1133,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         });
         pres.push(predicate);
         pres.push(lifetime_token.clone());
+
+        // FIXME: is validity right here?
+        let operand_validity =
+            self.encode_snapshot_valid_call_for_type(operand_value.clone().into(), ty)?;
+        pres.push(operand_validity);
+        let result_validity =
+            self.encode_snapshot_valid_call_for_type(result_value.clone().into(), result_type)?;
         posts.push(lifetime_token);
         posts.push(reference_predicate);
         posts.push(restoration);
+        posts.push(result_validity);
         parameters.push(operand_place);
         parameters.push(operand_address);
         parameters.push(operand_value);
@@ -1353,8 +1367,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 target_root_address: Address,
                 source_place: Place,
                 source_root_address: Address,
-                source_value: {ty.to_snapshot(self)?},
-                lifetime: Lifetime
+                source_value: {ty.to_snapshot(self)?}
             };
             let source_address =
                 expr! { ComputeAddress::compute_address(source_place, source_root_address) };
@@ -1364,14 +1377,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 expr! { ComputeAddress::compute_address(target_place, target_root_address) };
             self.mark_owned_non_aliased_as_unfolded(ty)?;
             let type_decl = self.encoder.get_type_decl_mid(ty)?;
-            let lifetimes: Vec<vir_low::Expression> =
-                if let vir_mid::TypeDecl::Reference(_) = type_decl {
-                    vec![lifetime.clone().into()]
-                } else {
-                    vec![]
-                };
+            let lifetimes_ty_expr = self.extract_lifetime_variables_as_expr(ty)?;
             statements.push(stmtp! { position =>
-                unfold OwnedNonAliased<ty>(source_place, source_root_address, source_value; lifetimes)
+                unfold OwnedNonAliased<ty>(source_place, source_root_address, source_value; lifetimes_ty_expr)
             });
             match &type_decl {
                 vir_mid::TypeDecl::Bool
@@ -1399,78 +1407,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         unimplemented!()
                     }
                 }
-                vir_mid::TypeDecl::Trusted(_decl) => {
-                    // // FIXME: Remove duplication with vir_mid::TypeDecl::Struct
-                    // if decl.fields.is_empty() {
-                    //     self.encode_write_address_method(ty)?;
-                    //     statements.push(stmtp! { position =>
-                    //         // TODO: Replace with memcopy.
-                    //         call write_address<ty>([target_address], source_value)
-                    //     });
-                    // } else {
-                    //     // FIXME: support encode_memory_block_split_method for abstract types
-                    //     // here 1
-                    //     // dbg!(&ty);
-                    //     assert!(
-                    //         // !ty.is_trusted() && !ty.is_type_var(),
-                    //         !ty.is_type_var(),
-                    //         "Trying to split an abstract type."
-                    //     );
-                    //     if ty.is_trusted(){
-                    //         // FIXME: trusted should not land here
-                    //         println!("trusted");
-                    //         dbg!(&ty);
-                    //         return Ok(());
-                    //     }
-                    //     self.encode_memory_block_split_method(ty)?;
-                    //     statements.push(stmtp! {
-                    //         position =>
-                    //         call memory_block_split<ty>(
-                    //             [target_address], [vir_low::Expression::full_permission()]
-                    //         )
-                    //     });
-                    //     for field in &decl.fields {
-                    //         let source_field_place = self.encode_field_place(
-                    //             ty,
-                    //             field,
-                    //             source_place.clone().into(),
-                    //             position,
-                    //         )?;
-                    //         let target_field_place = self.encode_field_place(
-                    //             ty,
-                    //             field,
-                    //             target_place.clone().into(),
-                    //             position,
-                    //         )?;
-                    //         let source_field_value = self.obtain_struct_field_snapshot(
-                    //             ty,
-                    //             field,
-                    //             source_value.clone().into(),
-                    //             position,
-                    //         )?;
-                    //         let field_type = &field.ty;
-                    //         self.encode_move_place_method(field_type)?;
-                    //         statements.push(stmtp! { position =>
-                    //             call move_place<field_type>(
-                    //                 [target_field_place],
-                    //                 target_root_address,
-                    //                 [source_field_place],
-                    //                 source_root_address,
-                    //                 [source_field_value]
-                    //             )
-                    //         });
-                    //     }
-                    //     self.encode_memory_block_join_method(ty)?;
-                    //     statements.push(stmtp! {
-                    //         position =>
-                    //         call memory_block_join<ty>(
-                    //             [source_address], [vir_low::Expression::full_permission()]
-                    //         )
-                    //     });
-                    // }
-                }
-                vir_mid::TypeDecl::Struct(decl) => {
-                    if decl.fields.is_empty() {
+                vir_mid::TypeDecl::Trusted(vir_mid::type_decl::Trusted { fields, .. })
+                | vir_mid::TypeDecl::Struct(vir_mid::type_decl::Struct { fields, .. }) => {
+                    if fields.is_empty() {
                         self.encode_write_address_method(ty)?;
                         statements.push(stmtp! { position =>
                             // TODO: Replace with memcopy.
@@ -1488,7 +1427,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                 [target_address], [vir_low::Expression::full_permission()]
                             )
                         });
-                        for field in &decl.fields {
+                        for field in fields {
                             let source_field_place = self.encode_field_place(
                                 ty,
                                 field,
@@ -1643,7 +1582,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             let preconditions;
             let postconditions;
             statements.push(stmtp! { position =>
-                fold OwnedNonAliased<ty>(target_place, target_root_address, source_value; lifetimes)
+                fold OwnedNonAliased<ty>(target_place, target_root_address, source_value; lifetimes_ty_expr)
             });
             arguments = vec![
                 target_place.clone(),
@@ -1652,17 +1591,16 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 source_root_address.clone(),
                 source_value.clone(),
             ];
-            if let vir_mid::TypeDecl::Reference(_) = type_decl {
-                arguments.push(lifetime);
-            }
+            let lifetimes_ty = self.extract_lifetime_variables(ty)?;
+            arguments.extend(lifetimes_ty);
             let validity =
                 self.encode_snapshot_valid_call_for_type(source_value.clone().into(), ty)?;
             preconditions = vec![
                 expr! {(acc(MemoryBlock((ComputeAddress::compute_address(target_place, target_root_address)), [size_of.clone()])))},
-                expr! {(acc(OwnedNonAliased<ty>(source_place, source_root_address, source_value; lifetimes)))},
+                expr! {(acc(OwnedNonAliased<ty>(source_place, source_root_address, source_value; lifetimes_ty_expr)))},
             ];
             postconditions = vec![
-                expr! {(acc(OwnedNonAliased<ty>(target_place, target_root_address, source_value; lifetimes)))},
+                expr! {(acc(OwnedNonAliased<ty>(target_place, target_root_address, source_value; lifetimes_ty_expr)))},
                 expr! {(acc(MemoryBlock((ComputeAddress::compute_address(source_place, source_root_address)), [size_of])))},
                 expr! {(([bytes]) == (Snap<ty>::to_bytes(source_value)))},
                 expr! {[validity]},
@@ -2126,6 +2064,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         {
             use vir_low::macros::*;
             let method_name = self.encode_havoc_owned_non_aliased_method_name(ty)?;
+            let lifetimes_ty = self.extract_lifetime_variables(ty)?;
+            let lifetimes_ty_expr = self.extract_lifetime_variables_as_expr(ty)?;
             var_decls! {
                 place: Place,
                 root_address: Address,
@@ -2134,13 +2074,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             };
             let validity =
                 self.encode_snapshot_valid_call_for_type(fresh_value.clone().into(), ty)?;
+            let mut parameters = vec![place.clone(), root_address.clone(), old_value.clone()];
+            parameters.extend(lifetimes_ty);
             let method = vir_low::MethodDecl::new(
                 method_name,
-                vec![place.clone(), root_address.clone(), old_value.clone()],
+                parameters,
                 vec![fresh_value.clone()],
-                vec![expr! { (acc(OwnedNonAliased<ty>(place, root_address, old_value))) }],
                 vec![
-                    expr! { (acc(OwnedNonAliased<ty>(place, root_address, fresh_value))) },
+                    expr! { (acc(OwnedNonAliased<ty>(place, root_address, old_value; lifetimes_ty_expr))) },
+                ],
+                vec![
+                    expr! { (acc(OwnedNonAliased<ty>(place, root_address, fresh_value; lifetimes_ty_expr))) },
                     validity,
                 ],
                 None,
@@ -2878,10 +2822,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         let mut arguments = Vec::new();
         self.encode_operand_arguments(&mut arguments, &operand)?;
         let ty = operand.expression.get_type();
-        if let vir_mid::ty::Type::Reference(reference) = ty {
-            let lifetime = self.encode_lifetime_const_into_variable(reference.lifetime.clone())?;
-            arguments.push(lifetime.into());
-        }
+        let lifetimes_ty = self.extract_lifetime_variables_as_expr(ty)?;
+        arguments.extend(lifetimes_ty);
         statements.push(vir_low::Statement::method_call(
             method_name,
             arguments,
@@ -2899,17 +2841,20 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         match predicate {
             vir_mid::Predicate::OwnedNonAliased(predicate) => {
                 let ty = predicate.place.get_type();
-                self.mark_owned_non_aliased_as_unfolded(ty)?;
                 self.encode_havoc_owned_non_aliased_method(ty)?;
+                self.mark_owned_non_aliased_as_unfolded(ty)?;
+                let lifetimes_ty_expr = self.extract_lifetime_variables_as_expr(ty)?;
                 let place = self.encode_expression_as_place(&predicate.place)?;
                 let address = self.extract_root_address(&predicate.place)?;
                 let old_value = predicate.place.to_procedure_snapshot(self)?;
                 let snapshot_type = ty.to_snapshot(self)?;
                 let fresh_value = self.create_new_temporary_variable(snapshot_type)?;
                 let method_name = self.encode_havoc_owned_non_aliased_method_name(ty)?;
+                let mut arguments = vec![place, address, old_value];
+                arguments.extend(lifetimes_ty_expr);
                 statements.push(vir_low::Statement::method_call(
                     method_name,
-                    vec![place, address, old_value],
+                    arguments,
                     vec![fresh_value.clone().into()],
                     position,
                 ));
