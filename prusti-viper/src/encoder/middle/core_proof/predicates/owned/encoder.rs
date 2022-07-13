@@ -1129,7 +1129,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             // vir_mid::TypeDecl::Closure(Closure) => {},
             // vir_mid::TypeDecl::Unsupported(Unsupported) => {},
             x => {
-                dbg!(&ty);
                 unimplemented!("{}", x)
             }
         };

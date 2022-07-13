@@ -130,7 +130,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Lowerer<'p, 'v, 'tcx> {
                 )?),
             ];
             for statement in basic_block.statements {
-                // here 3
                 statements.extend(statement.into_low(&mut self)?);
             }
             let successor = basic_block.successor.into_low(&mut self)?;

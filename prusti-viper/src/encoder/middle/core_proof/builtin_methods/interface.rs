@@ -1396,6 +1396,9 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                 vir_mid::TypeDecl::TypeVar(_) => {
                     // move_place of a generic or trusted type has no body
                 }
+                vir_mid::TypeDecl::Trusted(_) => {
+                    // No body for Trusted
+                }
                 vir_mid::TypeDecl::Tuple(decl) => {
                     if decl.arguments.is_empty() {
                         self.encode_write_address_method(ty)?;
@@ -1407,9 +1410,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         unimplemented!()
                     }
                 }
-                vir_mid::TypeDecl::Trusted(vir_mid::type_decl::Trusted { fields, .. })
-                | vir_mid::TypeDecl::Struct(vir_mid::type_decl::Struct { fields, .. }) => {
-                    if fields.is_empty() {
+                vir_mid::TypeDecl::Struct(decl) => {
+                    if decl.fields.is_empty() {
                         self.encode_write_address_method(ty)?;
                         statements.push(stmtp! { position =>
                             // TODO: Replace with memcopy.
@@ -1427,7 +1429,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                 [target_address], [vir_low::Expression::full_permission()]
                             )
                         });
-                        for field in fields {
+                        for field in &decl.fields {
                             let source_field_place = self.encode_field_place(
                                 ty,
                                 field,
@@ -2107,9 +2109,7 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
         {
             // FIXME: support encode_memory_block_split_method for abstract types
             assert!(
-                // FIXME: fix this for trusted
-                // !ty.is_trusted() && !ty.is_type_var(),
-                !ty.is_type_var(),
+                !ty.is_trusted() && !ty.is_type_var(),
                 "Trying to split an abstract type."
             );
             if ty.is_trusted() {

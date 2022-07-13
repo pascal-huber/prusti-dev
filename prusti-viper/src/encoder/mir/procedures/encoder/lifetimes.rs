@@ -446,7 +446,12 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             old_original_lifetimes,
             &new_original_lifetimes,
         )?;
+        self.encode_dead_inclusion(block_builder, location, &new_original_lifetimes)?;
         self.encode_new_lft(block_builder, location, &lifetimes_to_create)?;
+        if shorten_lifetimes {
+            // needs to be before lft_take
+            self.encode_obtain_mut_ref(block_builder, location, &lifetime_backups)?;
+        }
         self.encode_lft_take(
             block_builder,
             location,
@@ -454,10 +459,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> LifetimesEncoder<'tcx> for ProcedureEncoder<'p, 'v, '
             new_derived_lifetimes,
             &reborrow_lifetimes,
         )?;
-        self.encode_dead_inclusion(block_builder, location, &new_original_lifetimes)?;
-        if shorten_lifetimes {
-            self.encode_obtain_mut_ref(block_builder, location, &lifetime_backups)?;
-        }
         self.encode_bor_shorten(block_builder, location, &lifetime_backups)?;
 
         *old_original_lifetimes = new_original_lifetimes.clone();

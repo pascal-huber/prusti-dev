@@ -102,7 +102,7 @@ fn nested_struct_with_shared_reference_assert_false () {
 //     x: &'a u32,
 // }
 // struct S6O<'a> {
-//     x: &'a S4I<'a>,
+//     x: &'a S6I<'a>,
 // }
 // fn nested_struct_same_lifetime_with_shared_reference () {
 //     let n = 4;

@@ -921,7 +921,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
             &deref_base,
             encoded_target.clone(),
         )?;
-
         match operand {
             mir::Operand::Move(source) => {
                 let encoded_source =

@@ -426,7 +426,6 @@ impl IntoLow for vir_mid::Statement {
                 let target_ty_without_lifetime = target_ty.clone().erase_lifetimes();
                 let source_ty_without_lifetime = source_ty.clone().erase_lifetimes();
                 assert_eq!(target_ty_without_lifetime, source_ty_without_lifetime);
-                // here 2
                 lowerer.encode_move_place_method(target_ty)?;
                 let target_place = lowerer.encode_expression_as_place(&statement.target)?;
                 let target_address = lowerer.extract_root_address(&statement.target)?;
