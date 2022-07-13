@@ -324,8 +324,7 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
         }
     }
     fn decode_type_high(&self, ty: &vir_high::Type) -> ty::Ty<'tcx> {
-        // FIXME: encoded_type_inverse contain both tys with and without lifetimes
-        // let ty_without_lifetime = &ty.clone().erase_lifetimes();
+        // FIXME: encoded_type_inverse currently contains both tys with and without lifetimes
         if let Some(ty_without_variant) = ty.forget_variant() {
             self.mir_type_encoder_state.encoded_types_inverse.borrow()[&ty_without_variant]
         } else if ty == &vir_high::Type::Lifetime {

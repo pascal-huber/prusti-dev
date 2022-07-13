@@ -371,8 +371,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> SnapshotVariablesInterface for Lowerer<'p, 'v, 'tcx> 
         &mut self,
         variable: &vir_mid::VariableDecl,
     ) -> SpannedEncodingResult<vir_low::VariableDecl> {
-        // FIXME: unwrap fails
-        // dbg!(&variable);
         let version = self
             .snapshots_state
             .current_variables

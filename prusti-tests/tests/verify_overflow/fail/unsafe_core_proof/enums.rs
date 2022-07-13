@@ -101,7 +101,6 @@ fn test7_assert_false(){
     assert!(false); //~ ERROR
 }
 
-// FIXME: enums with mixed mut and shared refences still cause issues
 struct C<'a>{
     x: &'a mut i32,
 }

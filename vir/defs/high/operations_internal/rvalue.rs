@@ -2,32 +2,80 @@ use super::{
     super::ast::{
         expression::Expression,
         position::Position,
-        rvalue::{visitors::RvalueWalker, Aggregate, Discriminant, OperandKind, Ref, Rvalue},
+        rvalue::{visitors::RvalueWalker, *},
         ty::*,
         variable::*,
     },
     ty::Typed,
 };
 
+impl Repeat {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
+        self.argument.get_lifetimes()
+    }
+}
+
 impl Ref {
-    // pub fn get_lifetimes(&self) -> Vec<LifetimeConst>{
-    //     // TODO: right?
-    //     self.place_lifetimes.clone()
-    // }
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
+        let mut lifetimes = vec![self.operand_lifetime.clone()];
+        lifetimes.extend(self.place_lifetimes.clone());
+        lifetimes
+    }
+}
+
+impl Reborrow {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
+        let mut lifetimes = vec![self.operand_lifetime.clone()];
+        lifetimes.extend(self.place_lifetimes.clone());
+        lifetimes
+    }
+}
+
+impl AddressOf {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
+        self.place.get_lifetimes()
+    }
+}
+
+impl Len {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
+        self.place.get_lifetimes()
+    }
+}
+
+impl BinaryOp {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
+        let mut lifetimes = self.left.get_lifetimes();
+        lifetimes.extend(self.right.get_lifetimes());
+        lifetimes
+    }
+}
+
+impl CheckedBinaryOp {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
+        let mut lifetimes = self.left.get_lifetimes();
+        lifetimes.extend(self.right.get_lifetimes());
+        lifetimes
+    }
+}
+
+impl UnaryOp {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
+        self.argument.get_lifetimes()
+    }
+}
+
+impl Discriminant {
+    pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
+        self.place.get_lifetimes()
+    }
 }
 
 impl Aggregate {
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         let mut lifetimes: Vec<LifetimeConst> = vec![];
         for operand in &self.operands {
-            match operand.kind {
-                OperandKind::Copy | OperandKind::Move => {
-                    let operand_ty = operand.expression.get_type();
-                    let operand_lifetimes = operand_ty.get_lifetimes();
-                    lifetimes.extend(operand_lifetimes);
-                }
-                _ => {}
-            }
+            lifetimes.extend(operand.get_lifetimes());
         }
         let lifetimes_ty = self.ty.get_lifetimes();
         lifetimes.extend(lifetimes_ty);
@@ -35,9 +83,9 @@ impl Aggregate {
     }
 }
 
-impl Discriminant {
+impl Operand {
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
-        self.place.get_lifetimes()
+        self.expression.get_lifetimes()
     }
 }
 
@@ -54,13 +102,16 @@ impl Rvalue {
 
     pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
         match self {
-            // TODO: add missing rvalue lifetime cases
-            // Rvalue::Ref(reference) => {
-            //     reference.get_lifetimes()
-            // }
-            Rvalue::Aggregate(value) => value.get_lifetimes(),
-            Rvalue::Discriminant(discriminant) => discriminant.get_lifetimes(),
-            _ => vec![],
+            Rvalue::Repeat(r) => r.get_lifetimes(),
+            Rvalue::Ref(r) => r.get_lifetimes(),
+            Rvalue::Reborrow(r) => r.get_lifetimes(),
+            Rvalue::AddressOf(r) => r.get_lifetimes(),
+            Rvalue::Len(r) => r.get_lifetimes(),
+            Rvalue::BinaryOp(r) => r.get_lifetimes(),
+            Rvalue::CheckedBinaryOp(r) => r.get_lifetimes(),
+            Rvalue::UnaryOp(r) => r.get_lifetimes(),
+            Rvalue::Discriminant(r) => r.get_lifetimes(),
+            Rvalue::Aggregate(r) => r.get_lifetimes(),
         }
     }
 

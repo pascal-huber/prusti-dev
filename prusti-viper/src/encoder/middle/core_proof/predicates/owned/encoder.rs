@@ -588,10 +588,15 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
     }
 
     fn encode_frac_ref(&mut self, ty: &vir_mid::Type) -> SpannedEncodingResult<()> {
-        if self.encoded_frac_borrow_predicates.contains(ty) {
+        let ty_without_lifetime = ty.clone().erase_lifetimes();
+        if self
+            .encoded_frac_borrow_predicates
+            .contains(&ty_without_lifetime)
+        {
             return Ok(());
         }
-        self.encoded_frac_borrow_predicates.insert(ty.clone());
+        self.encoded_frac_borrow_predicates
+            .insert(ty_without_lifetime);
         self.lowerer.encode_compute_address(ty)?;
         use vir_low::macros::*;
         let type_decl = self.lowerer.encoder.get_type_decl_mid(ty)?;

@@ -396,10 +396,7 @@ impl IntoLow for vir_mid::Statement {
                 let snapshot = statement.place.to_procedure_snapshot(lowerer)?;
                 let lifetime = lowerer.encode_lifetime_const_into_variable(statement.lifetime)?;
                 let validity = lowerer.encode_snapshot_valid_call_for_type(snapshot.clone(), ty)?;
-
-                // FIXME: add place lifetimes?
                 let ty_lifetimes = lowerer.extract_lifetime_variables_as_expr(ty)?;
-
                 let low_statement = if let Some(condition) = statement.condition {
                     let low_condition = lowerer.lower_block_marker_condition(condition)?;
                     stmtp! {
