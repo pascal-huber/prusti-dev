@@ -61,7 +61,6 @@ pub macro expr {
     )) ) => {
         {
             let mut arguments = vec![ $( $crate::low::macros::expr!( $argument ) ),* ];
-            // TODO: check if calling clone here is okay
             $( arguments.extend($argument_list.clone()); )?
             $crate::low::ast::expression::Expression::predicate_access_predicate_no_pos(
                 format!(

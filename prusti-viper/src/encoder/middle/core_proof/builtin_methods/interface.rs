@@ -919,7 +919,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             .collect();
         let lifetime_token =
             self.encode_lifetime_token(operand_lifetime.clone(), lifetime_perm.clone().into())?;
-        // let lifetimes_ty = self.extract_lifetime_variables(ty)?;
         let lifetimes_ty_expr = self.extract_lifetime_variables_as_expr(ty)?;
         let predicate = if reference_type.uniqueness.is_unique() {
             expr! {
@@ -1809,10 +1808,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                             )?;
                             let field_type = &field.ty;
                             let field_lifetimes = self.extract_lifetime_variables(field_type)?;
-                            if !field_lifetimes.is_empty() {
-                                encode_body = false;
-                            }
-                            if field_type.is_type_var() || field_type.is_trusted() {
+                            if !field_lifetimes.is_empty()
+                                || field_type.is_type_var()
+                                || field_type.is_trusted()
+                            {
                                 encode_body = false;
                             }
                             self.encode_write_place_method(field_type)?;
