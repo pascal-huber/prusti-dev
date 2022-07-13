@@ -117,69 +117,6 @@ impl Type {
             _ => vec![],
         }
     }
-    // pub fn get_lifetimes(&self) -> Vec<LifetimeConst> {
-    //     pub struct LifetimeFinder {
-    //         lifetimes: Vec<LifetimeConst>
-    //     }
-    //     impl TypeWalker for LifetimeFinder {
-    //         fn walk_reference(&mut self, reference: &Reference){
-    //             self.lifetimes.push(reference.lifetime.clone());
-    //         }
-    //         fn walk_sequence(&mut self, sequence: &Sequence){
-    //             self.lifetimes.extend(sequence.lifetimes.clone());
-    //         }
-    //         fn walk_map(&mut self, map: &Map){
-    //             self.lifetimes.extend(map.lifetimes.clone());
-    //         }
-    //         fn walk_array(&mut self, array: &Array){
-    //             self.lifetimes.extend(array.lifetimes.clone());
-    //         }
-    //         fn walk_slice(&mut self, slice: &Slice){
-    //             self.lifetimes.extend(slice.lifetimes.clone());
-    //         }
-    //         fn walk_struct(&mut self, struct_: &Struct){
-    //             self.lifetimes.extend(struct_.lifetimes.clone());
-    //             for ty in &struct_.arguments {
-    //                 default_walk_type(self, &ty);
-    //             }
-    //         }
-    //         fn walk_enum(&mut self, enum_: &Enum){
-    //             self.lifetimes.extend(enum_.lifetimes.clone());
-    //             for ty in &enum_.arguments {
-    //                 default_walk_type(self, &ty);
-    //             }
-    //         }
-    //         fn walk_projection(&mut self, projection: &Projection){
-    //             self.lifetimes.extend(projection.lifetimes.clone());
-    //             for ty in &projection.arguments {
-    //                 default_walk_type(self, &ty);
-    //             }
-    //         }
-    //         fn walk_trusted(&mut self, trusted: &Trusted){
-    //             self.lifetimes.extend(trusted.lifetimes.clone());
-    //             for ty in &trusted.arguments {
-    //                 default_walk_type(self, &ty);
-    //             }
-    //         }
-    //         fn walk_union(&mut self, union: &Union){
-    //             self.lifetimes.extend(union.lifetimes.clone());
-    //             for ty in &union.arguments {
-    //                 default_walk_type(self, &ty);
-    //             }
-    //         }
-    //     }
-    //     let mut finder = LifetimeFinder {
-    //         lifetimes: vec![]
-    //     };
-    //     finder.walk_type(self);
-    //     let mut unique_lifetimes = vec![];
-    //     for lifetime in &finder.lifetimes {
-    //         if !unique_lifetimes.contains(lifetime) {
-    //             unique_lifetimes.push(lifetime.clone());
-    //         }
-    //     }
-    //     unique_lifetimes
-    // }
     pub fn get_lifetimes_as_var(&self) -> Vec<VariableDecl> {
         let lifetimes_const = self.get_lifetimes();
         lifetimes_const

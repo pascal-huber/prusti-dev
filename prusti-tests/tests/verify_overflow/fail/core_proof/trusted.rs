@@ -2,7 +2,6 @@
 
 use prusti_contracts::*;
 
-// FIXME: trusted tests does not yet work
 #[trusted]
 struct GenericTrustedBox<T> {
     value: T,

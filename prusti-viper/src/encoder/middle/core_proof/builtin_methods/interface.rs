@@ -409,8 +409,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
             let mut encode_body = true;
             match value {
                 vir_mid::Rvalue::CheckedBinaryOp(value) => {
-                    // println!("---- assign binop: {}", method_name);
-                    // dbg!(&ty);
                     self.encode_assign_method_rvalue_checked_binary_op(
                         &mut parameters,
                         &mut pres,
@@ -423,9 +421,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     )?;
                 }
                 vir_mid::Rvalue::Reborrow(value) => {
-                    // println!("---- assign reborrow: {}", method_name);
-                    // dbg!(&ty);
-                    // dbg!(&args2);
                     self.encode_assign_method_rvalue_reborrow(
                         method_name,
                         parameters,
@@ -439,8 +434,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     return Ok(());
                 }
                 vir_mid::Rvalue::Ref(value) => {
-                    // println!("---- assign ref: {}", method_name);
-                    // dbg!(&ty);
                     self.encode_assign_method_rvalue_ref(
                         method_name,
                         parameters,
@@ -459,20 +452,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                     post_write_statements.push(stmtp! {
                         position => call write_place<ty>(target_place, target_address, result_value; args)
                     });
-
-                    // Get lifetimes of ty as snapshots
                     let mut lifetimes_ty: Vec<vir_low::Expression> = vec![];
                     for lifetime in ty.get_lifetimes() {
                         let snap = self.encode_lifetime_const_into_variable(lifetime)?;
                         lifetimes_ty.push(snap.into());
                     }
                     args2.extend(lifetimes_ty.clone());
-
-                    // Get lifetimes of rvalue (for parameters)
                     let lifetimes_rvalue = self.extract_lifetime_arguments_from_rvalue(value)?;
-                    // let lifetimes_rvalue_expr =
-                    //     self.extract_lifetime_arguments_from_rvalue_as_expr(value)?;
-
                     // FIXME: body is not encoded if we have additional lifetime
                     // parameters from structs.
                     // FIXME: As a workaround for #1065, we encode bodies only
@@ -2107,16 +2093,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             .encoded_memory_block_split_methods
             .contains(ty)
         {
-            // FIXME: support encode_memory_block_split_method for abstract types
             assert!(
                 !ty.is_trusted() && !ty.is_type_var(),
                 "Trying to split an abstract type."
             );
-            if ty.is_trusted() {
-                println!("trusted.");
-                dbg!(&ty);
-                return Ok(());
-            }
             use vir_low::macros::*;
             let method = if ty.has_variants() {
                 // TODO: remove code duplication with encode_memory_block_join_method

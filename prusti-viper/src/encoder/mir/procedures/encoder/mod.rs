@@ -616,7 +616,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> ProcedureEncoder<'p, 'v, 'tcx> {
                 let encoded_place = self.encoder.encode_place_high(self.mir, *place, None)?;
                 let region_name = region.to_text();
                 let operand_lifetime = vir_high::ty::LifetimeConst { name: region_name };
-
                 let root: vir_high::Expression = self
                     .encoder
                     .encode_local_high(self.mir, place.local)?
