@@ -36,7 +36,8 @@ struct S2<'a> {
 }
 fn struct_with_mut_reference () {
     let mut n = 4;
-    let mut t = S2{ x: &mut n};
+    let t = S2{ x: &mut n};
+    let u = &t;
 }
 fn struct_with_mut_reference_assert_false () {
     let mut n = 4;

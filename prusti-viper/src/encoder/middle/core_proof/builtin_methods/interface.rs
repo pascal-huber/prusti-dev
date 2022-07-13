@@ -1926,10 +1926,10 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                             )?;
                             let field_type = &field.ty;
                             let field_lifetimes = self.extract_lifetime_variables(field_type)?;
-                            if !field_lifetimes.is_empty() {
-                                encode_body = false;
-                            }
-                            if field_type.is_type_var() || field_type.is_trusted() {
+                            if !field_lifetimes.is_empty()
+                                || field_type.is_type_var()
+                                || field_type.is_trusted()
+                            {
                                 encode_body = false;
                             }
                             self.encode_write_place_method(field_type)?;
@@ -1973,6 +1973,13 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                             position,
                         )?;
                         let variant_ty = &ty.clone().variant(variant_index);
+                        let variant_lifetimes = self.extract_lifetime_variables(variant_ty)?;
+                        if !variant_lifetimes.is_empty()
+                            || variant_ty.is_type_var()
+                            || variant_ty.is_trusted()
+                        {
+                            encode_body = false;
+                        }
                         self.encode_write_place_method(variant_ty)?;
                         statements.push(stmtp! { position =>
                             call<condition> write_place<variant_ty>(
@@ -1993,6 +2000,14 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                         discriminant_call,
                         position,
                     )?;
+                    let discriminant_lifetimes =
+                        self.extract_lifetime_variables(discriminant_type)?;
+                    if !discriminant_lifetimes.is_empty()
+                        || discriminant_type.is_type_var()
+                        || discriminant_type.is_trusted()
+                    {
+                        encode_body = false;
+                    }
                     self.encode_write_place_method(discriminant_type)?;
                     statements.push(stmtp! { position =>
                         call write_place<discriminant_type>(
@@ -2060,16 +2075,17 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
             statements.push(stmtp! { position =>
                 fold OwnedNonAliased<ty>(place, root_address, value)
             });
-            let body = if ty.is_array() || (ty.is_struct() && !lifetime_args.is_empty()) || !encode_body {
-                // TODO: We currently make write_place bodyless for arrays
-                // because we would need builtin methods to support loops if we
-                // wanted to implement the body.
-                // TODO: We currently make write_place bodyless for structs with
-                //   reference-typed or generic or trusted fields
-                None
-            } else {
-                Some(statements)
-            };
+            let body =
+                if ty.is_array() || (ty.is_struct() && !lifetime_args.is_empty()) || !encode_body {
+                    // TODO: We currently make write_place bodyless for arrays
+                    // because we would need builtin methods to support loops if we
+                    // wanted to implement the body.
+                    // TODO: We currently make write_place bodyless for structs with
+                    //   reference-typed or generic or trusted fields
+                    None
+                } else {
+                    Some(statements)
+                };
             let mut parameters = vec![place.clone(), root_address.clone(), value.clone()];
             parameters.extend(self.extract_non_type_parameters_from_type(ty)?);
             let mut args = self.extract_non_type_parameters_from_type_as_exprs(ty)?;
