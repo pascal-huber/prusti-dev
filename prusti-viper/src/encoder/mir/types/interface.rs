@@ -169,18 +169,10 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
     ) -> SpannedEncodingResult<Vec<vir_high::ty::LifetimeConst>> {
         let mut lifetimes = vec![];
         for kind in substs.iter() {
-            match kind.unpack() {
-                // FIXME: try taking this out
-                // ty::subst::GenericArgKind::Type(arg_ty) => {
-                //     let lifetime = self.get_lifetimes_high(&arg_ty)?;
-                //     lifetimes.extend(lifetime);
-                // }
-                ty::subst::GenericArgKind::Lifetime(region) => {
-                    lifetimes.push(vir_high::ty::LifetimeConst {
-                        name: region.to_text(),
-                    });
-                }
-                _ => {}
+            if let ty::subst::GenericArgKind::Lifetime(region) = kind.unpack() {
+                lifetimes.push(vir_high::ty::LifetimeConst {
+                    name: region.to_text(),
+                });
             }
         }
         Ok(lifetimes)
@@ -324,7 +316,6 @@ impl<'v, 'tcx: 'v> MirTypeEncoderInterface<'tcx> for super::super::super::Encode
         }
     }
     fn decode_type_high(&self, ty: &vir_high::Type) -> ty::Ty<'tcx> {
-        // FIXME: encoded_type_inverse currently contains both tys with and without lifetimes
         if let Some(ty_without_variant) = ty.forget_variant() {
             self.mir_type_encoder_state.encoded_types_inverse.borrow()[&ty_without_variant]
         } else if ty == &vir_high::Type::Lifetime {

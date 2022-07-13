@@ -129,8 +129,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 let discriminant_call =
                     self.lowerer
                         .obtain_enum_discriminant(snapshot.clone().into(), ty, position)?;
-                // let mut enum_lifetimes = vec![];
-
                 let mut lifetimes_ty = vec![];
                 for lifetime in ty.get_lifetimes() {
                     lifetimes_ty.push(vir_low::VariableDecl {
@@ -164,7 +162,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         self.encode_owned_non_aliased(&variant_type)?;
                     }
                     let variant_type = &variant_type;
-
                     let lifetimes_field_ty: Vec<vir_low::VariableDecl> = variant_type
                         .get_lifetimes()
                         .iter()
@@ -370,7 +367,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 let target_type = &reference.target_type;
                 let deref_place = self.lowerer.reference_deref_place(place.into(), position)?;
                 self.encode_unique_ref(target_type)?;
-
                 let mut lifetimes_ty = vec![];
                 for lifetime in reference.target_type.get_lifetimes() {
                     lifetimes_ty.push(vir_low::VariableDecl {

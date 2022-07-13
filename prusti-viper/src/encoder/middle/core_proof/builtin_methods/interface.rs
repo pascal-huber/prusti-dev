@@ -260,7 +260,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
                 self.encode_operand_arguments(arguments, &value.right)?;
             }
             vir_mid::Rvalue::Discriminant(value) => {
-                // FIXME: add lifetimes for Rvalue::Discriminant
                 self.encode_place_arguments_with_permission(
                     arguments,
                     &value.place,
@@ -1119,8 +1118,6 @@ impl<'p, 'v: 'p, 'tcx: 'v> Private for Lowerer<'p, 'v, 'tcx> {
         });
         pres.push(predicate);
         pres.push(lifetime_token.clone());
-
-        // FIXME: is validity right here?
         let operand_validity =
             self.encode_snapshot_valid_call_for_type(operand_value.clone().into(), ty)?;
         pres.push(operand_validity);
@@ -2602,31 +2599,8 @@ impl<'p, 'v: 'p, 'tcx: 'v> BuiltinMethodsInterface for Lowerer<'p, 'v, 'tcx> {
                                     )
                                 });
                             },
-                            vir_mid::TypeDecl::Trusted(decl) => {
-                                // into_memory_block for trusted types is
-                                // trusted and has no statements.
-                                // FIXME: Remove duplication with vir_mid::TypeDecl::Struct
-                                for field in decl.iter_fields() {
-                                    let field_place = self.encode_field_place(
-                                        ty, &field, place.clone().into(), position
-                                    )?;
-                                    let field_value = self.obtain_struct_field_snapshot(
-                                        ty, &field, value.clone().into(), position
-                                    )?;
-                                    self.encode_into_memory_block_method(&field.ty)?;
-                                    let field_ty = &field.ty;
-                                    statements.push(stmtp! {
-                                        position =>
-                                        call into_memory_block<field_ty>([field_place], root_address, [field_value])
-                                    });
-                                }
-                                self.encode_memory_block_join_method(ty)?;
-                                statements.push(stmtp! {
-                                    position =>
-                                    call memory_block_join<ty>(
-                                        [address.clone()], [vir_low::Expression::full_permission()]
-                                    )
-                                });
+                            vir_mid::TypeDecl::Trusted(_) => {
+                                // into_memory_block for trusted types is trusted and has no statements.
                             },
                             vir_mid::TypeDecl::Struct(decl) => {
                                 // TODO: Remove code duplication.
