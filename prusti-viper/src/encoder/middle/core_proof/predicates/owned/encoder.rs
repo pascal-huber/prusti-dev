@@ -136,7 +136,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         ty: ty!(Lifetime),
                     });
                 }
-
                 for (&discriminant, variant) in decl.discriminant_values.iter().zip(&decl.variants)
                 {
                     let variant_index = variant.name.clone().into();
@@ -772,9 +771,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             // vir_mid::TypeDecl::Never => {},
             // vir_mid::TypeDecl::Closure(Closure) => {},
             // vir_mid::TypeDecl::Unsupported(Unsupported) => {},
-            x => {
-                unimplemented!("{}", x)
-            }
+            x => unimplemented!("{}", x),
         };
         self.predicates.push(predicate);
         Ok(())
@@ -957,8 +954,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         position,
                     )?;
                     let variant_type = &ty.clone().variant(variant_index);
-                    // FIXME: check if variant_type is a shared reference
-                    self.encode_unique_ref(variant_type)?;
                     let lifetimes_variant_ty: Vec<vir_low::VariableDecl> = variant_type
                         .get_lifetimes()
                         .iter()
@@ -1099,9 +1094,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             // vir_mid::TypeDecl::Never => {},
             // vir_mid::TypeDecl::Closure(Closure) => {},
             // vir_mid::TypeDecl::Unsupported(Unsupported) => {},
-            x => {
-                unimplemented!("{}", x)
-            }
+            x => unimplemented!("{}", x),
         };
         self.predicates.push(predicate);
         Ok(())

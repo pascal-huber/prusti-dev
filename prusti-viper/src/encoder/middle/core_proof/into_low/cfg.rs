@@ -432,7 +432,6 @@ impl IntoLow for vir_mid::Statement {
                 let source_place = lowerer.encode_expression_as_place(&statement.source)?;
                 let source_address = lowerer.extract_root_address(&statement.source)?;
                 let value = statement.source.to_procedure_snapshot(lowerer)?;
-                // TODO: is target_ty okay for lifetimes?
                 let lifetimes_ty_expr = lowerer.extract_lifetime_variables_as_expr(target_ty)?;
                 let mut statements = vec![stmtp! { statement.position =>
                     call move_place<target_ty>(

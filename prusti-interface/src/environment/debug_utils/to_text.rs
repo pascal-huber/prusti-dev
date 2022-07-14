@@ -68,10 +68,10 @@ impl ToText for prusti_rustc_interface::middle::ty::BoundRegionKind {
     fn to_text(&self) -> String {
         match self {
             prusti_rustc_interface::middle::ty::BoundRegionKind::BrAnon(id) => {
-                format!("lft_anon_{}", id)
+                format!("lft_br_anon_{}", id)
             }
             prusti_rustc_interface::middle::ty::BoundRegionKind::BrNamed(_, name) => {
-                name.to_string()
+                format!("lft_br_named_{}", name)
             }
             prusti_rustc_interface::middle::ty::BoundRegionKind::BrEnv => "lft_br_env".to_string(),
         }
