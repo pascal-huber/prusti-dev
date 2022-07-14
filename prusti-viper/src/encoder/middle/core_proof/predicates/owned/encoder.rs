@@ -414,7 +414,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                 )?;
                 let target_type = &reference.target_type;
                 let deref_place = self.lowerer.reference_deref_place(place.into(), position)?;
-                // TODO: is this "frac_ref" right?
                 self.encode_frac_ref(target_type)?;
                 let mut lifetimes_ty = vec![];
                 for lifetime in reference.target_type.get_lifetimes() {
@@ -618,6 +617,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         .cloned()
                         .map(|x| x.into())
                         .collect();
+                    // NOTE: field_ty may be a mutable reference
                     self.encode_frac_ref(field_ty)?;
                     let acc = expr! {
                         acc(FracRef<field_ty>(
@@ -687,6 +687,7 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         .cloned()
                         .map(|x| x.into())
                         .collect();
+                    // NOTE: variant_type may be a mutable reference
                     self.encode_frac_ref(&variant_type)?;
                     let variant_type = &variant_type;
                     let acc = expr! {
@@ -754,7 +755,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             // vir_mid::TypeDecl::Array(Array) => {},
             vir_mid::TypeDecl::Reference(reference) => {
                 // NOTE: regardless if the reference is shared or unique, we encode FracRef here
-                // TODO: is this right?
                 let target_type = &reference.target_type;
                 self.encode_frac_ref(target_type)?;
                 let mut parameters = vec![place, root_address, snapshot, lifetime];
@@ -773,7 +773,6 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
             // vir_mid::TypeDecl::Closure(Closure) => {},
             // vir_mid::TypeDecl::Unsupported(Unsupported) => {},
             x => {
-                dbg!(&x);
                 unimplemented!("{}", x)
             }
         };
@@ -866,40 +865,35 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         .map(|x| x.into())
                         .collect();
                     field_lifetimes.extend(lifetimes_field_ty.clone());
-                    let is_frac_ref = {
-                        if field_ty.is_reference() {
-                            let reference = field_ty.clone().unwrap_reference();
-                            reference.uniqueness.is_shared()
-                        } else {
-                            false
+                    if field_ty.is_reference() {
+                        let reference = field_ty.clone().unwrap_reference();
+                        if reference.uniqueness.is_shared() {
+                            self.encode_frac_ref(field_ty)?;
+                            let acc = expr! {
+                                acc(FracRef<field_ty>(
+                                    [field_place],
+                                    root_address,
+                                    [current_field_snapshot],
+                                    lifetime;
+                                    lifetimes_field_ty_expr
+                                ))
+                            };
+                            field_predicates.push(acc);
+                            continue;
                         }
-                    };
-                    if is_frac_ref {
-                        self.encode_frac_ref(field_ty)?;
-                        let acc = expr! {
-                            acc(FracRef<field_ty>(
-                                [field_place],
-                                root_address,
-                                [current_field_snapshot],
-                                lifetime;
-                                lifetimes_field_ty_expr
-                            ))
-                        };
-                        field_predicates.push(acc);
-                    } else {
-                        self.encode_unique_ref(field_ty)?;
-                        let acc = expr! {
-                            acc(UniqueRef<field_ty>(
-                                [field_place],
-                                root_address,
-                                [current_field_snapshot],
-                                [final_field_snapshot],
-                                lifetime;
-                                lifetimes_field_ty_expr
-                            ))
-                        };
-                        field_predicates.push(acc);
                     }
+                    self.encode_unique_ref(field_ty)?;
+                    let acc = expr! {
+                        acc(UniqueRef<field_ty>(
+                            [field_place],
+                            root_address,
+                            [current_field_snapshot],
+                            [final_field_snapshot],
+                            lifetime;
+                            lifetimes_field_ty_expr
+                        ))
+                    };
+                    field_predicates.push(acc);
                 }
                 if field_predicates.is_empty() {
                     // FIXME: add MemoryBlock predicate unimplemented!();
@@ -979,6 +973,25 @@ impl<'l, 'p, 'v, 'tcx> PredicateEncoder<'l, 'p, 'v, 'tcx> {
                         .cloned()
                         .map(|x| x.into())
                         .collect();
+                    if variant_type.is_reference() {
+                        let reference = variant_type.clone().unwrap_reference();
+                        if reference.uniqueness.is_shared() {
+                            self.encode_frac_ref(variant_type)?;
+                            let acc = expr! {
+                                ([ discriminant_current_call.clone() ] == [ discriminant.into() ]) ==>
+                                (acc(FracRef<variant_type>(
+                                    [variant_place],
+                                    root_address,
+                                    [current_variant_snapshot],
+                                    lifetime;
+                                    lifetimes_variant_ty_expr
+                                )))
+                            };
+                            variant_predicates.push(acc);
+                            continue;
+                        }
+                    }
+                    self.encode_unique_ref(variant_type)?;
                     let acc = expr! {
                         ([ discriminant_current_call.clone() ] == [ discriminant.into() ]) ==>
                         (acc(UniqueRef<variant_type>(

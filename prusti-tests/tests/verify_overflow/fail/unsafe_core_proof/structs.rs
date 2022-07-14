@@ -23,12 +23,13 @@ fn simple_struct_shared() {
     let mut x = S1{ x: 4 };
     let y = &x;
     let z = &x;
+    assert!(z.x == 4);
 }
 fn simple_struct_shared_assert_false() {
     let mut x = S1{ x: 4 };
     let y = &x;
     let z = &x;
-    assert!(false);      //~ ERROR: the asserted expression might not hold
+    assert!(z.x == 5);      //~ ERROR: the asserted expression might not hold
 }
 
 struct S2<'a> {
@@ -42,6 +43,7 @@ fn struct_with_mut_reference () {
 fn struct_with_mut_reference_assert_false () {
     let mut n = 4;
     let mut t = S2{ x: &mut n};
+    let u = &t;
     assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 
@@ -49,14 +51,16 @@ struct S3<'a> {
     x: &'a u32,
 }
 fn struct_with_shared_reference () {
-    let mut n = 4;
-    let mut t = S3{ x: &n};
-    let mut u = S3{ x: &n};
+    let n = 4;
+    let mut t1 = S3{ x: &n};
+    let mut t2 = S3{ x: &n};
+    let u = &mut t2;
 }
 fn struct_with_shared_reference_assert_false () {
-    let mut n = 4;
-    let mut t = S3{ x: &n};
-    let mut u = S3{ x: &n};
+    let n = 4;
+    let mut t1 = S3{ x: &n};
+    let mut t2 = S3{ x: &n};
+    let u = &mut t2;
     assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 
@@ -96,7 +100,6 @@ fn nested_struct_with_shared_reference_assert_false () {
     assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 
-
 // FIXME: Nested structs with "shared" lifetimes don't work due to "lifetime extension"
 // struct S6I<'a> {
 //     x: &'a u32,
@@ -117,18 +120,18 @@ fn nested_struct_with_shared_reference_assert_false () {
 // }
 
 // FIXME: accessing references of structs panics
-// struct S3<'a> {
+// struct S7<'a> {
 //     x: &'a mut u32,
 // }
 // fn struct_with_reference_and_access () {
 //     let mut n = 4;
-//     let mut t = S2{ x: &mut n};
+//     let mut t = S7{ x: &mut n};
 //     *t.x = 5;
 // }
 // FIXME: accessing references of structs panics
 // fn struct_with_reference_and_access_assert_false () {
 //     let mut n = 4;
-//     let mut t = S2{ x: &mut n};
+//     let mut t = S7{ x: &mut n};
 //     *t.x = 5;
 //     assert!(false);           the asserted expression might not hold
 // }

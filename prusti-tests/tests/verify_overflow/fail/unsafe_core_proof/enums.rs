@@ -14,7 +14,7 @@ fn test1() {
 fn test1_assert_false() {
     let x = Enum1::A(4);
     let y = &x;
-    assert!(false); //~ ERROR
+    assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 fn test2() {
     let mut x = Enum1::A(4);
@@ -25,7 +25,7 @@ fn test2_assert_false() {
     let mut x = Enum1::A(4);
     let mut y = &mut x;
     let z = &mut y;
-    assert!(false); //~ ERROR
+    assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 
 enum Enum2<'a> {
@@ -41,7 +41,7 @@ fn test3_assert_false() {
     let mut n = 4;
     let x = Enum2::A(&mut n);
     let y = &x;
-    assert!(false); //~ ERROR
+    assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 fn test4() {
     let n = 4;
@@ -52,7 +52,7 @@ fn test4_assert_false() {
     let n = 4;
     let x = Enum2::B(&n);
     let y = &x;
-    assert!(false); //~ ERROR
+    assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 fn test5() {
     let mut n = 4;
@@ -63,7 +63,7 @@ fn test5_assert_false() {
     let mut n = 4;
     let mut x = Enum2::A(&mut n);
     let y = &mut x;
-    assert!(false); //~ ERROR
+    assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 fn test6() {
     let n = 4;
@@ -74,7 +74,7 @@ fn test6_assert_false() {
     let n = 4;
     let mut x = Enum2::B(&n);
     let y = &mut x;
-    assert!(false); //~ ERROR
+    assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 
 struct A<'a>{
@@ -98,7 +98,7 @@ fn test7_assert_false(){
     let mut b = B{ x: &mut n };
     let mut x = Enum3::B(&mut b);
     let y = &mut x;
-    assert!(false); //~ ERROR
+    assert!(false);      //~ ERROR: the asserted expression might not hold
 }
 
 struct C<'a>{
@@ -112,13 +112,30 @@ enum Enum4<'a, 'b> {
     B(&'b C<'a>),
 }
 fn test8(){
+    // Enum with shared reference to struct with mutable reference
     let mut n = 5;
-    let mut b = C{ x: &mut n };
-    let mut x = Enum4::B(&b);
+    let mut c = C{ x: &mut n };
+    let mut x = Enum4::B(&c);
+    let r = &mut x;
 }
 fn test8_assert_false(){
     let mut n = 5;
-    let mut b = C{ x: &mut n };
-    let mut x = Enum4::B(&b);
-    assert!(false); //~ ERROR
+    let mut c = C{ x: &mut n };
+    let mut x = Enum4::B(&c);
+    let r = &mut x;
+    assert!(false);      //~ ERROR: the asserted expression might not hold
+}
+fn test9(){
+    // Enum with mutable reference to struct with shared reference
+    let n = 5;
+    let mut d = D{ x: &n };
+    let mut a = Enum4::A(&mut d);
+    let r = &mut a;
+}
+fn test9_assert_false(){
+    let n = 5;
+    let mut b = D{ x: &n };
+    let mut e = Enum4::A(&mut b);
+    let r = &mut e;
+    assert!(false);      //~ ERROR: the asserted expression might not hold
 }
