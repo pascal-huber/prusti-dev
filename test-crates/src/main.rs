@@ -15,6 +15,7 @@ use log::{error, info, warn, LevelFilter};
 use rustwide::{cmd, logging, logging::LogStorage, Crate, Toolchain, WorkspaceBuilder};
 use serde::Deserialize;
 use clap::Parser;
+use rustwide::cmd::SandboxImage;
 
 /// How a crate should be tested. All tests use `check_panics=false`, `check_overflows=false` and
 /// `skip_unsupported_features=true`.
@@ -65,7 +66,7 @@ impl cmd::Runnable for CargoPrusti {
         cmd.env("VIPER_HOME", self.viper_home.to_str().unwrap())
             .env("Z3_EXE", self.z3_exe.join("z3").to_str().unwrap())
             .env("JAVA_HOME", java_home)
-            .env("CARGO_PATH", "/opt/rustwide/cargo-home/bin/cargo")
+            .env("CARGO_HOME", "/opt/rustwide/cargo-home/bin/cargo")
     }
 }
 
@@ -166,7 +167,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("Crate a new workspace...");
     // `Error: Compat { error: SandboxImagePullFailed(ExecutionFailed(ExitStatus(unix_wait_status(256)))) }` if
     // docker daemon isn't running
-    let workspace = WorkspaceBuilder::new(workspace_path, "prusti-test-crates").init()?;
+    let mut workspace_builder = WorkspaceBuilder::new(workspace_path, "prusti-test-crates");
+    let sandbox_image = SandboxImage::local("prusti-test-crates:latest")?;
+    workspace_builder = WorkspaceBuilder::sandbox_image(workspace_builder, sandbox_image);
+    let workspace = workspace_builder.init()?;
 
     info!("Install the toolchain...");
     let rust_toolchain = get_rust_toolchain();
